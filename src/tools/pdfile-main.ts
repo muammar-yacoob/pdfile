@@ -55,6 +55,13 @@ export async function runGUI(file: string): Promise<boolean> {
 			});
 		});
 
+		// Serve the actual PDF file for preview
+		app.get('/pdf/:filename', (_req, res) => {
+			res.setHeader('Content-Type', 'application/pdf');
+			res.setHeader('Content-Disposition', 'inline');
+			res.sendFile(file);
+		});
+
 		// Start server on random port
 		const server = createServer(app);
 		server.listen(0, '127.0.0.1', () => {

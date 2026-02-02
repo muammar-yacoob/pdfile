@@ -7,7 +7,6 @@ import { registerInstallCommand } from './commands/install.js';
 import { registerUninstallCommand } from './commands/uninstall.js';
 import { registerMergePdfsCommand } from './commands/merge-pdfs.js';
 import { registerPdfToWordCommand } from './commands/pdf-to-word.js';
-import { registerAddImageOverlayCommand } from './commands/add-image-overlay.js';
 import { registerRemovePagesCommand } from './commands/remove-pages.js';
 import { registerReorderPagesCommand } from './commands/reorder-pages.js';
 import { registerInsertDateCommand } from './commands/insert-date.js';
@@ -33,9 +32,6 @@ export function showHelp(): void {
 	);
 	console.log(
 		`    ${cmd('to-word')} ${arg('<file>')}            Convert PDF to Word document`,
-	);
-	console.log(
-		`    ${cmd('add-image')} ${arg('<pdf> <image>')}   Add image overlay to PDF`,
 	);
 	console.log(
 		`    ${cmd('sign')} ${arg('<pdf> <signature>')}    Add signature to PDF`,
@@ -68,7 +64,6 @@ export function showHelp(): void {
 	console.log(`    ${dim('$')} pdfile ${cmd('to-word')} ${arg('doc.pdf')}                        ${dim('# Convert to Word')}`);
 	console.log(`    ${dim('$')} pdfile ${cmd('sign')} ${arg('doc.pdf signature.png')}           ${dim('# Add signature')}`);
 	console.log(`    ${dim('$')} pdfile ${cmd('insert-date')} ${arg('doc.pdf')}                    ${dim("# Insert today's date")}`);
-	console.log(`    ${dim('$')} pdfile ${cmd('add-image')} ${arg('doc.pdf logo.png')} ${opt('--opacity 0.5')}  ${dim('# Watermark')}`);
 	console.log(`    ${dim('$')} pdfile ${cmd('remove-pages')} ${arg('doc.pdf')} ${opt('-p 1,3,5')}         ${dim('# Remove pages')}`);
 	console.log(`    ${dim('$')} pdfile ${cmd('reorder')} ${arg('doc.pdf')} ${opt('-n 3,1,2')}               ${dim('# Reorder pages')}`);
 	console.log();
@@ -101,7 +96,6 @@ export function createProgram(): Command {
 	registerUninstallCommand(program);
 	registerMergePdfsCommand(program);
 	registerPdfToWordCommand(program);
-	registerAddImageOverlayCommand(program);
 	registerAddSignatureCommand(program);
 	registerInsertDateCommand(program);
 	registerRemovePagesCommand(program);

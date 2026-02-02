@@ -68,9 +68,6 @@ export function registerInstallCommand(program: Command): void {
 			console.log(
 				`    ${cmd('to-word')} ${arg('<file>')}        Convert PDF to Word document`,
 			);
-			console.log(
-				`    ${cmd('add-image')} ${arg('<pdf> <img>')} Add image overlay to PDF`,
-			);
 			console.log();
 			console.log(head('  Setup'));
 			console.log(`    ${cmd('install')}              Add Windows right-click menu`);
@@ -87,7 +84,6 @@ export function registerInstallCommand(program: Command): void {
 			console.log(head('  Examples'));
 			console.log(`    ${dim('$')} pdfile ${cmd('merge')} ${arg('file1.pdf file2.pdf')}   ${dim('# Merge PDFs')}`);
 			console.log(`    ${dim('$')} pdfile ${cmd('to-word')} ${arg('doc.pdf')}             ${dim('# Convert to Word')}`);
-			console.log(`    ${dim('$')} pdfile ${cmd('add-image')} ${arg('doc.pdf logo.png')} ${dim('# Add logo')}`);
 			console.log(`    ${dim('$')} pdfile ${cmd('remove-pages')} ${arg('doc.pdf')} ${opt('-p 1,3')} ${dim('# Remove pages')}`);
 			console.log(`    ${dim('$')} pdfile ${cmd('reorder')} ${arg('doc.pdf')} ${opt('-n 3,1,2')}    ${dim('# Reorder pages')}`);
 			console.log(

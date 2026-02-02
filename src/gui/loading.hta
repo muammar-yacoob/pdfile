@@ -24,19 +24,17 @@
 />
 <style>
   *{margin:0;padding:0;cursor:default}
-  html{height:100%;background:#000}
-  body{height:100%;overflow:hidden;background:linear-gradient(180deg,#1a1a2e 0%,#16213e 100%);font-family:Segoe UI,sans-serif;color:#e4e4e7;text-align:center;padding:24px;opacity:1;transition:opacity .3s ease-out;border:1px solid #333;border-radius:8px;box-sizing:border-box}
+  html,body{height:100%;width:100%;background:#000;overflow:hidden}
+  body{display:flex;flex-direction:column;background-image:url('img/pdfile-loading-bg.png');background-size:cover;background-position:center;background-repeat:no-repeat;font-family:Segoe UI,sans-serif;color:#fff;opacity:1;transition:opacity .3s ease-out;border:none;box-sizing:border-box;justify-content:flex-end}
   body.fade-out{opacity:0}
-  .logo{width:80px;height:80px;margin-bottom:8px}
-  .title{font-size:28px;font-weight:700;color:#7fa5df;margin-bottom:2px}
-  .tagline{font-size:10px;color:#a3b8d9;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
-  .desc{font-size:10px;color:#636366;margin-bottom:14px}
-  .progress{font-size:14px;color:#7fa5df;font-weight:600;margin-bottom:8px;min-height:18px}
+  .footer{padding:20px 16px 16px;text-align:center;background:linear-gradient(to top,rgba(0,0,0,0.9) 0%,rgba(0,0,0,0.7) 60%,transparent 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+  .website{font-size:13px;color:#7fa5df;text-decoration:none;font-weight:600;transition:color .2s;text-shadow:0 2px 4px rgba(0,0,0,0.5)}
+  .website:hover{color:#a3b8d9}
 </style>
 <script language="javascript">
-  var w = 280, h = 330;
+  var w = 320, h = 400;  // Compact loading window
   window.resizeTo(w, h);
-  window.moveTo((screen.availWidth - w) / 2, (screen.availHeight - h) / 2.5);
+  window.moveTo((screen.availWidth - w) / 2, (screen.availHeight - h) / 2);
 
   // Drag support for borderless window
   var isDragging = false, dragX = 0, dragY = 0;
@@ -118,10 +116,8 @@
 </script>
 </head>
 <body>
-  <img class="logo" src="img/logo.ico">
-  <div class="title">PDFile</div>
-  <div class="tagline">PDF Utility Toolkit</div>
-  <div class="desc">Comprehensive document manipulation tools</div>
-  <div class="progress" id="progress">Loading...</div>
+  <div class="footer">
+    <a class="website" href="#" onclick="shell.Run('https://pdfile.co');return false">pdfile.co</a>
+  </div>
 </body>
 </html>
