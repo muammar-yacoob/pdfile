@@ -1,0 +1,109 @@
+import { PDFDocument } from 'pdf-lib';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+
+export interface AddImageOverlayConfig {
+	extensions: string[];
+	outputSuffix: string;
+}
+
+export const config: AddImageOverlayConfig = {
+	extensions: ['.pdf'],
+	outputSuffix: '_with_overlay',
+};
+
+export interface ImageOverlayOptions {
+	imagePath: string;
+	x?: number;
+	y?: number;
+	width?: number;
+	height?: number;
+	opacity?: number;
+	pages?: number[]; // Specific page numbers (0-indexed), or all pages if undefined
+}
+
+/**
+ * Add an image overlay to a PDF
+ * @param inputFile PDF file path
+ * @param options Image overlay configuration
+ * @param outputPath Output path for the modified PDF
+ * @returns Success status
+ */
+export async function addImageOverlay(
+	inputFile: string,
+	options: ImageOverlayOptions,
+	outputPath?: string,
+): Promise<boolean> {
+	try {
+		// Load PDF
+		const pdfBytes = await fs.readFile(inputFile);
+		const pdfDoc = await PDFDocument.load(pdfBytes);
+
+		// Load image
+		const imageBytes = await fs.readFile(options.imagePath);
+		const imageExt = path.extname(options.imagePath).toLowerCase();
+
+		let image;
+		if (imageExt === '.png') {
+			image = await pdfDoc.embedPng(imageBytes);
+		} else if (imageExt === '.jpg' || imageExt === '.jpeg') {
+			image = await pdfDoc.embedJpg(imageBytes);
+		} else {
+			throw new Error(
+				'Unsupported image format. Use PNG or JPG/JPEG images only.',
+			);
+		}
+
+		// Get image dimensions
+		const imageDims = image.scale(1);
+
+		// Determine which pages to apply overlay to
+		const pages = pdfDoc.getPages();
+		const targetPages = options.pages
+			? options.pages.map((pageNum) => pages[pageNum])
+			: pages;
+
+		// Apply overlay to target pages
+		for (const page of targetPages) {
+			const { width: pageWidth, height: pageHeight } = page.getSize();
+
+			// Calculate position and size
+			const x = options.x ?? (pageWidth - (options.width ?? imageDims.width)) / 2;
+			const y = options.y ?? (pageHeight - (options.height ?? imageDims.height)) / 2;
+			const width = options.width ?? imageDims.width;
+			const height = options.height ?? imageDims.height;
+			const opacity = options.opacity ?? 1.0;
+
+			// Draw image
+			page.drawImage(image, {
+				x,
+				y,
+				width,
+				height,
+				opacity,
+			});
+		}
+
+		// Determine output path
+		const outputFilePath =
+			outputPath ||
+			path.join(
+				path.dirname(inputFile),
+				`${path.basename(inputFile, '.pdf')}${config.outputSuffix}.pdf`,
+			);
+
+		// Save with compression
+		const savedPdfBytes = await pdfDoc.save({
+			useObjectStreams: true,
+			addDefaultPage: false,
+		});
+
+		await fs.writeFile(outputFilePath, savedPdfBytes);
+		console.log(`✓ PDF with image overlay saved to: ${outputFilePath}`);
+
+		return true;
+	} catch (error) {
+		console.error('Error adding image overlay:', error);
+		return false;
+	}
+}

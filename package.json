@@ -1,0 +1,73 @@
+{
+	"name": "@spark-apps/pdfile",
+	"version": "1.0.0",
+	"description": "Comprehensive PDF utility toolkit for document manipulation",
+	"type": "module",
+	"bin": {
+		"pdfile": "dist/cli.js"
+	},
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write .",
+		"typecheck": "tsc --noEmit",
+		"prepublishOnly": "bun run build"
+	},
+	"keywords": [
+		"pdf",
+		"pdf-tools",
+		"pdf-merge",
+		"pdf-to-word",
+		"pdf-converter",
+		"pdf-manipulation",
+		"document",
+		"cli",
+		"context-menu"
+	],
+	"author": "spark-apps",
+	"license": "AGPL-3.0",
+	"publishConfig": {
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/muammar-yacoob/PDFile.git"
+	},
+	"bugs": {
+		"url": "https://github.com/muammar-yacoob/PDFile/issues"
+	},
+	"homepage": "https://github.com/muammar-yacoob/PDFile#readme",
+	"engines": {
+		"node": ">=18"
+	},
+	"os": [
+		"linux"
+	],
+	"files": [
+		"dist"
+	],
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@types/express": "^5.0.6",
+		"@types/figlet": "^1.7.0",
+		"@types/gradient-string": "^1.1.6",
+		"@types/node": "^22.0.0",
+		"@types/pdf-parse": "^1.1.4",
+		"@types/prompts": "^2.4.9",
+		"tsup": "^8.5.0",
+		"typescript": "^5.7.0"
+	},
+	"dependencies": {
+		"chalk": "^5.6.2",
+		"commander": "^14.0.2",
+		"docx": "^9.0.1",
+		"express": "^5.2.1",
+		"figlet": "^1.8.0",
+		"gradient-string": "^3.0.0",
+		"pdf-lib": "^1.17.1",
+		"pdf-parse": "^1.1.1",
+		"prompts": "^2.4.2"
+	}
+}

@@ -1,0 +1,127 @@
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>PDFile Loading</title>
+<hta:application
+  id="PDFileLoader"
+  applicationName="PDFile"
+  icon="logo.ico"
+  border="none"
+  borderStyle="normal"
+  caption="no"
+  innerBorder="no"
+  maximizeButton="no"
+  minimizeButton="no"
+  showInTaskbar="yes"
+  singleInstance="yes"
+  scroll="no"
+  contextMenu="no"
+  selection="no"
+  sysmenu="no"
+/>
+<style>
+  *{margin:0;padding:0;cursor:default}
+  html{height:100%;background:#000}
+  body{height:100%;overflow:hidden;background:linear-gradient(180deg,#1a1a2e 0%,#16213e 100%);font-family:Segoe UI,sans-serif;color:#e4e4e7;text-align:center;padding:24px;opacity:1;transition:opacity .3s ease-out;border:1px solid #333;border-radius:8px;box-sizing:border-box}
+  body.fade-out{opacity:0}
+  .logo{width:80px;height:80px;margin-bottom:8px}
+  .title{font-size:28px;font-weight:700;color:#7fa5df;margin-bottom:2px}
+  .tagline{font-size:10px;color:#a3b8d9;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+  .desc{font-size:10px;color:#636366;margin-bottom:14px}
+  .progress{font-size:14px;color:#7fa5df;font-weight:600;margin-bottom:8px;min-height:18px}
+</style>
+<script language="javascript">
+  var w = 280, h = 330;
+  window.resizeTo(w, h);
+  window.moveTo((screen.availWidth - w) / 2, (screen.availHeight - h) / 2.5);
+
+  // Drag support for borderless window
+  var isDragging = false, dragX = 0, dragY = 0;
+  window.onload = function() {
+    document.body.onmousedown = function(e) {
+      isDragging = true;
+      dragX = e.screenX - window.screenLeft;
+      dragY = e.screenY - window.screenTop;
+    };
+    document.body.onmousemove = function(e) {
+      if (isDragging) {
+        window.moveTo(e.screenX - dragX, e.screenY - dragY);
+      }
+    };
+    document.body.onmouseup = function() { isDragging = false; };
+    document.body.onmouseleave = function() { isDragging = false; };
+  };
+
+  var fso = new ActiveXObject("Scripting.FileSystemObject");
+  var shell = new ActiveXObject("WScript.Shell");
+  var tempDir = shell.ExpandEnvironmentStrings("%TEMP%");
+  var readyFile = tempDir + "\\pdfile-ready.tmp";
+  var logFile = tempDir + "\\pdfile-loading.log";
+  var pollTimer = null;
+  var isClosing = false;
+  var animProgress = 0;
+
+  function log(msg) {
+    try {
+      var f = fso.OpenTextFile(logFile, 8, true);
+      f.WriteLine(new Date().toISOString() + " | " + msg);
+      f.Close();
+    } catch(e) {}
+  }
+
+  // Clear previous log
+  try { fso.DeleteFile(logFile); } catch(e) {}
+  log("=== HTA STARTED ===");
+
+  function closeHTA() {
+    log("closeHTA()");
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+    try { fso.DeleteFile(readyFile); } catch(e) {}
+    self.close();
+  }
+
+  function fadeAndClose() {
+    log("fadeAndClose() - Edge already launched by server");
+    if (isClosing) return;
+    isClosing = true;
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+    try { fso.DeleteFile(readyFile); } catch(e) {}
+
+    // Fade out and close (Edge is already running)
+    document.body.className = 'fade-out';
+    setTimeout(closeHTA, 300);
+  }
+
+  // Failsafe timeout
+  setTimeout(function() {
+    if (!isClosing) {
+      log("FAILSAFE TIMEOUT");
+      closeHTA();
+    }
+  }, 30000);
+
+  // Poll for ready signal
+  setTimeout(function() {
+    log("Poll started");
+    pollTimer = setInterval(function() {
+      if (fso.FileExists(readyFile)) {
+        log("Ready file found - Edge already launched, closing HTA");
+        fadeAndClose();
+      }
+    }, 80);
+  }, 100);
+</script>
+</head>
+<body>
+  <img class="logo" src="img/logo.ico">
+  <div class="title">PDFile</div>
+  <div class="tagline">PDF Utility Toolkit</div>
+  <div class="desc">Comprehensive document manipulation tools</div>
+  <div class="progress" id="progress">Loading...</div>
+</body>
+</html>
