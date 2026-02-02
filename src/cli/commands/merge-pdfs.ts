@@ -39,9 +39,10 @@ export function registerMergePdfsCommand(program: Command): void {
 					let outputPath = options.output;
 
 					if (!outputPath && !options.yes) {
+						const firstFile = path.basename(files[0], '.pdf');
 						const defaultOutput = path.join(
 							path.dirname(files[0]),
-							`merged_${Date.now()}.pdf`,
+							`${firstFile}_merged.pdf`,
 						);
 
 						const response = await prompts({

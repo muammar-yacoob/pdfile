@@ -18,7 +18,10 @@ export interface DateInsertOptions {
 	fontSize?: number;
 	color?: { r: number; g: number; b: number };
 	format?: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD' | 'Month DD, YYYY';
+	dateText?: string; // Pre-formatted date text (overrides format)
 	pages?: number[]; // Specific page numbers (0-indexed), or all pages if undefined
+	rotation?: number; // Rotation angle in degrees
+	bgColor?: { r: number; g: number; b: number }; // Background color
 }
 
 /**
@@ -79,10 +82,8 @@ export async function insertDate(
 		// Get font
 		const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-		// Format today's date
-		const today = new Date();
-		const dateFormat = options.format ?? 'MM/DD/YYYY';
-		const dateText = formatDate(today, dateFormat);
+		// Get date text (use provided text or format today's date)
+		const dateText = options.dateText ?? formatDate(new Date(), options.format ?? 'MM/DD/YYYY');
 
 		// Determine which pages to apply date to
 		const pages = pdfDoc.getPages();
@@ -93,14 +94,28 @@ export async function insertDate(
 		// Apply date to target pages
 		const fontSize = options.fontSize ?? 12;
 		const color = options.color ?? { r: 0, g: 0, b: 0 };
+		const rotation = options.rotation ?? 0;
 
 		for (const page of targetPages) {
 			const { width, height } = page.getSize();
 
 			// Calculate position (default: bottom right with padding)
 			const textWidth = font.widthOfTextAtSize(dateText, fontSize);
+			const textHeight = fontSize;
 			const x = options.x ?? width - textWidth - 50;
 			const y = options.y ?? 30;
+
+			// Draw background if specified
+			if (options.bgColor) {
+				page.drawRectangle({
+					x: x - 2,
+					y: y - 2,
+					width: textWidth + 4,
+					height: textHeight + 4,
+					color: rgb(options.bgColor.r, options.bgColor.g, options.bgColor.b),
+					rotate: { angle: rotation, type: 'degrees' },
+				});
+			}
 
 			// Draw date text
 			page.drawText(dateText, {
@@ -109,6 +124,7 @@ export async function insertDate(
 				size: fontSize,
 				font,
 				color: rgb(color.r, color.g, color.b),
+				rotate: { angle: rotation, type: 'degrees' },
 			});
 		}
 

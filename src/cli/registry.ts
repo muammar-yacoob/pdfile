@@ -54,7 +54,7 @@ async function registerMenuForExtension(
 
 	// Create parent PDFile menu
 	await addRegistryKey(basePath, 'MUIVerb', 'PDFile');
-	await addRegistryKey(basePath, 'Icon', `${iconsDirWin}\\banana.ico`);
+	await addRegistryKey(basePath, 'Icon', `${iconsDirWin}\\pdfile.ico`);
 	await addRegistryKey(basePath, 'SubCommands', '');
 
 	// Create submenu for each tool
@@ -239,7 +239,7 @@ function generateRegContent(): string {
 
 		lines.push(`[${basePath}]`);
 		lines.push(`"MUIVerb"="${escapeRegValue('PDFile')}"`);
-		lines.push(`"Icon"="${escapeRegValue(`${iconsDirWin}\\banana.ico`)}"`);
+		lines.push(`"Icon"="${escapeRegValue(`${iconsDirWin}\\pdfile.ico`)}"`);
 		lines.push('"MultiSelectModel"="Player"');
 		lines.push('');
 

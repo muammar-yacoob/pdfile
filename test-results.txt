@@ -1,0 +1,53 @@
+
+========================================
+PDFile API Functionality Tests
+========================================
+
+[Server]: Error converting PDF to Word: Error
+    at InvalidPDFExceptionClosure (/mnt/d/RandomProjects/pdfile/node_modules/pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js:452:35)
+    at Object.<anonymous> (/mnt/d/RandomProjects/pdfile/node_modules/pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js:455:2)
+    at __w_pdfjs_require__ (/mnt/d/RandomProjects/pdfile/node_modules/pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js:45:30)
+    at Object.<anonymous> (/mnt/d/RandomProjects/pdfile/node_modules/pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js:7939:23)
+    at __w_pdfjs_require__ (/mnt/d/RandomProjects/pdfile/node_modules/pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js:45:30)
+    at /mnt/d/RandomProjects/pdfile/node_modules/pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js:88:18
+    at /mnt/d/RandomProjects/pdfile/node_modules/pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js:91:10
+    at webpackUniversalModuleDefinition (/mnt/d/RandomProjects/pdfile/node_modules/pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js:18:20)
+    at Object.<anonymous> (/mnt/d/RandomProjects/pdfile/node_modules/pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js:25:3)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14) {
+  message: 'Invalid PDF structure'
+}
+
+❌ Convert PDF to Word - page.waitForEvent: Timeout 30000ms exceeded while waiting for event "download"
+=========================== logs ===========================
+waiting for event "download"
+============================================================
+  Downloaded: test_reordered.pdf
+✓ Reorder pages
+  Downloaded: test_removed.pdf
+✓ Remove pages
+  Downloaded: test_exported.pdf
+✓ Add date overlay and export
+  Downloaded: test_exported.pdf
+✓ Add image overlay
+[Server]: Error adding signature: TypeError [ERR_INVALID_ARG_TYPE]: The "path" argument must be of type string. Received undefined
+    at Module.extname (node:path:1505:5)
+    at addSignature (file:///mnt/d/RandomProjects/pdfile/dist/cli.js:439:32)
+    at file:///mnt/d/RandomProjects/pdfile/dist/cli.js:1020:31 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+
+❌ Add signature overlay - page.waitForEvent: Timeout 30000ms exceeded while waiting for event "download"
+=========================== logs ===========================
+waiting for event "download"
+============================================================
+  Downloaded: test_merged.pdf
+✓ Merge PDFs
+
+========================================
+API Test Results
+========================================
+Passed: 5
+Failed: 2
+Total:  7
+
+❌ Some tests failed

@@ -1,5 +1,5 @@
 /**
- * Window Launcher - Opens Edge app window and signals loading HTA
+ * Edge Launcher - Opens Edge in app mode and signals loading HTA
  */
 
 import { execSync, spawn } from 'node:child_process';
@@ -44,31 +44,49 @@ function getReadyFilePath(): string {
 }
 
 /**
- * Open URL in Edge app mode (standalone window without browser UI)
+ * Clean up any stale signal files from previous sessions
  */
-function openAppWindow(url: string): void {
-	// Use PowerShell with hidden window to launch Edge - prevents terminal flash
-	spawn(
-		'powershell.exe',
-		['-WindowStyle', 'Hidden', '-Command', `Start-Process msedge -ArgumentList '--app=${url}'`],
-		{
-			detached: true,
-			stdio: 'ignore',
-			windowsHide: true,
-		},
-	).unref();
+export function cleanupSignalFiles(): void {
+	const readyFile = getReadyFilePath();
+	try {
+		if (fs.existsSync(readyFile)) {
+			fs.unlinkSync(readyFile);
+		}
+	} catch {
+		// Ignore errors
+	}
 }
 
 /**
- * Signal the loading HTA to close and open Edge
- * Launches Edge first via PowerShell (properly focused), then signals HTA to close
+ * Signal the loading HTA to close and open Edge in app mode
+ * Launches Edge first (properly focused), then signals HTA to close
  * @param url - The URL for Edge to open
  */
 export function signalLoadingComplete(url: string): void {
 	const readyFile = getReadyFilePath();
 	try {
-		// Launch Edge via PowerShell
-		openAppWindow(url);
+		// Launch Edge in app mode via cmd.exe (faster than PowerShell)
+		// Calculate centered position (assume 1920x1080 if we can't detect)
+		const edgeW = 700;
+		const edgeH = 590;
+		const screenW = 1920;
+		const screenH = 1080;
+		const x = Math.round((screenW - edgeW) / 2);
+		const y = Math.round((screenH - edgeH) / 2);
+
+		// Use cmd.exe to launch Edge with app mode
+		// Disable tracking prevention to allow localStorage and cookies
+		spawn('cmd.exe', [
+			'/c', 'start', '', 'msedge',
+			`--app=${url}`,
+			`--window-position=${x},${y}`,
+			'--disable-features=msEdgeEnhancedTrackingPrevention',
+			'--disable-blink-features=AutomationControlled'
+		], {
+			detached: true,
+			stdio: 'ignore',
+			windowsHide: true,
+		}).unref();
 
 		// Give Edge a moment to start and gain focus, then signal HTA to close
 		setTimeout(() => {

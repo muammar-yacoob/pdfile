@@ -1,18 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html data-pdfile data-width="700" data-height="590">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>PDFile - PDF Utility Toolkit</title>
     <link rel="icon" href="img/logo.ico">
     <link rel="stylesheet" href="/css/theme.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/css/flatpickr.min.css">
+    <link rel="stylesheet" href="/css/pickr.min.css">
+    <script src="/js/lucide.min.js"></script>
+    <script src="/js/pdf.min.js"></script>
+    <script src="/js/flatpickr.min.js"></script>
+    <script src="/js/pickr.min.js"></script>
     <style>
+        * { box-sizing: border-box; }
+
         .app {
             display: flex;
             flex-direction: column;
             height: 100vh;
-            padding: 12px;
+            padding: 10px;
+            gap: 8px;
         }
 
         .header {
@@ -49,6 +57,7 @@
             color: var(--txt3);
             cursor: pointer;
             transition: all 0.2s;
+            position: relative;
         }
 
         .share-btn:hover {
@@ -57,38 +66,277 @@
             color: #7fa5df;
         }
 
-        .share-btn svg {
-            width: 16px;
-            height: 16px;
+        /* Dark mode for flatpickr calendar */
+        .flatpickr-calendar {
+            background: var(--bg2) !important;
+            border: 1px solid var(--brd) !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
         }
 
+        .flatpickr-months {
+            background: var(--bg) !important;
+        }
+
+        .flatpickr-month, .flatpickr-current-month .flatpickr-monthDropdown-months {
+            color: var(--txt) !important;
+        }
+
+        .flatpickr-weekdays {
+            background: var(--bg) !important;
+        }
+
+        .flatpickr-weekday {
+            color: var(--txt3) !important;
+        }
+
+        .flatpickr-day {
+            color: var(--txt) !important;
+        }
+
+        .flatpickr-day:hover, .flatpickr-day.selected {
+            background: #7fa5df !important;
+            border-color: #7fa5df !important;
+        }
+
+        .flatpickr-day.today {
+            border-color: #7fa5df !important;
+        }
+
+        /* Dark mode for Pickr color picker */
+        .pcr-app {
+            background: var(--bg2) !important;
+            border: 1px solid var(--brd) !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+        }
+
+        .pcr-app .pcr-interaction .pcr-result,
+        .pcr-app .pcr-interaction input {
+            background: var(--bg) !important;
+            color: var(--txt) !important;
+            border-color: var(--brd) !important;
+        }
+
+        .pcr-app .pcr-interaction .pcr-save {
+            background: #7fa5df !important;
+        }
+
+        .pcr-app .pcr-interaction .pcr-save:hover {
+            background: #6a8fc7 !important;
+        }
+
+        .pcr-app .pcr-interaction .pcr-clear,
+        .pcr-app .pcr-interaction .pcr-cancel {
+            background: #f44250 !important;
+        }
+
+        .pcr-app .pcr-swatches > button {
+            border: 1px solid var(--brd) !important;
+        }
+
+        /* Smaller color picker button */
+        .pickr {
+            width: 24px !important;
+            height: 24px !important;
+        }
+
+        .pickr .pcr-button {
+            width: 24px !important;
+            height: 24px !important;
+            border-radius: 4px !important;
+            border: 1px solid var(--brd) !important;
+        }
+
+        /* Main 3-column layout */
         .main {
             display: flex;
             flex: 1;
-            gap: 12px;
+            gap: 8px;
             overflow: hidden;
-            margin-top: 10px;
         }
 
-        /* Left panel - PDF Preview */
+        /* Left: Page Thumbnails */
+        .thumbnails-panel {
+            width: 160px;
+            background: var(--bg2);
+            border-radius: 6px;
+            border: 1px solid var(--brd);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: width 0.3s ease;
+        }
+
+        .thumbnails-panel.collapsed {
+            width: 40px;
+        }
+
+        .thumbnails-panel.collapsed .thumbnails-list {
+            display: none;
+        }
+
+        .thumbnails-header {
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--brd);
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--txt2);
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .thumbnails-header .collapse-btn {
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--txt3);
+            transition: color 0.2s;
+        }
+
+        .thumbnails-header .collapse-btn:hover {
+            color: #7fa5df;
+        }
+
+        .thumbnails-panel.collapsed .thumbnails-header {
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .thumbnails-panel.collapsed .thumbnails-header span {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+        }
+
+        /* Page Actions Toolbar */
+        .page-actions-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px;
+            border-bottom: 1px solid var(--brd);
+            background: var(--bg);
+        }
+
+        .page-action-btn {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 1px solid var(--brd);
+            border-radius: 4px;
+            color: var(--txt2);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .page-action-btn:hover:not(:disabled) {
+            background: var(--bg2);
+            border-color: #7fa5df;
+            color: #7fa5df;
+        }
+
+        .page-action-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .thumbnails-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .thumbnail-item {
+            background: var(--bg);
+            border: 2px solid var(--brd);
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .thumbnail-item.selected {
+            border-color: #7fa5df;
+            background: rgba(127, 165, 223, 0.15);
+            box-shadow: 0 0 0 1px rgba(127, 165, 223, 0.3);
+        }
+
+        .thumbnail-item:hover {
+            border-color: #7fa5df;
+            transform: translateX(2px);
+        }
+
+        .thumbnail-item.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .thumbnail-item.dragover {
+            border-color: #7fa5df;
+            background: rgba(127, 165, 223, 0.1);
+        }
+
+        .thumbnail-canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 3px;
+        }
+
+        .thumbnail-number {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .thumbnail-checkbox {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: #7fa5df;
+        }
+
+        /* Center: PDF Preview */
         .preview-panel {
             flex: 1;
-            min-width: 300px;
             display: flex;
             flex-direction: column;
             gap: 8px;
+            min-width: 400px;
         }
 
         .preview-area {
             flex: 1;
+            background: var(--bg2);
+            border-radius: 6px;
+            border: 1px solid var(--brd);
+            overflow: auto;
+            position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--bg2);
-            border-radius: 6px;
-            overflow: auto;
-            position: relative;
-            min-height: 200px;
         }
 
         .preview-area::before {
@@ -99,41 +347,30 @@
             z-index: 0;
         }
 
-        .preview-area.dragover {
-            border: 2px dashed #7fa5df;
-            background: rgba(127, 165, 223, 0.05);
-        }
-
-        .preview-area iframe {
-            width: 100%;
-            height: 100%;
+        .preview-area canvas {
+            width: auto;
+            height: auto;
+            max-width: 100%;
+            max-height: 100%;
             border: none;
             position: relative;
             z-index: 1;
+            background: #fff;
         }
 
         .preview-area .placeholder {
             position: relative;
             z-index: 1;
-            font-size: 12px;
-            color: var(--txt3);
-            text-align: center;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-        }
-
-        .preview-info {
-            font-size: 10px;
+            gap: 12px;
             color: var(--txt3);
-            text-align: center;
-            padding: 4px 0;
+            font-size: 12px;
         }
 
         .load-btn {
-            width: 100%;
-            padding: 8px;
+            padding: 8px 16px;
             font-size: 11px;
             background: var(--bg2);
             border: 1px dashed var(--brd);
@@ -148,63 +385,104 @@
             color: #7fa5df;
         }
 
-        /* Resizable divider */
-        .divider {
-            width: 6px;
-            cursor: col-resize;
-            background: transparent;
+        /* Overlay gizmo */
+        .overlay-gizmo {
+            position: absolute;
+            border: 2px dashed #7fa5df;
+            background: rgba(127, 165, 223, 0.1);
+            cursor: move;
+            z-index: 10;
+            min-width: 80px;
+            min-height: 40px;
+            padding: 20px 4px 4px 4px;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-shrink: 0;
-            margin: 0 -2px;
+            user-select: none;
         }
 
-        .divider:hover,
-        .divider.dragging {
-            background: var(--bg3);
+        .overlay-gizmo img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            pointer-events: none;
         }
 
-        .divider::after {
-            content: '';
-            width: 2px;
-            height: 40px;
-            background: var(--brd);
-            border-radius: 1px;
-            transition: background 0.2s;
+        .overlay-gizmo-text {
+            font-size: 10px;
+            color: #7fa5df;
+            text-align: center;
+            word-break: break-word;
+            padding: 4px;
         }
 
-        .divider:hover::after,
-        .divider.dragging::after {
+        .overlay-gizmo:hover {
+            background: rgba(127, 165, 223, 0.2);
+            border-color: #a3b8d9;
+        }
+
+        .overlay-gizmo-handle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
             background: #7fa5df;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            cursor: nwse-resize;
+            bottom: -6px;
+            right: -6px;
         }
 
-        /* Right panel - Tools */
+        .overlay-gizmo-label {
+            position: absolute;
+            top: -22px;
+            left: 0;
+            font-size: 10px;
+            color: #7fa5df;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 3px 8px;
+            border-radius: 3px;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        .overlay-gizmo-delete {
+            position: absolute;
+            top: -22px;
+            right: 0;
+            width: 18px;
+            height: 18px;
+            background: #ff4444;
+            border: none;
+            border-radius: 3px;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .overlay-gizmo-delete:hover {
+            background: #ff0000;
+        }
+
+        /* Right: Tools */
         .tools-panel {
-            width: 300px;
-            min-width: 240px;
-            flex-shrink: 0;
+            width: 240px;
             display: flex;
             flex-direction: column;
             gap: 6px;
             overflow-y: auto;
-            overflow-x: hidden;
-            padding-right: 4px;
-            align-self: flex-start;
-            max-height: 100%;
         }
 
-        /* Tool sections */
         .tool {
             background: var(--bg2);
-            border-radius: 6px;
             border: 1px solid var(--brd);
+            border-radius: 6px;
             overflow: hidden;
-        }
-
-        .tool.disabled {
-            opacity: 0.35;
-            pointer-events: none;
         }
 
         .tool.active {
@@ -214,8 +492,8 @@
         .tool-header {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
+            gap: 6px;
+            padding: 7px 8px;
             cursor: pointer;
             user-select: none;
         }
@@ -225,8 +503,8 @@
         }
 
         .tool-header .icon {
-            width: 18px;
-            height: 18px;
+            width: 15px;
+            height: 15px;
             opacity: 0.6;
             color: var(--txt2);
         }
@@ -238,7 +516,7 @@
 
         .tool-header .name {
             flex: 1;
-            font-size: 12px;
+            font-size: 11px;
             color: var(--txt2);
         }
 
@@ -248,10 +526,10 @@
         }
 
         .tool-header .toggle {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             border: 1.5px solid var(--brd);
-            border-radius: 4px;
+            border-radius: 3px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -264,14 +542,14 @@
 
         .tool.active .tool-header .toggle::after {
             content: '✓';
-            font-size: 10px;
+            font-size: 9px;
             color: #000;
             font-weight: bold;
         }
 
         .tool-body {
             display: none;
-            padding: 6px 10px 10px;
+            padding: 8px;
             border-top: 1px solid var(--brd);
         }
 
@@ -282,28 +560,120 @@
         .tool-desc {
             font-size: 10px;
             color: var(--txt3);
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
 
         .tool-btn {
             width: 100%;
-            padding: 8px 12px;
-            font-size: 11px;
+            padding: 6px 10px;
+            font-size: 10px;
             background: #7fa5df;
             border: none;
-            border-radius: 5px;
+            border-radius: 4px;
             color: #000;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
+            margin-top: 6px;
+        }
+
+        .tool-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
         .tool-btn:hover {
             background: #a3b8d9;
         }
 
-        .tool-btn:active {
-            transform: scale(0.98);
+        .tool-btn-secondary {
+            background: var(--bg3);
+            color: var(--txt2);
+            border: 1px solid var(--brd);
+        }
+
+        .tool-btn-secondary:hover {
+            background: var(--bg2);
+            border-color: #7fa5df;
+            color: var(--txt);
+        }
+
+        /* Form elements */
+        .form-group {
+            margin-bottom: 8px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 9px;
+            color: var(--txt2);
+            margin-bottom: 3px;
+            font-weight: 500;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 5px 7px;
+            background: var(--bg);
+            border: 1px solid var(--brd);
+            border-radius: 4px;
+            color: var(--txt);
+            font-size: 11px;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: #7fa5df;
+        }
+
+        .color-picker {
+            width: 100%;
+            height: 32px;
+            cursor: pointer;
+            border-radius: 4px;
+            border: 1px solid var(--brd);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 10px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 6px;
+            font-size: 10px;
+            background: var(--bg);
+            border: 1px solid var(--brd);
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            color: var(--txt3);
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: #7fa5df;
+            color: #000;
+            border-color: #7fa5df;
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
         }
 
         /* Custom Modal */
@@ -397,32 +767,165 @@
 </head>
 <body>
     <div class="app">
+        <!-- Header -->
         <div class="header">
             <b>PDFile</b>
             <span id="fileName">No PDF loaded</span>
+            <button class="share-btn" onclick="exportPDF()" title="Export PDF" id="exportBtn">
+                <i data-lucide="download"></i>
+            </button>
             <button class="share-btn" onclick="shareApp()" title="Share PDFile">
                 <i data-lucide="share-2"></i>
             </button>
         </div>
 
+        <!-- Main 3-column layout -->
         <div class="main">
-            <!-- Left: PDF Preview -->
+            <!-- Left: Page Thumbnails -->
+            <div class="thumbnails-panel" id="thumbnailsPanel">
+                <div class="thumbnails-header">
+                    <span>Pages</span>
+                    <button class="collapse-btn" onclick="togglePagesPanel()" title="Collapse/Expand">
+                        <i data-lucide="chevron-left" style="width: 16px; height: 16px;"></i>
+                    </button>
+                </div>
+
+                <!-- Action Toolbar (always visible) -->
+                <div class="page-actions-toolbar">
+                    <button class="page-action-btn" onclick="insertPagesDialog()" title="Insert pages">
+                        <i data-lucide="file-plus" style="width: 14px; height: 14px;"></i>
+                    </button>
+                    <div style="flex: 1; border-left: 1px solid var(--brd);"></div>
+                    <button class="page-action-btn" id="deleteSelectedBtn" onclick="removeSelectedPages()" title="Delete selected" disabled>
+                        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                    </button>
+                </div>
+
+                <div class="thumbnails-list" id="thumbnailsList">
+                    <div style="text-align: center; padding: 20px; font-size: 10px; color: var(--txt3);">
+                        Load a PDF to see pages
+                    </div>
+                </div>
+
+                <div style="display: none; gap: 8px; margin: 8px;">
+                    <button class="tool-btn" onclick="applyReorder()" id="reorderBtn" style="flex: 1; display: none;">
+                        <i data-lucide="arrow-up-down" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                        Apply Reorder
+                    </button>
+                    <button class="tool-btn" onclick="removeSelectedPages()" id="removePageBtn" style="flex: 1; display: none;">
+                        <i data-lucide="trash-2" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                        Remove Selected
+                    </button>
+                </div>
+            </div>
+
+            <!-- Center: PDF Preview -->
             <div class="preview-panel">
                 <div class="preview-area" id="previewArea">
                     <div class="placeholder">
-                        <i data-lucide="file" style="width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.4;"></i>
+                        <i data-lucide="file" style="width: 48px; height: 48px; opacity: 0.4;"></i>
                         <p>PDF preview will appear here</p>
+                        <button class="load-btn" onclick="loadPDF()">Load PDF</button>
                     </div>
                 </div>
-                <div class="preview-info" id="previewInfo">No PDF loaded</div>
-                <button class="load-btn" onclick="loadPDF()">Load Different PDF</button>
             </div>
-
-            <!-- Divider -->
-            <div class="divider" id="divider"></div>
 
             <!-- Right: Tools -->
             <div class="tools-panel">
+                <!-- Overlays Tool -->
+                <div class="tool" id="t-overlays">
+                    <div class="tool-header" onclick="toggleTool('t-overlays')">
+                        <i class="icon" data-lucide="layers"></i>
+                        <span class="name">Overlays</span>
+                        <div class="toggle"></div>
+                    </div>
+                    <div class="tool-body">
+                        <div class="tool-desc">Add draggable overlays to your PDF</div>
+
+                        <!-- Tabs -->
+                        <div class="tabs">
+                            <div class="tab active" onclick="switchOverlayTab('date')">Date</div>
+                            <div class="tab" onclick="switchOverlayTab('text')">Text</div>
+                            <div class="tab" onclick="switchOverlayTab('image')">Image</div>
+                        </div>
+
+                        <!-- Date Tab -->
+                        <div class="tab-content active" id="overlay-date">
+                            <div class="form-group">
+                                <label class="form-label">Date</label>
+                                <input type="text" class="form-input" id="dateValue" placeholder="Select date...">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Format</label>
+                                <select class="form-select" id="dateFormat">
+                                    <option>MM/DD/YYYY</option>
+                                    <option>DD/MM/YYYY</option>
+                                    <option>YYYY-MM-DD</option>
+                                    <option>Month DD, YYYY</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Font Size</label>
+                                <input type="number" class="form-input" id="dateFontSize" value="12" min="8" max="72">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Text Color</label>
+                                <div id="textColorPicker"></div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Background</label>
+                                <label style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 10px;">
+                                    <input type="checkbox" id="dateBgTransparent" checked> Transparent
+                                </label>
+                                <div id="bgColorPicker" style="display: none;"></div>
+                            </div>
+                            <button class="tool-btn" onclick="addDateOverlay()">Add Date</button>
+                        </div>
+
+                        <!-- Text Tab -->
+                        <div class="tab-content" id="overlay-text">
+                            <div class="form-group">
+                                <label class="form-label">Text Content</label>
+                                <input type="text" class="form-input" id="textContent" placeholder="Enter text...">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Font Size</label>
+                                <input type="number" class="form-input" id="textFontSize" value="14" min="8" max="72">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Background Color</label>
+                                <input type="color" class="color-picker" id="textBgColor" value="#ffffff">
+                                <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 10px;">
+                                    <input type="checkbox" id="textBgTransparent"> Transparent
+                                </label>
+                            </div>
+                            <button class="tool-btn" onclick="addTextOverlay()">Add Text Overlay</button>
+                        </div>
+
+                        <!-- Image Tab -->
+                        <div class="tab-content" id="overlay-image">
+                            <div class="form-group">
+                                <label class="form-label">Select Image</label>
+                                <input type="file" class="form-input" id="imageFile" accept="image/*">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Opacity</label>
+                                <input type="range" class="form-input" id="imageOpacity" min="0" max="100" value="100">
+                                <span style="font-size: 10px; color: var(--txt3);" id="imageOpacityLabel">100%</span>
+                            </div>
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 10px;">
+                                    <input type="checkbox" id="useAsSignature"> Use as signature (removes white background)
+                                </label>
+                            </div>
+                            <button class="tool-btn" onclick="addImageOverlay()">Add Image</button>
+                            <button class="tool-btn tool-btn-secondary" onclick="quickSign()" id="quickSignBtn" style="display: none;">
+                                Quick Sign
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Merge PDFs -->
                 <div class="tool" id="t-merge">
                     <div class="tool-header" onclick="toggleTool('t-merge')">
@@ -431,86 +934,10 @@
                         <div class="toggle"></div>
                     </div>
                     <div class="tool-body">
-                        <div class="tool-desc">Combine multiple PDF files into one</div>
-                        <button class="tool-btn" onclick="mergePDFs()">Select PDFs to Merge</button>
-                    </div>
-                </div>
-
-                <!-- Convert to Word -->
-                <div class="tool" id="t-word">
-                    <div class="tool-header" onclick="toggleTool('t-word')">
-                        <i class="icon" data-lucide="file-text"></i>
-                        <span class="name">Convert to Word</span>
-                        <div class="toggle"></div>
-                    </div>
-                    <div class="tool-body">
-                        <div class="tool-desc">Convert PDF to editable .docx format</div>
-                        <button class="tool-btn" onclick="convertToWord()">Convert to Word</button>
-                    </div>
-                </div>
-
-                <!-- Add Signature -->
-                <div class="tool" id="t-signature">
-                    <div class="tool-header" onclick="toggleTool('t-signature')">
-                        <i class="icon" data-lucide="pen-tool"></i>
-                        <span class="name">Add Signature</span>
-                        <div class="toggle"></div>
-                    </div>
-                    <div class="tool-body">
-                        <div class="tool-desc">Add PNG signature with auto background removal</div>
-                        <button class="tool-btn" onclick="addSignature()">Choose Signature</button>
-                    </div>
-                </div>
-
-                <!-- Insert Date -->
-                <div class="tool" id="t-date">
-                    <div class="tool-header" onclick="toggleTool('t-date')">
-                        <i class="icon" data-lucide="calendar"></i>
-                        <span class="name">Insert Date</span>
-                        <div class="toggle"></div>
-                    </div>
-                    <div class="tool-body">
-                        <div class="tool-desc">Insert today's date in various formats</div>
-                        <button class="tool-btn" onclick="insertDate()">Insert Date</button>
-                    </div>
-                </div>
-
-                <!-- Add Image -->
-                <div class="tool" id="t-image">
-                    <div class="tool-header" onclick="toggleTool('t-image')">
-                        <i class="icon" data-lucide="image"></i>
-                        <span class="name">Add Image Overlay</span>
-                        <div class="toggle"></div>
-                    </div>
-                    <div class="tool-body">
-                        <div class="tool-desc">Add watermarks, logos, or stamps</div>
-                        <button class="tool-btn" onclick="addImage()">Choose Image</button>
-                    </div>
-                </div>
-
-                <!-- Remove Pages -->
-                <div class="tool" id="t-remove">
-                    <div class="tool-header" onclick="toggleTool('t-remove')">
-                        <i class="icon" data-lucide="trash-2"></i>
-                        <span class="name">Remove Pages</span>
-                        <div class="toggle"></div>
-                    </div>
-                    <div class="tool-body">
-                        <div class="tool-desc">Delete specific pages from PDF</div>
-                        <button class="tool-btn" onclick="removePages()">Select Pages</button>
-                    </div>
-                </div>
-
-                <!-- Reorder Pages -->
-                <div class="tool" id="t-reorder">
-                    <div class="tool-header" onclick="toggleTool('t-reorder')">
-                        <i class="icon" data-lucide="arrow-up-down"></i>
-                        <span class="name">Reorder Pages</span>
-                        <div class="toggle"></div>
-                    </div>
-                    <div class="tool-body">
-                        <div class="tool-desc">Rearrange pages in custom order</div>
-                        <button class="tool-btn" onclick="reorderPages()">Reorder Pages</button>
+                        <div class="tool-desc">Add pages from another PDF</div>
+                        <button class="tool-btn" onclick="mergePDFs('end')">Add to End</button>
+                        <button class="tool-btn tool-btn-secondary" onclick="mergePDFs('beginning')">Add to Beginning</button>
+                        <button class="tool-btn tool-btn-secondary" onclick="mergePDFs('replace')">Replace All Pages</button>
                     </div>
                 </div>
             </div>
@@ -528,16 +955,33 @@
         </div>
     </div>
 
-    <!-- Hidden file input for loading PDFs -->
+    <!-- Hidden file input -->
     <input type="file" id="fileInput" accept=".pdf" style="display: none;">
 
     <script>
+        // Configure PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.min.js';
+
         // ===== STATE =====
         let currentPdfPath = null;
         let currentPdfFile = null;
+        let pdfDocument = null;
+        let pageOrder = [];
+        let mergedPagesData = []; // Stores info about merged pages including images
+        let selectedPages = new Set();
+        let pendingOverlays = []; // Store overlays to apply on export
+
+        // ===== PANEL COLLAPSE =====
+        function togglePagesPanel() {
+            const panel = document.getElementById('thumbnailsPanel');
+            panel.classList.toggle('collapsed');
+            lucide.createIcons();
+        }
 
         // ===== MODAL SYSTEM =====
-        function showModal(title, message, buttons = null) {
+        let modalCallback = null;
+
+        function showModal(title, message) {
             const overlay = document.getElementById('modalOverlay');
             const header = document.getElementById('modalHeader');
             const body = document.getElementById('modalBody');
@@ -545,36 +989,44 @@
 
             header.textContent = title;
             body.textContent = message;
-
-            // Setup buttons
-            if (buttons) {
-                footer.innerHTML = '';
-                buttons.forEach(btn => {
-                    const button = document.createElement('button');
-                    button.className = `modal-btn ${btn.primary ? 'modal-btn-primary' : 'modal-btn-secondary'}`;
-                    button.textContent = btn.text;
-                    button.onclick = () => {
-                        closeModal();
-                        if (btn.onClick) btn.onClick();
-                    };
-                    footer.appendChild(button);
-                });
-            } else {
-                footer.innerHTML = '<button class="modal-btn modal-btn-primary" onclick="closeModal()">OK</button>';
-            }
+            footer.innerHTML = '<button class="modal-btn modal-btn-primary" onclick="closeModal()">OK</button>';
 
             overlay.classList.add('active');
         }
 
+        function showConfirmModal(title, message, onConfirm) {
+            const overlay = document.getElementById('modalOverlay');
+            const header = document.getElementById('modalHeader');
+            const body = document.getElementById('modalBody');
+            const footer = document.getElementById('modalFooter');
+
+            header.textContent = title;
+            body.textContent = message;
+            footer.innerHTML = `
+                <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="confirmModal()">Confirm</button>
+            `;
+
+            modalCallback = onConfirm;
+            overlay.classList.add('active');
+        }
+
+        function confirmModal() {
+            if (modalCallback) {
+                modalCallback();
+                modalCallback = null;
+            }
+            closeModal();
+        }
+
         function closeModal() {
             document.getElementById('modalOverlay').classList.remove('active');
+            modalCallback = null;
         }
 
         // Close modal on overlay click
         document.getElementById('modalOverlay').addEventListener('click', (e) => {
-            if (e.target.id === 'modalOverlay') {
-                closeModal();
-            }
+            if (e.target.id === 'modalOverlay') closeModal();
         });
 
         // ===== PDF LOADING =====
@@ -587,19 +1039,20 @@
                     currentPdfPath = data.filePath;
                     currentPdfFile = data.fileName;
                     document.getElementById('fileName').textContent = data.fileName;
-                    document.getElementById('previewInfo').textContent = data.fileName;
 
                     // Load PDF preview
                     const previewArea = document.getElementById('previewArea');
-                    previewArea.innerHTML = `<iframe src="/pdf/${encodeURIComponent(data.fileName)}" style="width: 100%; height: 100%; border: none;"></iframe>`;
+                    previewArea.innerHTML = `<canvas id="pdfCanvas" style="max-width: 100%; max-height: 100%; display: block; margin: auto;"></canvas>`;
+
+                    // Generate thumbnails and render first page
+                    await generateThumbnails(data.filePath);
+                    await renderPreviewPage(1);
                 }
             } catch (err) {
                 console.error('Failed to load initial PDF:', err);
-                showModal('Error', 'Failed to load PDF file');
             }
         }
 
-        // Load different PDF via file picker
         function loadPDF() {
             const fileInput = document.getElementById('fileInput');
             fileInput.onchange = async (e) => {
@@ -609,25 +1062,26 @@
                 } else {
                     showModal('Invalid File', 'Please select a PDF file');
                 }
-                fileInput.value = ''; // Reset input
+                fileInput.value = '';
             };
             fileInput.click();
         }
 
-        // Load PDF file (from file picker or drag/drop)
         async function loadPDFFile(file) {
             try {
-                // Create object URL for preview
                 const objectUrl = URL.createObjectURL(file);
-
-                // Update UI
                 currentPdfFile = file.name;
                 document.getElementById('fileName').textContent = file.name;
-                document.getElementById('previewInfo').textContent = file.name;
 
                 // Show preview
                 const previewArea = document.getElementById('previewArea');
-                previewArea.innerHTML = `<iframe src="${objectUrl}" style="width: 100%; height: 100%; border: none;"></iframe>`;
+                previewArea.innerHTML = `<canvas id="pdfCanvas" style="max-width: 100%; max-height: 100%; display: block; margin: auto;"></canvas>`;
+
+                // Load PDF for thumbnails
+                const arrayBuffer = await file.arrayBuffer();
+                pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                await generateThumbnailsFromDoc();
+                await renderPreviewPage(1);
 
                 showModal('Success', `Loaded: ${file.name}`);
             } catch (err) {
@@ -635,99 +1089,317 @@
             }
         }
 
-        // ===== DRAG AND DROP =====
-        function setupDragDrop() {
-            const area = document.getElementById('previewArea');
+        // ===== THUMBNAIL GENERATION =====
+        async function generateThumbnails(filePath) {
+            try {
+                const response = await fetch(`/pdf/${encodeURIComponent(currentPdfFile)}`);
+                const arrayBuffer = await response.arrayBuffer();
+                pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                await generateThumbnailsFromDoc();
+            } catch (err) {
+                console.error('Failed to generate thumbnails:', err);
+            }
+        }
 
-            area.addEventListener('dragenter', (e) => {
-                if (e.dataTransfer?.types?.includes('Files')) {
-                    e.preventDefault();
-                    area.classList.add('dragover');
+        async function generateThumbnailsFromDoc() {
+            const thumbnailsList = document.getElementById('thumbnailsList');
+            thumbnailsList.innerHTML = '';
+
+            const pageCount = pdfDocument.numPages;
+            pageOrder = Array.from({ length: pageCount }, (_, i) => i + 1);
+
+            for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
+                const page = await pdfDocument.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 0.3 });
+
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+
+                await page.render({ canvasContext: context, viewport }).promise;
+
+                const item = document.createElement('div');
+                item.className = 'thumbnail-item';
+                item.draggable = true;
+                item.dataset.pageNum = pageNum;
+                item.innerHTML = `
+                    <canvas class="thumbnail-canvas"></canvas>
+                    <div class="thumbnail-number">${pageNum}</div>
+                    <input type="checkbox" class="thumbnail-checkbox" data-page="${pageNum}">
+                `;
+                const thumbCanvas = item.querySelector('canvas');
+                thumbCanvas.width = canvas.width;
+                thumbCanvas.height = canvas.height;
+                thumbCanvas.getContext('2d').drawImage(canvas, 0, 0);
+
+                // Checkbox selection
+                const checkbox = item.querySelector('.thumbnail-checkbox');
+                checkbox.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    handlePageSelection(pageNum, checkbox.checked);
+                });
+
+                // Click to preview page
+                item.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('thumbnail-checkbox')) return;
+                    renderPreviewPage(pageNum);
+                });
+
+                // Drag and drop for reordering
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragover', handleDragOver);
+                item.addEventListener('drop', handleDrop);
+                item.addEventListener('dragend', handleDragEnd);
+
+                thumbnailsList.appendChild(item);
+            }
+        }
+
+        // ===== PDF PREVIEW RENDERING =====
+        let currentPreviewPage = 1;
+        let previewScale = 1;
+
+        async function renderPreviewPage(pageNum) {
+            if (!pdfDocument) return;
+
+            try {
+                currentPreviewPage = pageNum;
+                const canvas = document.getElementById('pdfCanvas');
+                if (!canvas) return;
+
+                const page = await pdfDocument.getPage(pageNum);
+
+                // Calculate scale to fit preview area
+                const previewArea = document.getElementById('previewArea');
+                const containerWidth = previewArea.clientWidth - 40;
+                const containerHeight = previewArea.clientHeight - 40;
+                const pageViewport = page.getViewport({ scale: 1 });
+
+                const scaleX = containerWidth / pageViewport.width;
+                const scaleY = containerHeight / pageViewport.height;
+                const scale = Math.min(scaleX, scaleY, 2); // Max scale of 2 for quality
+                previewScale = scale;
+
+                const viewport = page.getViewport({ scale });
+
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+
+                const context = canvas.getContext('2d');
+                await page.render({ canvasContext: context, viewport }).promise;
+
+                // Render overlays on top of the PDF
+                await renderOverlaysOnCanvas(context, viewport.width, viewport.height, pageNum);
+            } catch (err) {
+                console.error('Error rendering preview page:', err);
+            }
+        }
+
+        async function renderOverlaysOnCanvas(context, canvasWidth, canvasHeight, pageNum) {
+            // Filter overlays for this page (currently all overlays are shown, need to track page)
+            const pageOverlays = pendingOverlays.filter(overlay => !overlay.pageIndex || overlay.pageIndex === pageNum - 1);
+
+            for (const overlay of pageOverlays) {
+                if (overlay.type === 'date') {
+                    // Render date overlay
+                    context.save();
+                    context.font = `${overlay.fontSize || 12}px Arial`;
+                    context.fillStyle = overlay.textColor || '#000000';
+                    context.globalAlpha = (overlay.opacity || 100) / 100;
+
+                    if (overlay.rotation) {
+                        const centerX = overlay.x + 50;
+                        const centerY = overlay.y + 10;
+                        context.translate(centerX, centerY);
+                        context.rotate((overlay.rotation * Math.PI) / 180);
+                        context.translate(-centerX, -centerY);
+                    }
+
+                    if (overlay.bgColor && !overlay.transparentBg) {
+                        const metrics = context.measureText(overlay.dateText);
+                        const textHeight = overlay.fontSize || 12;
+                        context.fillStyle = overlay.bgColor;
+                        context.fillRect(overlay.x - 2, overlay.y - textHeight, metrics.width + 4, textHeight + 4);
+                        context.fillStyle = overlay.textColor || '#000000';
+                    }
+
+                    context.fillText(overlay.dateText, overlay.x, overlay.y);
+                    context.restore();
+                } else if (overlay.type === 'image' || overlay.type === 'signature') {
+                    // Render image/signature overlay
+                    const img = new Image();
+                    img.src = overlay.imageData;
+
+                    await new Promise((resolve) => {
+                        if (img.complete) {
+                            resolve();
+                        } else {
+                            img.onload = resolve;
+                            img.onerror = resolve;
+                        }
+                    });
+
+                    context.save();
+                    context.globalAlpha = (overlay.opacity || 100) / 100;
+
+                    if (overlay.rotation) {
+                        const centerX = overlay.x + overlay.width / 2;
+                        const centerY = overlay.y + overlay.height / 2;
+                        context.translate(centerX, centerY);
+                        context.rotate((overlay.rotation * Math.PI) / 180);
+                        context.translate(-centerX, -centerY);
+                    }
+
+                    context.drawImage(img, overlay.x, overlay.y, overlay.width, overlay.height);
+                    context.restore();
                 }
-            });
+            }
+        }
 
-            area.addEventListener('dragover', (e) => {
-                if (e.dataTransfer?.types?.includes('Files')) {
-                    e.preventDefault();
+        let draggedElement = null;
+
+        function handleDragStart(e) {
+            draggedElement = e.target.closest('.thumbnail-item');
+            draggedElement.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            const target = e.target.closest('.thumbnail-item');
+            if (target && target !== draggedElement) {
+                target.classList.add('dragover');
+            }
+            return false;
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) e.stopPropagation();
+            e.preventDefault();
+
+            const target = e.target.closest('.thumbnail-item');
+            if (target && draggedElement && target !== draggedElement) {
+                const draggedIndex = parseInt(draggedElement.dataset.pageNum) - 1;
+                const targetIndex = parseInt(target.dataset.pageNum) - 1;
+
+                // Swap in pageOrder array
+                [pageOrder[draggedIndex], pageOrder[targetIndex]] = [pageOrder[targetIndex], pageOrder[draggedIndex]];
+
+                // Visual swap
+                const parent = target.parentNode;
+                if (draggedElement.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING) {
+                    parent.insertBefore(draggedElement, target);
+                } else {
+                    parent.insertBefore(draggedElement, target.nextSibling);
                 }
+
+                // Update page numbers
+                updatePageNumbers();
+
+                // Show reorder button
+                document.getElementById('reorderBtn').style.display = 'block';
+            }
+            target.classList.remove('dragover');
+            return false;
+        }
+
+        function handleDragEnd() {
+            document.querySelectorAll('.thumbnail-item').forEach(item => {
+                item.classList.remove('dragging', 'dragover');
             });
+        }
 
-            area.addEventListener('dragleave', (e) => {
-                if (!area.contains(e.relatedTarget)) {
-                    area.classList.remove('dragover');
-                }
-            });
+        // Handle page selection via checkbox
+        function handlePageSelection(pageNum, isSelected) {
+            if (isSelected) {
+                selectedPages.add(pageNum);
+            } else {
+                selectedPages.delete(pageNum);
+            }
 
-            area.addEventListener('drop', (e) => {
-                e.preventDefault();
-                area.classList.remove('dragover');
+            // Update visual selection
+            const item = document.querySelector(`.thumbnail-item[data-page-num="${pageNum}"]`);
+            if (item) {
+                item.classList.toggle('selected', isSelected);
+            }
 
-                const files = e.dataTransfer?.files;
-                if (files && files.length > 0) {
-                    const file = files[0];
-                    if (file.name.toLowerCase().endsWith('.pdf')) {
-                        loadPDFFile(file);
-                    } else {
-                        showModal('Invalid File', 'Please drop a PDF file');
+            // Update delete button state
+            const deleteBtn = document.getElementById('deleteSelectedBtn');
+            deleteBtn.disabled = selectedPages.size === 0;
+        }
+
+        function updatePageNumbers() {
+            const items = document.querySelectorAll('.thumbnail-item');
+            items.forEach((item, index) => {
+                const newPageNum = index + 1;
+                item.querySelector('.thumbnail-number').textContent = newPageNum;
+                item.dataset.pageNum = newPageNum;
+
+                // Update checkbox data attribute
+                const checkbox = item.querySelector('.thumbnail-checkbox');
+                if (checkbox) {
+                    const oldPageNum = parseInt(checkbox.dataset.page);
+                    checkbox.dataset.page = newPageNum;
+
+                    // Update selectedPages set
+                    if (selectedPages.has(oldPageNum)) {
+                        selectedPages.delete(oldPageNum);
+                        selectedPages.add(newPageNum);
                     }
                 }
             });
         }
 
+        async function applyReorder() {
+            if (!currentPdfFile) {
+                showModal('No PDF Loaded', 'Please load a PDF first');
+                return;
+            }
+
+            // Get current page order from thumbnails
+            const items = document.querySelectorAll('.thumbnail-item');
+            const pageOrder = Array.from(items).map(item => parseInt(item.dataset.pageNum));
+
+            showConfirmModal(
+                'Apply Reorder',
+                'Apply the new page order? This will download a reordered PDF file.',
+                async () => {
+                    try {
+                        showModal('Processing', 'Reordering pages...');
+
+                        const response = await fetch('/api/reorder-pages', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ order: pageOrder })
+                        });
+
+                        if (!response.ok) throw new Error('Reorder failed');
+
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${currentPdfFile.replace('.pdf', '')}_reordered.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+
+                        closeModal();
+                        showModal('Success', 'Pages reordered successfully!');
+                        document.getElementById('reorderBtn').style.display = 'none';
+                    } catch (err) {
+                        closeModal();
+                        showModal('Error', `Failed to reorder pages: ${err.message}`);
+                    }
+                }
+            );
+        }
+
         // ===== TOOL FUNCTIONS =====
-        function mergePDFs() {
-            showModal('Coming Soon', 'PDF merging functionality will be available soon. This will allow you to combine multiple PDF files into one document.');
-        }
-
-        function convertToWord() {
-            if (!currentPdfFile) {
-                showModal('No PDF Loaded', 'Please load a PDF file first');
-                return;
-            }
-            showModal('Coming Soon', `Convert "${currentPdfFile}" to Word functionality will be available soon. This will create an editable .docx file from your PDF.`);
-        }
-
-        function addSignature() {
-            if (!currentPdfFile) {
-                showModal('No PDF Loaded', 'Please load a PDF file first');
-                return;
-            }
-            showModal('Coming Soon', 'Signature functionality will be available soon. This will allow you to add a PNG signature with automatic background removal.');
-        }
-
-        function insertDate() {
-            if (!currentPdfFile) {
-                showModal('No PDF Loaded', 'Please load a PDF file first');
-                return;
-            }
-            showModal('Coming Soon', 'Date insertion functionality will be available soon. Choose from multiple date formats like MM/DD/YYYY, YYYY-MM-DD, or custom formats.');
-        }
-
-        function addImage() {
-            if (!currentPdfFile) {
-                showModal('No PDF Loaded', 'Please load a PDF file first');
-                return;
-            }
-            showModal('Coming Soon', 'Image overlay functionality will be available soon. Add watermarks, logos, or stamps to your PDF with adjustable opacity and positioning.');
-        }
-
-        function removePages() {
-            if (!currentPdfFile) {
-                showModal('No PDF Loaded', 'Please load a PDF file first');
-                return;
-            }
-            showModal('Coming Soon', 'Page removal functionality will be available soon. Select specific pages to delete from your PDF document.');
-        }
-
-        function reorderPages() {
-            if (!currentPdfFile) {
-                showModal('No PDF Loaded', 'Please load a PDF file first');
-                return;
-            }
-            showModal('Coming Soon', 'Page reordering functionality will be available soon. Drag pages to rearrange them or move pages up and down.');
-        }
-
-        // ===== ACCORDION =====
         function toggleTool(toolId) {
             const tools = document.querySelectorAll('.tool');
             const clickedTool = document.getElementById(toolId);
@@ -741,52 +1413,765 @@
             });
         }
 
-        // ===== RESIZABLE DIVIDER =====
-        const divider = document.getElementById('divider');
-        const previewPanel = document.querySelector('.preview-panel');
-        let isDragging = false;
+        function switchOverlayTab(tabName) {
+            document.querySelectorAll('.tabs .tab').forEach((tab, i) => {
+                tab.classList.toggle('active', ['date', 'text', 'image'][i] === tabName);
+            });
+            document.querySelectorAll('.tab-content').forEach((content, i) => {
+                content.classList.toggle('active', ['date', 'text', 'image'][i] === tabName);
+            });
+        }
 
-        divider.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            divider.classList.add('dragging');
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
+        // Update opacity label
+        document.getElementById('imageOpacity')?.addEventListener('input', (e) => {
+            document.getElementById('imageOpacityLabel').textContent = e.target.value + '%';
         });
 
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
+        async function addDateOverlay() {
+            if (!currentPdfFile) return;
 
-            const containerRect = document.querySelector('.main').getBoundingClientRect();
-            const newWidth = e.clientX - containerRect.left;
+            const dateInput = document.getElementById('dateValue').value;
+            if (!dateInput) return;
 
-            if (newWidth > 300 && newWidth < containerRect.width - 300) {
-                previewPanel.style.flex = 'none';
-                previewPanel.style.width = newWidth + 'px';
+            const format = document.getElementById('dateFormat').value;
+            const fontSize = parseInt(document.getElementById('dateFontSize').value);
+            const textColor = selectedTextColor;
+            const bgColor = selectedBgColor;
+            const transparent = document.getElementById('dateBgTransparent').checked;
+
+            // Format the date according to selected format
+            const date = new Date(dateInput);
+            let formattedDate = '';
+
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            const yyyy = date.getFullYear();
+
+            const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+
+            switch(format) {
+                case 'MM/DD/YYYY':
+                    formattedDate = `${mm}/${dd}/${yyyy}`;
+                    break;
+                case 'DD/MM/YYYY':
+                    formattedDate = `${dd}/${mm}/${yyyy}`;
+                    break;
+                case 'YYYY-MM-DD':
+                    formattedDate = `${yyyy}-${mm}-${dd}`;
+                    break;
+                case 'Month DD, YYYY':
+                    formattedDate = `${months[date.getMonth()]} ${dd}, ${yyyy}`;
+                    break;
             }
-        });
 
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                divider.classList.remove('dragging');
-                document.body.style.cursor = '';
-                document.body.style.userSelect = '';
+            // Add to pending overlays
+            const overlayIndex = pendingOverlays.length;
+            pendingOverlays.push({
+                type: 'date',
+                dateText: formattedDate, // Use dateText for consistency
+                format,
+                fontSize,
+                textColor,
+                bgColor: transparent ? null : bgColor,
+                transparentBg: transparent,
+                x: 100,
+                y: 100,
+                rotation: 0,
+                opacity: 100,
+                scale: 1,
+                pageIndex: 0  // TODO: Get current page from PDF viewer
+            });
+
+            // Add visual gizmo to preview
+            addOverlayGizmo('date', `Date: ${formattedDate}`, 100, 100, overlayIndex);
+
+            // Refresh preview to show overlay
+            renderPreviewPage(currentPreviewPage);
+        }
+
+        async function addTextOverlay() {
+            const text = document.getElementById('textContent').value;
+            if (!text.trim()) return;
+
+            const fontSize = parseInt(document.getElementById('textFontSize')?.value || '12');
+            const textColor = '#000000'; // TODO: Add color picker for text overlays
+
+            // Add to pending overlays
+            const overlayIndex = pendingOverlays.length;
+            pendingOverlays.push({
+                type: 'date', // Using date type since it handles text rendering
+                dateText: text,
+                x: 100,
+                y: 100,
+                fontSize: fontSize,
+                textColor: textColor,
+                opacity: 100,
+                scale: 1,
+                pageIndex: 0
+            });
+
+            // Add visual gizmo to preview
+            addOverlayGizmo('text', `Text: ${text.substring(0, 20)}...`, 100, 100, overlayIndex);
+
+            // Refresh preview to show overlay
+            renderPreviewPage(currentPreviewPage);
+        }
+
+        // Store signature image for quick signing
+        let savedSignatureData = null;
+
+        async function addImageOverlay() {
+            const file = document.getElementById('imageFile').files[0];
+            if (!file || !currentPdfFile) return;
+
+            const opacity = parseInt(document.getElementById('imageOpacity').value);
+            const isSignature = document.getElementById('useAsSignature').checked;
+
+            // Read file as base64
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const imageData = e.target.result;
+
+                // If marked as signature, save it for quick signing
+                if (isSignature) {
+                    savedSignatureData = imageData;
+                    document.getElementById('quickSignBtn').style.display = 'block';
+                }
+
+                // Add to pending overlays
+                const overlayIndex = pendingOverlays.length;
+                const type = isSignature ? 'signature' : 'image';
+
+                pendingOverlays.push({
+                    type: type,
+                    imageData: imageData,
+                    x: 100,
+                    y: 100,
+                    width: isSignature ? 200 : 150,
+                    height: isSignature ? 60 : 150,
+                    opacity: opacity,
+                    removeBackground: isSignature
+                });
+
+                // Add visual gizmo to preview
+                const label = isSignature ? 'Signature' : 'Image';
+                addOverlayGizmo(type, label, 100, 100, overlayIndex);
+
+                // Refresh preview to show overlay
+                renderPreviewPage(currentPreviewPage);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function quickSign() {
+            if (!savedSignatureData || !currentPdfFile) return;
+
+            // Get preview area dimensions to center the signature
+            const previewArea = document.getElementById('previewArea');
+            const centerX = (previewArea.clientWidth / 2) - 100; // Center minus half width
+            const centerY = (previewArea.clientHeight / 2) - 30; // Center minus half height
+
+            const overlayIndex = pendingOverlays.length;
+            pendingOverlays.push({
+                type: 'signature',
+                imageData: savedSignatureData,
+                x: Math.max(0, centerX),
+                y: Math.max(0, centerY),
+                width: 200,
+                height: 60,
+                opacity: 100,
+                removeBackground: true
+            });
+
+            addOverlayGizmo('signature', 'Signature', Math.max(0, centerX), Math.max(0, centerY), overlayIndex);
+
+            // Refresh preview to show overlay
+            renderPreviewPage(currentPreviewPage);
+        }
+
+        async function convertToWord() {
+            if (!currentPdfFile) {
+                showModal('No PDF Loaded', 'Please load a PDF file first');
+                return;
             }
-        });
 
-        // ===== SHARE =====
+            try {
+                showModal('Processing', 'Converting PDF to Word document...');
+
+                const response = await fetch('/api/convert-to-word', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!response.ok) throw new Error('Conversion failed');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentPdfFile.replace('.pdf', '')}.docx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                closeModal();
+                showModal('Success', `Converted "${currentPdfFile}" to Word successfully!`);
+            } catch (err) {
+                closeModal();
+                showModal('Error', `Failed to convert: ${err.message}`);
+            }
+        }
+
+        // Insert pages dialog (simplified UI)
+        function insertPagesDialog() {
+            if (!currentPdfFile) {
+                showModal('Error', 'Please load a PDF file first');
+                return;
+            }
+
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf,.png,.jpg,.jpeg';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    mergePDFs('end'); // Default to end, can add position selection later
+                }
+            };
+            input.click();
+        }
+
+        async function mergePDFs(position) {
+            if (!currentPdfFile) {
+                showModal('Error', 'Please load a PDF file first');
+                return;
+            }
+
+            // Create file input for selecting PDF or image to merge
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf,.png,.jpg,.jpeg';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const fileName = file.name.toLowerCase();
+                const isPdf = fileName.endsWith('.pdf');
+                const isImage = fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg');
+
+                if (!isPdf && !isImage) {
+                    showModal('Invalid File', 'Please select a PDF or image file (PNG, JPG, JPEG)');
+                    return;
+                }
+
+                try {
+                    showModal('Processing', isImage ? 'Loading image...' : 'Loading PDF pages...');
+
+                    let newPdfDoc = null;
+                    let newPageCount = 0;
+                    let imageData = null;
+
+                    if (isImage) {
+                        // Load image and create preview
+                        const img = new Image();
+                        const reader = new FileReader();
+
+                        await new Promise((resolve, reject) => {
+                            reader.onload = (e) => {
+                                imageData = e.target.result;
+                                img.onload = resolve;
+                                img.onerror = reject;
+                                img.src = imageData;
+                            };
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+
+                        // Image will be treated as 1 page
+                        newPageCount = 1;
+                    } else {
+                        // Load the new PDF using PDF.js
+                        const arrayBuffer = await file.arrayBuffer();
+                        newPdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        newPageCount = newPdfDoc.numPages;
+                    }
+
+                    // Load current PDF if not already loaded
+                    if (!pdfDocument) {
+                        const response = await fetch(`/pdf/${encodeURIComponent(currentPdfFile)}`);
+                        const currentArrayBuffer = await response.arrayBuffer();
+                        pdfDocument = await pdfjsLib.getDocument({ data: currentArrayBuffer }).promise;
+                    }
+
+                    const currentPageCount = pdfDocument.numPages;
+
+                    // Store the new pages (PDF or image)
+                    const mergedPages = [];
+
+                    if (position === 'beginning') {
+                        // Add new pages first, then current pages
+                        for (let i = 1; i <= newPageCount; i++) {
+                            mergedPages.push({
+                                doc: newPdfDoc,
+                                pageNum: i,
+                                source: 'new',
+                                isImage: isImage,
+                                imageData: imageData
+                            });
+                        }
+                        for (let i = 1; i <= currentPageCount; i++) {
+                            mergedPages.push({ doc: pdfDocument, pageNum: i, source: 'current' });
+                        }
+                    } else if (position === 'replace') {
+                        // Replace with new pages
+                        for (let i = 1; i <= newPageCount; i++) {
+                            mergedPages.push({
+                                doc: newPdfDoc,
+                                pageNum: i,
+                                source: 'new',
+                                isImage: isImage,
+                                imageData: imageData
+                            });
+                        }
+                    } else { // 'end' or default
+                        // Add current pages first, then new pages
+                        for (let i = 1; i <= currentPageCount; i++) {
+                            mergedPages.push({ doc: pdfDocument, pageNum: i, source: 'current' });
+                        }
+                        for (let i = 1; i <= newPageCount; i++) {
+                            mergedPages.push({
+                                doc: newPdfDoc,
+                                pageNum: i,
+                                source: 'new',
+                                isImage: isImage,
+                                imageData: imageData
+                            });
+                        }
+                    }
+
+                    // Generate thumbnails for all pages
+                    const thumbnailsList = document.getElementById('thumbnailsList');
+                    thumbnailsList.innerHTML = '';
+
+                    for (let i = 0; i < mergedPages.length; i++) {
+                        const pageInfo = mergedPages[i];
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+
+                        if (pageInfo.isImage) {
+                            // Create thumbnail from image
+                            const img = new Image();
+                            img.src = pageInfo.imageData;
+                            await new Promise(resolve => {
+                                if (img.complete) {
+                                    resolve();
+                                } else {
+                                    img.onload = resolve;
+                                }
+                            });
+
+                            // Scale image to thumbnail size (similar to PDF scale 0.3)
+                            const scale = 0.3;
+                            canvas.width = img.width * scale;
+                            canvas.height = img.height * scale;
+                            context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        } else {
+                            // Render PDF page
+                            const page = await pageInfo.doc.getPage(pageInfo.pageNum);
+                            const viewport = page.getViewport({ scale: 0.3 });
+                            canvas.width = viewport.width;
+                            canvas.height = viewport.height;
+                            await page.render({ canvasContext: context, viewport }).promise;
+                        }
+
+                        const item = document.createElement('div');
+                        item.className = 'thumbnail-item';
+                        item.draggable = true;
+                        item.dataset.pageNum = i + 1;
+                        item.dataset.source = pageInfo.source;
+                        item.dataset.originalPage = pageInfo.pageNum;
+                        item.innerHTML = `
+                            <canvas class="thumbnail-canvas"></canvas>
+                            <div class="thumbnail-number">${i + 1}</div>
+                            <input type="checkbox" class="thumbnail-checkbox" data-page="${i + 1}">
+                        `;
+
+                        if (pageInfo.source === 'new') {
+                            item.style.borderColor = '#4CAF50'; // Green border for new pages
+                        }
+
+                        const thumbCanvas = item.querySelector('canvas');
+                        thumbCanvas.width = canvas.width;
+                        thumbCanvas.height = canvas.height;
+                        thumbCanvas.getContext('2d').drawImage(canvas, 0, 0);
+
+                        // Checkbox selection
+                        const checkbox = item.querySelector('.thumbnail-checkbox');
+                        checkbox.addEventListener('change', (e) => {
+                            e.stopPropagation();
+                            handlePageSelection(i + 1, checkbox.checked);
+                        });
+
+                        // Click to preview
+                        item.addEventListener('click', (e) => {
+                            if (e.target.classList.contains('thumbnail-checkbox')) return;
+                            // TODO: Preview page from merged document
+                        });
+
+                        // Drag events for reordering
+                        item.addEventListener('dragstart', handleDragStart);
+                        item.addEventListener('dragover', handleDragOver);
+                        item.addEventListener('drop', handleDrop);
+                        item.addEventListener('dragend', handleDragEnd);
+
+                        thumbnailsList.appendChild(item);
+                    }
+
+                    // Store merged pages data for export
+                    mergedPagesData = mergedPages;
+
+                    // Update page order
+                    pageOrder = Array.from({ length: mergedPages.length }, (_, i) => i + 1);
+
+                    // Store merged state
+                    window.mergedPdfData = { mergedPages, arrayBuffer: await file.arrayBuffer() };
+
+                    closeModal();
+                } catch (err) {
+                    closeModal();
+                    showModal('Error', `Failed to merge: ${err.message}`);
+                }
+            };
+            input.click();
+        }
+
+        async function removeSelectedPages() {
+            if (selectedPages.size === 0) {
+                showModal('No Pages Selected', 'Hold Ctrl and click pages to select them for removal');
+                return;
+            }
+
+            if (!currentPdfFile) {
+                showModal('No PDF Loaded', 'Please load a PDF first');
+                return;
+            }
+
+            showConfirmModal(
+                'Remove Pages',
+                `Are you sure you want to remove ${selectedPages.size} page(s)? This will download a new PDF file.`,
+                async () => {
+                    try {
+                        showModal('Processing', `Removing ${selectedPages.size} page(s)...`);
+
+                        const response = await fetch('/api/remove-pages', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pages: Array.from(selectedPages) })
+                        });
+
+                        if (!response.ok) throw new Error('Remove failed');
+
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${currentPdfFile.replace('.pdf', '')}_removed.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+
+                        closeModal();
+                        showModal('Success', `Removed ${selectedPages.size} page(s) successfully!`);
+                        selectedPages.clear();
+                        document.getElementById('removePageBtn').style.display = 'none';
+                    } catch (err) {
+                        closeModal();
+                        showModal('Error', `Failed to remove pages: ${err.message}`);
+                    }
+                }
+            );
+        }
+
         function shareApp() {
-            const shareUrl = 'https://twitter.com/intent/tweet?text=Check%20out%20PDFile%20%E2%80%93%20Free%20PDF%20utility%20toolkit!%20pdfile.co';
-            window.open(shareUrl, '_blank');
+            window.open('https://twitter.com/intent/tweet?text=Check%20out%20PDFile%20%E2%80%93%20Free%20PDF%20utility%20toolkit!%20pdfile.co', '_blank');
+        }
+
+
+        // ===== OVERLAY GIZMO =====
+        function addOverlayGizmo(type, label, x, y, overlayIndex) {
+            const previewArea = document.getElementById('previewArea');
+            const overlay = pendingOverlays[overlayIndex];
+
+            // Create gizmo element
+            const gizmo = document.createElement('div');
+            gizmo.className = 'overlay-gizmo';
+            gizmo.style.left = x + 'px';
+            gizmo.style.top = y + 'px';
+            gizmo.dataset.overlayIndex = overlayIndex;
+
+            // Set gizmo size based on overlay dimensions
+            if (overlay && (type === 'image' || type === 'signature')) {
+                gizmo.style.width = (overlay.width || 120) + 'px';
+                gizmo.style.height = (overlay.height || 60) + 'px';
+            }
+
+            // Build inner HTML based on type
+            let content = '';
+            if (type === 'image' || type === 'signature') {
+                // Show image preview
+                content = overlay && overlay.imageData
+                    ? `<img src="${overlay.imageData}" alt="${label}">`
+                    : `<div class="overlay-gizmo-text">${label}</div>`;
+            } else {
+                // Show text label for date/text overlays
+                content = `<div class="overlay-gizmo-text">${label}</div>`;
+            }
+
+            gizmo.innerHTML = `
+                <div class="overlay-gizmo-label">${label}</div>
+                <div class="overlay-gizmo-handle"></div>
+                <button class="overlay-gizmo-delete" onclick="removeOverlay(${overlayIndex})" title="Remove">✕</button>
+                ${content}
+            `;
+
+            // Make draggable
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            gizmo.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('overlay-gizmo-delete')) return;
+
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                initialLeft = parseInt(gizmo.style.left) || 0;
+                initialTop = parseInt(gizmo.style.top) || 0;
+                gizmo.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+
+                const newLeft = Math.max(0, initialLeft + deltaX);
+                const newTop = Math.max(0, initialTop + deltaY);
+
+                gizmo.style.left = newLeft + 'px';
+                gizmo.style.top = newTop + 'px';
+
+                // Update pending overlay position
+                const index = parseInt(gizmo.dataset.overlayIndex);
+                if (pendingOverlays[index]) {
+                    pendingOverlays[index].x = newLeft;
+                    pendingOverlays[index].y = newTop;
+                }
+            });
+
+            document.addEventListener('mouseup', async () => {
+                if (isDragging) {
+                    isDragging = false;
+                    gizmo.style.cursor = 'move';
+                    // Re-render preview to show updated overlay position
+                    await renderPreviewPage(currentPreviewPage);
+                }
+            });
+
+            previewArea.appendChild(gizmo);
+        }
+
+        async function removeOverlay(index) {
+            pendingOverlays.splice(index, 1);
+
+            // Remove all gizmos and recreate them with updated indices
+            document.querySelectorAll('.overlay-gizmo').forEach(g => g.remove());
+
+            pendingOverlays.forEach((overlay, i) => {
+                const label = overlay.type === 'date' ? `Date: ${overlay.dateText || 'Today'}` :
+                             overlay.type === 'text' ? `Text: ${overlay.text}` :
+                             overlay.type === 'image' ? 'Image' : 'Signature';
+                addOverlayGizmo(overlay.type, label, overlay.x, overlay.y, i);
+            });
+
+            // Re-render preview to remove the overlay from canvas
+            await renderPreviewPage(currentPreviewPage);
+        }
+
+        // ===== EXPORT PDF =====
+        async function exportPDF() {
+            if (!currentPdfFile) return;
+
+            try {
+                // Show subtle processing indicator instead of modal
+                const exportBtn = document.getElementById('exportBtn');
+                const originalHtml = exportBtn.innerHTML;
+                exportBtn.innerHTML = '<i data-lucide="loader" style="animation: spin 1s linear infinite;"></i>';
+                exportBtn.disabled = true;
+
+                // If no overlays, just download the current PDF
+                if (pendingOverlays.length === 0) {
+                    const response = await fetch(`/pdf/${encodeURIComponent(currentPdfFile)}`);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = currentPdfFile;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    exportBtn.innerHTML = originalHtml;
+                    exportBtn.disabled = false;
+                    lucide.createIcons();
+                    return;
+                }
+
+                // Send all overlays in a single request to process sequentially
+                const response = await fetch('/api/apply-overlays', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ overlays: pendingOverlays })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to apply overlays');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentPdfFile.replace('.pdf', '')}_with_overlays.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                // Clear overlays
+                pendingOverlays = [];
+
+                // Remove gizmos
+                document.querySelectorAll('.overlay-gizmo').forEach(g => g.remove());
+
+                // Restore button
+                exportBtn.innerHTML = originalHtml;
+                exportBtn.disabled = false;
+                lucide.createIcons();
+
+            } catch (err) {
+                // Restore button on error
+                exportBtn.innerHTML = originalHtml;
+                exportBtn.disabled = false;
+                lucide.createIcons();
+
+                showModal('Error', `Failed to export: ${err.message}`);
+                console.error('Export error:', err);
+            }
         }
 
         // ===== INITIALIZATION =====
+        // Initialize window size and position
+        (function initWindow() {
+            const html = document.documentElement;
+            const w = parseInt(html.getAttribute('data-width')) || 700;
+            const h = parseInt(html.getAttribute('data-height')) || 590;
+
+            // Center window on available screen
+            const x = Math.round((screen.availWidth - w) / 2) + (screen.availLeft || 0);
+            const y = Math.round((screen.availHeight - h) / 2) + (screen.availTop || 0);
+
+            if (typeof window.moveTo === 'function') {
+                window.moveTo(x, y);
+            }
+            if (typeof window.resizeTo === 'function') {
+                window.resizeTo(w, h);
+            }
+
+            // Reset zoom
+            html.style.zoom = '100%';
+        })();
+
         document.addEventListener('contextmenu', e => e.preventDefault());
+        // Initialize components
+        let datePicker, textColorPicker, bgColorPicker;
+        let selectedTextColor = '#000000';
+        let selectedBgColor = '#ffffff';
+
         document.addEventListener('DOMContentLoaded', () => {
-            setupDragDrop();
             loadInitialPDF();
-            // Initialize Lucide icons
             lucide.createIcons();
+
+            // Initialize Flatpickr date picker
+            datePicker = flatpickr('#dateValue', {
+                defaultDate: 'today',
+                dateFormat: 'Y-m-d',
+                allowInput: true,
+                theme: 'dark'
+            });
+
+            // Initialize Pickr color pickers
+            textColorPicker = Pickr.create({
+                el: '#textColorPicker',
+                theme: 'nano',
+                default: '#000000',
+                swatches: [
+                    '#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff',
+                    '#ffff00', '#ff00ff', '#00ffff'
+                ],
+                components: {
+                    preview: true,
+                    opacity: false,
+                    hue: true,
+                    interaction: {
+                        hex: true,
+                        input: true,
+                        save: true
+                    }
+                }
+            });
+
+            textColorPicker.on('save', (color) => {
+                selectedTextColor = color.toHEXA().toString();
+                textColorPicker.hide();
+            });
+
+            bgColorPicker = Pickr.create({
+                el: '#bgColorPicker',
+                theme: 'nano',
+                default: '#ffffff',
+                swatches: [
+                    '#ffffff', '#000000', '#ffff00', '#00ffff',
+                    '#ff00ff', '#c0c0c0', '#808080'
+                ],
+                components: {
+                    preview: true,
+                    opacity: false,
+                    hue: true,
+                    interaction: {
+                        hex: true,
+                        input: true,
+                        save: true
+                    }
+                }
+            });
+
+            bgColorPicker.on('save', (color) => {
+                selectedBgColor = color.toHEXA().toString();
+                bgColorPicker.hide();
+            });
+
+            // Toggle background color picker visibility
+            document.getElementById('dateBgTransparent').addEventListener('change', (e) => {
+                const bgPicker = document.getElementById('bgColorPicker');
+                bgPicker.style.display = e.target.checked ? 'none' : 'block';
+            });
         });
     </script>
 </body>

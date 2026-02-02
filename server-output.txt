@@ -1,0 +1,23 @@
+PDFile GUI started at: http://127.0.0.1:40455?file=test-doc.pdf
+TypeError: path must be absolute or specify root to res.sendFile
+    at ServerResponse.sendFile (/mnt/d/RandomProjects/pdfile/node_modules/express/lib/response.js:400:11)
+    at file:///mnt/d/RandomProjects/pdfile/dist/cli.js:768:11
+    at Layer.handleRequest (/mnt/d/RandomProjects/pdfile/node_modules/router/lib/layer.js:152:17)
+    at next (/mnt/d/RandomProjects/pdfile/node_modules/router/lib/route.js:157:13)
+    at Route.dispatch (/mnt/d/RandomProjects/pdfile/node_modules/router/lib/route.js:117:3)
+    at handle (/mnt/d/RandomProjects/pdfile/node_modules/router/index.js:435:11)
+    at Layer.handleRequest (/mnt/d/RandomProjects/pdfile/node_modules/router/lib/layer.js:152:17)
+    at /mnt/d/RandomProjects/pdfile/node_modules/router/index.js:295:15
+    at param (/mnt/d/RandomProjects/pdfile/node_modules/router/index.js:600:14)
+    at param (/mnt/d/RandomProjects/pdfile/node_modules/router/index.js:610:14)
+TypeError: path must be absolute or specify root to res.sendFile
+    at ServerResponse.sendFile (/mnt/d/RandomProjects/pdfile/node_modules/express/lib/response.js:400:11)
+    at file:///mnt/d/RandomProjects/pdfile/dist/cli.js:768:11
+    at Layer.handleRequest (/mnt/d/RandomProjects/pdfile/node_modules/router/lib/layer.js:152:17)
+    at next (/mnt/d/RandomProjects/pdfile/node_modules/router/lib/route.js:157:13)
+    at Route.dispatch (/mnt/d/RandomProjects/pdfile/node_modules/router/lib/route.js:117:3)
+    at handle (/mnt/d/RandomProjects/pdfile/node_modules/router/index.js:435:11)
+    at Layer.handleRequest (/mnt/d/RandomProjects/pdfile/node_modules/router/lib/layer.js:152:17)
+    at /mnt/d/RandomProjects/pdfile/node_modules/router/index.js:295:15
+    at param (/mnt/d/RandomProjects/pdfile/node_modules/router/index.js:600:14)
+    at param (/mnt/d/RandomProjects/pdfile/node_modules/router/index.js:610:14)
