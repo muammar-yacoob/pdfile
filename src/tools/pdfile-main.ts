@@ -177,29 +177,38 @@ export async function runGUI(file: string): Promise<boolean> {
 							await writeFile(imagePath, imageBuffer);
 							tempFiles.push(imagePath);
 
-						// Use signature processing if removeBackground is true
-						if (overlay.removeBackground) {
-							success = await addSignature(currentFile, {
-								signatureFile: imagePath,
-								x: overlay.x,
-								y: overlay.y,
-								width: overlay.width,
-								height: overlay.height,
-								opacity: overlay.opacity / 100,
-								removeBg: true,
-								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
-							}, outputPath);
-						} else {
-							success = await addImageOverlay(currentFile, {
-								imagePath,
-								x: overlay.x,
-								y: overlay.y,
-								width: overlay.width,
-								height: overlay.height,
-								opacity: overlay.opacity / 100,
-								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
-							}, outputPath);
-						}
+							// Log dimensions for debugging
+							console.log(`Image overlay dimensions: x=${overlay.x}, y=${overlay.y}, w=${overlay.width}, h=${overlay.height}`);
+
+							// Use signature processing if removeBackground is true
+							if (overlay.removeBackground) {
+								success = await addSignature(currentFile, {
+									signatureFile: imagePath,
+									x: overlay.x,
+									y: overlay.y,
+									width: overlay.width,
+									height: overlay.height,
+									opacity: overlay.opacity / 100,
+									rotation: overlay.rotation || 0,
+									removeBg: true,
+									pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
+								}, outputPath);
+							} else {
+								success = await addImageOverlay(currentFile, {
+									imagePath,
+									x: overlay.x,
+									y: overlay.y,
+									width: overlay.width,
+									height: overlay.height,
+									opacity: overlay.opacity / 100,
+									rotation: overlay.rotation || 0,
+									pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
+								}, outputPath);
+							}
+
+							if (!success) {
+								console.error(`Failed to apply image overlay with dimensions: ${overlay.width}x${overlay.height}`);
+							}
 
 						} else if (overlay.type === 'signature') {
 							const imageBuffer = Buffer.from(overlay.imageData.split(',')[1], 'base64');
@@ -213,7 +222,10 @@ export async function runGUI(file: string): Promise<boolean> {
 								y: overlay.y,
 								width: overlay.width,
 								height: overlay.height,
+								opacity: overlay.opacity / 100,
+								rotation: overlay.rotation || 0,
 								removeBg: overlay.removeBackground !== false,
+								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
 							}, outputPath);
 						}
 
@@ -257,7 +269,13 @@ export async function runGUI(file: string): Promise<boolean> {
 
 			} catch (error) {
 				console.error('Export PDF error:', error);
-				res.status(500).json({ error: 'Internal server error: ' + (error as Error).message });
+				if (error instanceof Error) {
+					console.error('Error stack:', error.stack);
+				}
+				res.status(500).json({
+					error: 'Internal server error: ' + (error as Error).message,
+					stack: error instanceof Error ? error.stack : undefined
+				});
 			}
 		});
 
@@ -328,6 +346,7 @@ export async function runGUI(file: string): Promise<boolean> {
 								width: overlay.width,
 								height: overlay.height,
 								opacity: overlay.opacity / 100,
+								rotation: overlay.rotation || 0,
 								removeBg: true,
 								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
 							}, outputPath);
@@ -339,6 +358,7 @@ export async function runGUI(file: string): Promise<boolean> {
 								width: overlay.width,
 								height: overlay.height,
 								opacity: overlay.opacity / 100,
+								rotation: overlay.rotation || 0,
 								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
 							}, outputPath);
 						}

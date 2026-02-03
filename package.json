@@ -1,6 +1,6 @@
 {
 	"name": "@spark-apps/pdfile",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Comprehensive PDF utility toolkit for document manipulation",
 	"type": "module",
 	"bin": {
@@ -43,7 +43,7 @@
 	"bugs": {
 		"url": "https://github.com/muammar-yacoob/PDFile/issues"
 	},
-	"homepage": "https://github.com/muammar-yacoob/PDFile#readme",
+	"homepage": "https://piclet.co",
 	"engines": {
 		"node": ">=18"
 	},

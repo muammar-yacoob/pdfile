@@ -24,6 +24,7 @@ export interface SignatureOptions {
 	width?: number;
 	height?: number;
 	opacity?: number;
+	rotation?: number; // Rotation angle in degrees
 	pages?: number[]; // Specific page numbers (0-indexed), or all pages if undefined
 	// Transparency removal options (applied automatically)
 	removeBg?: boolean; // Default: true
@@ -195,8 +196,14 @@ export async function addSignature(
 				(signatureDims.height * sigWidth) / signatureDims.width;
 
 			const x = options.x ?? pageWidth - sigWidth - 50;
-			const y = options.y ?? 80;
+
+			// CRITICAL FIX: Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
+			// Canvas: y=0 at top, PDF: y=0 at bottom
+			const canvasY = options.y ?? 80;
+			const y = pageHeight - canvasY - sigHeight;
+
 			const opacity = options.opacity ?? 1.0;
+			const rotation = options.rotation ?? 0;
 
 			// Draw signature
 			page.drawImage(signatureImage, {
@@ -205,6 +212,7 @@ export async function addSignature(
 				width: sigWidth,
 				height: sigHeight,
 				opacity,
+				rotate: { angle: rotation, type: 'degrees' },
 			});
 		}
 

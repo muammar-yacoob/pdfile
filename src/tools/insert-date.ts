@@ -103,7 +103,11 @@ export async function insertDate(
 			const textWidth = font.widthOfTextAtSize(dateText, fontSize);
 			const textHeight = fontSize;
 			const x = options.x ?? width - textWidth - 50;
-			const y = options.y ?? 30;
+
+			// CRITICAL FIX: Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
+			// Canvas: y=0 at top, PDF: y=0 at bottom
+			const canvasY = options.y ?? 30;
+			const y = height - canvasY - textHeight;
 
 			// Draw background if specified
 			if (options.bgColor) {
