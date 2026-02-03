@@ -21,6 +21,15 @@ npm run lint:fix       # Auto-fix linting issues
 npm run format         # Format code with Biome
 npm run typecheck      # Run TypeScript type checking
 
+# Testing
+npm run test           # Run all tests (basic + API)
+npm run test:basic     # Run basic automated tests
+npm run test:api       # Run API endpoint tests
+npm run test:manual    # Run manual test suite
+
+# Marketing assets
+npm run social-cards   # Generate social media cards (1200x630px) for all taglines
+
 # Local development installation
 npm link               # Make pdfile globally available for testing
 pdfile install         # Register Windows context menu entries
@@ -121,17 +130,46 @@ The command points to the launcher VBScript which handles GUI initialization.
 
 ## Important Patterns
 
+### GUI State Management
+
+The GUI maintains several critical state variables:
+- **`currentWorkingFile`**: Tracks the active PDF file on the server (changes after merges)
+- **`mergedPagesData`**: Array storing info about merged pages from multiple PDFs
+- **`pendingOverlays`**: Array of overlays (text, dates, images, signatures) to apply on export
+- **`selectedPages`**: Set of page numbers currently selected in thumbnails panel
+
+When merging images/PDFs as pages:
+1. Frontend sends merge request to `/api/merge-pdfs`
+2. Backend creates merged PDF, returns as blob
+3. Frontend converts blob to base64, sends to `/api/update-working-file`
+4. Backend updates `currentWorkingFile` to point to merged PDF
+5. All subsequent operations (preview, export) use the updated file
+
+### Background Removal (Signatures/Images)
+
+Uses edge-aware flood-fill approach inspired by PicLet:
+- Auto-detects background color from corner pixels
+- Applies flood-fill from borders only (preserves inner details)
+- Feathers alpha channel for smooth edges
+- Default settings: fuzz=20%, feather=50
+- Requires ImageMagick: `sudo apt install imagemagick`
+
 ### Error Handling in Registry Operations
 Registry operations silently ignore WSL interop errors (when `reg.exe` can't run) to avoid spamming users with expected failures.
-
-### Signature Background Removal
-Uses ImageMagick with fuzz tolerance and feathering for clean signature edges. Falls back gracefully if ImageMagick is not installed.
 
 ### Express Server Lifecycle
 The GUI server runs until the Edge window is closed (process exit). No explicit shutdown mechanism - relies on process cleanup.
 
 ### CLI Prompt System
 Uses `prompts` library for interactive inputs (page selection, format selection, etc.). Supports `-y` flag to skip prompts with defaults.
+
+### Image Format Support
+
+The app supports all major image formats:
+- **PNG/JPG**: Direct embedding via pdf-lib
+- **GIF/BMP/WebP/TIFF**: Converted to PNG using ImageMagick first
+- Images can be merged as full pages or added as overlays
+- Large images (≥300px) auto-scale to 90% of page size when dropped
 
 ## Platform Requirements
 
@@ -150,3 +188,37 @@ pdfile install        # Re-register context menu
 # Right-click a PDF in Windows Explorer to test GUI
 # Or run CLI: pdfile merge test1.pdf test2.pdf
 ```
+
+## GUI Implementation Details
+
+### Frontend Libraries
+- **PDF.js**: PDF rendering and preview
+- **pdf-lib**: Client-side PDF manipulation
+- **Flatpickr**: Date picker with dark theme
+- **Pickr**: Color picker for text/background colors
+- **Lucide**: Icon system
+
+### Overlay System (Gizmos)
+Overlays are managed through interactive "gizmos" in the preview area:
+- **Move**: Click and drag the gizmo
+- **Resize**: Drag the bottom-right handle (text overlays auto-scale font)
+- **Rotate**: Drag the bottom-left circular handle
+- **Delete**: Click the X button (shows confirmation modal)
+- Handles only visible on hover; dotted border when not hovered
+
+### Color Handling
+- Text and background colors use Pickr with real-time updates (no save button)
+- Colors stored as HEX strings (6 characters, not 8)
+- Backend `parseColor()` converts HEX to RGB object for pdf-lib: `{r, g, b}` (0-1 range)
+
+### Page Selection
+- Clicking a thumbnail selects/deselects it and shows it in preview
+- Multiple selections: preview shows the last-selected page
+- Selected pages have thicker 3px theme blue border
+- Up/down arrow buttons move selected pages in order
+
+### Loading Screen
+- Shows random tagline from 9 options on each launch
+- Tagline font auto-sizes based on content length (max 16px, min 10px)
+- Background: `@Promo/Pdfile.png` copied to `src/gui/img/pdfile-loading-bg.png`
+- Uses HTA (HTML Application) to show loading while Node server starts

@@ -17,6 +17,7 @@
 		"test:basic": "tsx tests/automated-test.ts",
 		"test:api": "tsx tests/api-test.ts",
 		"test:manual": "tsx tests/manual-test.ts",
+		"social-cards": "tsx src/tools/generate-social-cards.ts",
 		"prepublishOnly": "bun run build"
 	},
 	"keywords": [

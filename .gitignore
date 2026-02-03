@@ -13,3 +13,6 @@ node_modules/
 # Legacy
 /libs
 /demo
+
+# Generated social media cards (regenerate with: npm run social-cards)
+social-cards/*.png

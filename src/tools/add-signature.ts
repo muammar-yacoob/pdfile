@@ -62,7 +62,8 @@ async function getMagickCommand(): Promise<string> {
 
 /**
  * Remove background from PNG signature using ImageMagick
- * Uses best practices: no preserve inner colors, with feathering
+ * Uses edge-aware flood-fill approach: removes only border/background colors
+ * while preserving inner details, with smooth feathering for clean edges
  */
 async function processSignature(
 	inputFile: string,
@@ -77,44 +78,37 @@ async function processSignature(
 
 	const magickCmd = await getMagickCommand();
 
-	// ImageMagick command to remove background with feathering
-	// -fuzz X%: color tolerance for transparency
-	// -transparent: make the detected color transparent
-	// -trim: remove transparent edges
-	// -alpha extract -morphology EdgeOut Diamond:1: creates feathered edge
-	const bgColor = 'white'; // Assume white background for signatures
+	// Auto-detect background color by sampling corner pixels
+	let bgColor = 'white';
+	try {
+		const sampleCmd =
+			magickCmd === 'magick'
+				? `magick "${inputFile}" -format "%[pixel:u.p{0,0}]" info:`
+				: `convert "${inputFile}" -format "%[pixel:u.p{0,0}]" info:`;
+		const { stdout } = await execAsync(sampleCmd);
+		bgColor = stdout.trim();
+	} catch {
+		// Fall back to white if detection fails
+		bgColor = 'white';
+	}
 
 	try {
-		// Step 1: Remove background with fuzz tolerance
-		const cmd1 =
+		// Calculate feather blur radius (0.5 to 3 pixels based on feather amount 0-100)
+		const featherRadius = feather > 0 ? 0.5 + (feather / 100) * 2.5 : 0;
+
+		// Edge-aware background removal with feathering
+		// This uses flood-fill from borders only, not affecting inner colors
+		// -bordercolor: sets the color to detect at edges
+		// -border 1x1: adds 1px border to ensure edge detection works
+		// -fill none -fuzz X% -draw "matte 0,0 floodfill": flood-fills from edges
+		// -shave 1x1: removes the temporary border
+		// -channel A -blur: feathers the alpha channel for smooth edges
+		const cmd =
 			magickCmd === 'magick'
-				? `magick "${inputFile}" -fuzz ${fuzz}% -transparent ${bgColor} "${tempFile}"`
-				: `convert "${inputFile}" -fuzz ${fuzz}% -transparent ${bgColor} "${tempFile}"`;
+				? `magick "${inputFile}" -bordercolor "${bgColor}" -border 1x1 -fill none -fuzz ${fuzz}% -draw "matte 0,0 floodfill" -shave 1x1 ${featherRadius > 0 ? `-channel A -blur 0x${featherRadius} +channel` : ''} "${tempFile}"`
+				: `convert "${inputFile}" -bordercolor "${bgColor}" -border 1x1 -fill none -fuzz ${fuzz}% -draw "matte 0,0 floodfill" -shave 1x1 ${featherRadius > 0 ? `-channel A -blur 0x${featherRadius} +channel` : ''} "${tempFile}"`;
 
-		await execAsync(cmd1);
-
-		// Step 2: Add feathering if requested
-		if (feather > 0) {
-			const tempFeathered = path.join(
-				tmpdir(),
-				`pdfile-signature-${Date.now()}-feathered.png`,
-			);
-
-			const cmd2 =
-				magickCmd === 'magick'
-					? `magick "${tempFile}" -alpha extract -morphology EdgeOut Diamond:${feather} -negate "${tempFeathered}"`
-					: `convert "${tempFile}" -alpha extract -morphology EdgeOut Diamond:${feather} -negate "${tempFeathered}"`;
-
-			try {
-				await execAsync(cmd2);
-				// Use feathered version
-				await fs.unlink(tempFile);
-				await fs.rename(tempFeathered, tempFile);
-			} catch {
-				// If feathering fails, continue with non-feathered version
-				console.warn('Feathering failed, using non-feathered signature');
-			}
-		}
+		await execAsync(cmd);
 
 		return tempFile;
 	} catch (error) {
@@ -151,8 +145,8 @@ export async function addSignature(
 
 		// Process signature if background removal is enabled
 		const removeBg = options.removeBg ?? true;
-		const fuzz = options.fuzz ?? 15;
-		const feather = options.feather ?? 2;
+		const fuzz = options.fuzz ?? 20;
+		const feather = options.feather ?? 50;
 
 		let processedSignature = options.signatureFile;
 

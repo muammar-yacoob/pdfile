@@ -32,6 +32,9 @@ export async function runGUI(file: string): Promise<boolean> {
 	cleanupSignalFiles();
 
 	return new Promise((resolve) => {
+		// Track current working file (may change after merges)
+		let currentWorkingFile = file;
+
 		const app = express();
 		app.use(express.json({ limit: '50mb' }));
 		app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -63,8 +66,8 @@ export async function runGUI(file: string): Promise<boolean> {
 		// API endpoint to get file info
 		app.get('/api/file', (_req, res) => {
 			res.json({
-				fileName: basename(file),
-				filePath: file,
+				fileName: basename(currentWorkingFile),
+				filePath: currentWorkingFile,
 			});
 		});
 
@@ -72,7 +75,190 @@ export async function runGUI(file: string): Promise<boolean> {
 		app.get('/pdf/:filename', (_req, res) => {
 			res.setHeader('Content-Type', 'application/pdf');
 			res.setHeader('Content-Disposition', 'inline');
-			res.sendFile(file);
+			res.sendFile(currentWorkingFile);
+		});
+
+		// API endpoint to update current working file (after merge)
+		app.post('/api/update-working-file', async (req, res) => {
+			try {
+				const { pdfData } = req.body;
+				if (!pdfData) {
+					return res.status(400).json({ error: 'No PDF data provided' });
+				}
+
+				const tmpDir = join(__dirname, 'temp');
+				const { mkdir } = await import('node:fs/promises');
+				await mkdir(tmpDir, { recursive: true });
+
+				// Save the PDF data to a temporary file
+				const pdfBuffer = Buffer.from(pdfData.split(',')[1], 'base64');
+				const tempPath = join(tmpDir, `working_${Date.now()}.pdf`);
+				await writeFile(tempPath, pdfBuffer);
+
+				// Update the current working file
+				currentWorkingFile = tempPath;
+
+				res.json({ success: true, filePath: tempPath });
+			} catch (error) {
+				console.error('Update working file error:', error);
+				res.status(500).json({ error: 'Failed to update working file' });
+			}
+		});
+
+		// API: Export PDF with merged pages and overlays
+		app.post('/api/export-pdf', async (req, res) => {
+			try {
+				const { hasMergedPages, hasReordering, pageOrder, overlays, mergedPagesData } = req.body;
+
+				const tmpDir = join(__dirname, 'temp');
+				const { mkdir } = await import('node:fs/promises');
+				await mkdir(tmpDir, { recursive: true });
+
+				let currentFile = currentWorkingFile;
+				let tempFiles: string[] = [];
+
+				// Step 1: Handle merged pages or reordering if needed
+				if ((hasMergedPages || hasReordering) && pageOrder && pageOrder.length > 0) {
+					const { PDFDocument } = await import('pdf-lib');
+					const pdfBytes = await readFile(currentWorkingFile);
+					const srcDoc = await PDFDocument.load(pdfBytes);
+					const newDoc = await PDFDocument.create();
+
+					// Copy pages in the specified order
+					for (const pageInfo of pageOrder) {
+						const pageIndex = pageInfo.pageNum - 1;
+						const [copiedPage] = await newDoc.copyPages(srcDoc, [pageIndex]);
+						newDoc.addPage(copiedPage);
+					}
+
+					// Save merged/reordered PDF
+					const reorderedPath = join(tmpDir, `reordered_${Date.now()}.pdf`);
+					const reorderedBytes = await newDoc.save({ useObjectStreams: true });
+					await writeFile(reorderedPath, reorderedBytes);
+					currentFile = reorderedPath;
+					tempFiles.push(reorderedPath);
+				}
+
+				// Step 2: Apply overlays if any
+				if (overlays && overlays.length > 0) {
+					const parseColor = (hex: string) => {
+						if (!hex) return undefined;
+						const r = parseInt(hex.slice(1, 3), 16) / 255;
+						const g = parseInt(hex.slice(3, 5), 16) / 255;
+						const b = parseInt(hex.slice(5, 7), 16) / 255;
+						return { r, g, b };
+					};
+
+					for (let i = 0; i < overlays.length; i++) {
+						const overlay = overlays[i];
+						const isLast = i === overlays.length - 1;
+						const outputPath = isLast
+							? file.replace(/\.pdf$/i, '_abused.pdf')
+							: join(tmpDir, `temp_overlay_${i}_${Date.now()}.pdf`);
+
+						let success = false;
+
+						if (overlay.type === 'date') {
+							success = await insertDate(currentFile, {
+								dateText: overlay.dateText,
+								format: overlay.format,
+								fontSize: overlay.fontSize,
+								color: parseColor(overlay.textColor),
+								bgColor: overlay.bgColor ? parseColor(overlay.bgColor) : undefined,
+								rotation: overlay.rotation || 0,
+								x: overlay.x,
+								y: overlay.y,
+								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
+							}, outputPath);
+
+						} else if (overlay.type === 'image') {
+							const imageBuffer = Buffer.from(overlay.imageData.split(',')[1], 'base64');
+							const imagePath = join(tmpDir, `overlay_${Date.now()}.png`);
+							await writeFile(imagePath, imageBuffer);
+							tempFiles.push(imagePath);
+
+						// Use signature processing if removeBackground is true
+						if (overlay.removeBackground) {
+							success = await addSignature(currentFile, {
+								signatureFile: imagePath,
+								x: overlay.x,
+								y: overlay.y,
+								width: overlay.width,
+								height: overlay.height,
+								opacity: overlay.opacity / 100,
+								removeBg: true,
+								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
+							}, outputPath);
+						} else {
+							success = await addImageOverlay(currentFile, {
+								imagePath,
+								x: overlay.x,
+								y: overlay.y,
+								width: overlay.width,
+								height: overlay.height,
+								opacity: overlay.opacity / 100,
+								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
+							}, outputPath);
+						}
+
+						} else if (overlay.type === 'signature') {
+							const imageBuffer = Buffer.from(overlay.imageData.split(',')[1], 'base64');
+							const imagePath = join(tmpDir, `signature_${Date.now()}.png`);
+							await writeFile(imagePath, imageBuffer);
+							tempFiles.push(imagePath);
+
+							success = await addSignature(currentFile, {
+								signatureFile: imagePath,
+								x: overlay.x,
+								y: overlay.y,
+								width: overlay.width,
+								height: overlay.height,
+								removeBg: overlay.removeBackground !== false,
+							}, outputPath);
+						}
+
+						if (!success) {
+							throw new Error(`Failed to apply ${overlay.type} overlay`);
+						}
+
+						if (!isLast) {
+							if (currentFile !== file) {
+								tempFiles.push(currentFile);
+							}
+							currentFile = outputPath;
+						} else {
+							currentFile = outputPath;
+						}
+					}
+				}
+
+				// Return the final file
+				const finalOutput = currentFile === file
+					? file.replace(/\.pdf$/i, '_modified.pdf')
+					: currentFile;
+
+				// If currentFile is still the original, copy it
+				if (currentFile === file && hasMergedPages) {
+					const { copyFile } = await import('node:fs/promises');
+					await copyFile(file, finalOutput);
+					currentFile = finalOutput;
+				}
+
+				if (existsSync(currentFile)) {
+					res.download(currentFile, basename(currentFile), (err) => {
+						tempFiles.forEach(f => unlink(f).catch(() => {}));
+						if (err) {
+							console.error('Download error:', err);
+						}
+					});
+				} else {
+					res.status(500).json({ error: 'Failed to create output file' });
+				}
+
+			} catch (error) {
+				console.error('Export PDF error:', error);
+				res.status(500).json({ error: 'Internal server error: ' + (error as Error).message });
+			}
 		});
 
 		// API: Apply multiple overlays sequentially
@@ -88,6 +274,9 @@ export async function runGUI(file: string): Promise<boolean> {
 				const { mkdir } = await import('node:fs/promises');
 				await mkdir(tmpDir, { recursive: true });
 
+				// Calculate final output path (next to original with _abused.pdf suffix)
+				const finalOutput = file.replace(/\.pdf$/i, '_abused.pdf');
+
 				let currentFile = file;
 				let tempFiles: string[] = [];
 
@@ -96,7 +285,7 @@ export async function runGUI(file: string): Promise<boolean> {
 					const overlay = overlays[i];
 					const isLast = i === overlays.length - 1;
 					const outputPath = isLast
-						? join(tmpDir, `${basename(file, '.pdf')}_with_overlays.pdf`)
+						? finalOutput
 						: join(tmpDir, `temp_${i}_${Date.now()}.pdf`);
 
 					let success = false;
@@ -123,37 +312,36 @@ export async function runGUI(file: string): Promise<boolean> {
 							pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
 						}, outputPath);
 
-					} else if (overlay.type === 'image') {
+					} else if (overlay.type === 'image' || overlay.type === 'signature') {
 						// Save base64 image to temp file
 						const imageBuffer = Buffer.from(overlay.imageData.split(',')[1], 'base64');
 						const imagePath = join(tmpDir, `overlay_${Date.now()}.png`);
 						await writeFile(imagePath, imageBuffer);
 						tempFiles.push(imagePath);
 
-						success = await addImageOverlay(currentFile, {
-							imagePath,
-							x: overlay.x,
-							y: overlay.y,
-							width: overlay.width,
-							height: overlay.height,
-							opacity: overlay.opacity / 100,
-						}, outputPath);
-
-					} else if (overlay.type === 'signature') {
-						// Save base64 image to temp file
-						const imageBuffer = Buffer.from(overlay.imageData.split(',')[1], 'base64');
-						const imagePath = join(tmpDir, `signature_${Date.now()}.png`);
-						await writeFile(imagePath, imageBuffer);
-						tempFiles.push(imagePath);
-
-						success = await addSignature(currentFile, {
-							signatureFile: imagePath,
-							x: overlay.x,
-							y: overlay.y,
-							width: overlay.width,
-							height: overlay.height,
-							removeBg: overlay.removeBackground !== false,
-						}, outputPath);
+						// Use signature processing if removeBackground is true
+						if (overlay.removeBackground) {
+							success = await addSignature(currentFile, {
+								signatureFile: imagePath,
+								x: overlay.x,
+								y: overlay.y,
+								width: overlay.width,
+								height: overlay.height,
+								opacity: overlay.opacity / 100,
+								removeBg: true,
+								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
+							}, outputPath);
+						} else {
+							success = await addImageOverlay(currentFile, {
+								imagePath,
+								x: overlay.x,
+								y: overlay.y,
+								width: overlay.width,
+								height: overlay.height,
+								opacity: overlay.opacity / 100,
+								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
+							}, outputPath);
+						}
 					}
 
 					if (!success) {
@@ -162,17 +350,17 @@ export async function runGUI(file: string): Promise<boolean> {
 
 					// Update current file for next overlay
 					if (!isLast) {
-						tempFiles.push(currentFile);
+						// Only add intermediate temp files, never the original source file
+						if (currentFile !== file) {
+							tempFiles.push(currentFile);
+						}
 						currentFile = outputPath;
 					}
 				}
 
-				const finalOutput = join(tmpDir, `${basename(file, '.pdf')}_with_overlays.pdf`);
-
 				if (existsSync(finalOutput)) {
-					res.download(finalOutput, `${basename(file, '.pdf')}_with_overlays.pdf`, (err) => {
-						// Clean up temp files
-						unlink(finalOutput).catch(() => {});
+					res.download(finalOutput, basename(finalOutput), (err) => {
+						// Clean up intermediate temp files only (keep finalOutput)
 						tempFiles.forEach(f => unlink(f).catch(() => {}));
 						if (err) {
 							console.error('Download error:', err);
@@ -454,7 +642,41 @@ export async function runGUI(file: string): Promise<boolean> {
 					} else if (imageType === 'jpeg' || imageType === 'jpg') {
 						image = await pdfDoc.embedJpg(imageBuffer);
 					} else {
-						return res.status(400).json({ error: 'Unsupported image type. Use PNG or JPEG.' });
+						// For other formats (gif, bmp, webp, etc.), convert to PNG first using ImageMagick
+						const { checkImageMagick } = await import('../lib/magick.js');
+						const hasImageMagick = await checkImageMagick();
+
+						if (!hasImageMagick) {
+							return res.status(400).json({
+								error: `Image type '${imageType}' requires ImageMagick. Install it with: sudo apt install imagemagick`
+							});
+						}
+
+						// Save original image to temp file
+						const tempImagePath = join(tmpDir, `temp_${Date.now()}.${imageType}`);
+						await writeFile(tempImagePath, imageBuffer);
+
+						// Convert to PNG using ImageMagick
+						const tempPngPath = join(tmpDir, `temp_${Date.now()}.png`);
+						const { exec } = await import('node:child_process');
+						const { promisify } = await import('node:util');
+						const execAsync = promisify(exec);
+
+						try {
+							await execAsync(`convert "${tempImagePath}" "PNG32:${tempPngPath}"`);
+
+							// Read the converted PNG
+							const pngBuffer = await (await import('node:fs/promises')).readFile(tempPngPath);
+							image = await pdfDoc.embedPng(pngBuffer);
+
+							// Clean up temp files
+							await (await import('node:fs/promises')).unlink(tempImagePath);
+							await (await import('node:fs/promises')).unlink(tempPngPath);
+						} catch (error) {
+							return res.status(500).json({
+								error: `Failed to convert ${imageType} to PNG: ${(error as Error).message}`
+							});
+						}
 					}
 
 					// Create page with image dimensions

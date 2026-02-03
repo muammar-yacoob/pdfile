@@ -15,6 +15,25 @@
     <style>
         * { box-sizing: border-box; }
 
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #7fa5df;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a3b8d9;
+        }
+
         .app {
             display: flex;
             flex-direction: column;
@@ -45,7 +64,7 @@
             flex: 1;
         }
 
-        .share-btn {
+        .header-btn {
             width: 32px;
             height: 32px;
             display: flex;
@@ -60,10 +79,15 @@
             position: relative;
         }
 
-        .share-btn:hover {
+        .header-btn:hover {
             background: var(--bg2);
             border-color: #7fa5df;
             color: #7fa5df;
+        }
+
+        .header-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
         }
 
         /* Dark mode for flatpickr calendar */
@@ -71,6 +95,14 @@
             background: var(--bg2) !important;
             border: 1px solid var(--brd) !important;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+            max-width: 280px !important;
+            font-size: 13px !important;
+        }
+
+        .flatpickr-day {
+            max-width: 35px !important;
+            height: 35px !important;
+            line-height: 35px !important;
         }
 
         .flatpickr-months {
@@ -249,6 +281,36 @@
             cursor: not-allowed;
         }
 
+        /* Arrow buttons - blue when enabled */
+        .page-action-btn:not(:disabled).arrow-btn {
+            color: #7fa5df;
+            border-color: #7fa5df;
+        }
+
+        .page-action-btn:not(:disabled).arrow-btn:hover {
+            background: rgba(127, 165, 223, 0.1);
+            border-color: #a3b8d9;
+            color: #a3b8d9;
+        }
+
+        /* Trash button - always dark red */
+        .page-action-btn.delete-btn {
+            color: #dc3545;
+            border-color: #dc3545;
+        }
+
+        .page-action-btn.delete-btn:hover:not(:disabled) {
+            background: rgba(220, 53, 69, 0.1);
+            border-color: #c82333;
+            color: #c82333;
+        }
+
+        .page-action-btn.delete-btn:disabled {
+            color: #dc3545;
+            border-color: #dc3545;
+            opacity: 0.3;
+        }
+
         .thumbnails-list {
             flex: 1;
             overflow-y: auto;
@@ -262,17 +324,12 @@
             background: var(--bg);
             border: 2px solid var(--brd);
             border-radius: 4px;
-            cursor: pointer;
+            cursor: grab;
             position: relative;
             transition: all 0.2s;
             user-select: none;
         }
 
-        .thumbnail-item.selected {
-            border-color: #7fa5df;
-            background: rgba(127, 165, 223, 0.15);
-            box-shadow: 0 0 0 1px rgba(127, 165, 223, 0.3);
-        }
 
         .thumbnail-item:hover {
             border-color: #7fa5df;
@@ -308,14 +365,45 @@
             font-weight: 600;
         }
 
-        .thumbnail-checkbox {
+        .thumbnail-item.selected {
+            border: 3px solid #7fa5df !important;
+            background: rgba(127, 165, 223, 0.15);
+            box-shadow: 0 0 12px rgba(127, 165, 223, 0.5);
+            position: relative;
+        }
+
+        .thumbnail-item.selected::after {
+            content: '';
             position: absolute;
-            top: 4px;
-            right: 4px;
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-            accent-color: #7fa5df;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 32px;
+            height: 32px;
+            background: #7fa5df;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .thumbnail-item.selected .thumbnail-checkmark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 32px;
+            height: 32px;
+            background: #7fa5df;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 10;
+            color: white;
         }
 
         /* Center: PDF Preview */
@@ -339,6 +427,21 @@
             justify-content: center;
         }
 
+        .preview-area::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .preview-area::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        .preview-area::-webkit-scrollbar-thumb {
+            background: #7fa5df;
+            border-radius: 4px;
+        }
+        .preview-area::-webkit-scrollbar-thumb:hover {
+            background: #a3b8d9;
+        }
+
         .preview-area::before {
             content: '';
             position: absolute;
@@ -347,14 +450,16 @@
             z-index: 0;
         }
 
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+            z-index: 1;
+        }
+
         .preview-area canvas {
-            width: auto;
-            height: auto;
+            display: block;
             max-width: 100%;
             max-height: 100%;
-            border: none;
-            position: relative;
-            z-index: 1;
             background: #fff;
         }
 
@@ -388,7 +493,7 @@
         /* Overlay gizmo */
         .overlay-gizmo {
             position: absolute;
-            border: 2px dashed #7fa5df;
+            border: 2px dotted #7fa5df;
             background: rgba(127, 165, 223, 0.1);
             cursor: move;
             z-index: 10;
@@ -418,6 +523,7 @@
 
         .overlay-gizmo:hover {
             background: rgba(127, 165, 223, 0.2);
+            border-style: dashed;
             border-color: #a3b8d9;
         }
 
@@ -431,42 +537,192 @@
             cursor: nwse-resize;
             bottom: -6px;
             right: -6px;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .overlay-gizmo:hover .overlay-gizmo-handle {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .overlay-gizmo-rotate {
+            position: absolute;
+            bottom: -11px;
+            left: -11px;
+            width: 22px;
+            height: 22px;
+            background: #7fa5df;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            cursor: grab;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #000;
+            font-weight: bold;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .overlay-gizmo:hover .overlay-gizmo-rotate {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .overlay-gizmo-rotate:active {
+            cursor: grabbing;
         }
 
         .overlay-gizmo-label {
-            position: absolute;
-            top: -22px;
-            left: 0;
-            font-size: 10px;
-            color: #7fa5df;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 3px 8px;
-            border-radius: 3px;
-            white-space: nowrap;
-            font-weight: 600;
+            display: none; /* Hidden - unnecessary */
         }
 
         .overlay-gizmo-delete {
             position: absolute;
-            top: -22px;
-            right: 0;
-            width: 18px;
-            height: 18px;
+            top: -10px;
+            right: -10px;
+            width: 20px;
+            height: 20px;
             background: #ff4444;
-            border: none;
-            border-radius: 3px;
+            border: 2px solid #1a1a1d;
+            border-radius: 50%;
             color: white;
             font-size: 12px;
+            font-weight: bold;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 0;
             line-height: 1;
+            opacity: 1;
+            pointer-events: auto;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .overlay-gizmo-delete:hover {
             background: #ff0000;
+            transform: scale(1.1);
+        }
+
+        .overlay-gizmo-transparent {
+            position: absolute;
+            top: -22px;
+            right: 22px;
+            width: 18px;
+            height: 18px;
+            background: var(--bg2);
+            border: 1px solid var(--brd);
+            border-radius: 3px;
+            color: var(--txt3);
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.2s;
+        }
+
+        .overlay-gizmo:hover .overlay-gizmo-transparent {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .overlay-gizmo-transparent.active {
+            background: #7fa5df;
+            border-color: #7fa5df;
+            color: #000;
+        }
+
+        .overlay-gizmo-transparent:hover {
+            background: #7fa5df;
+            border-color: #7fa5df;
+            color: #000;
+        }
+
+        .overlay-gizmo.selected {
+            border: 2px solid #7fa5df !important;
+            box-shadow: 0 0 8px rgba(127, 165, 223, 0.6);
+        }
+
+        /* Layers List */
+        .layer-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            background: var(--bg);
+            border: 1px solid var(--brd);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 11px;
+        }
+
+        .layer-item:hover {
+            background: var(--bg3);
+            border-color: #7fa5df;
+        }
+
+        .layer-item.selected {
+            background: rgba(127, 165, 223, 0.15);
+            border-color: #7fa5df;
+        }
+
+        .layer-icon {
+            color: var(--txt3);
+            flex-shrink: 0;
+        }
+
+        .layer-name {
+            flex: 1;
+            color: var(--txt);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .layer-controls {
+            display: flex;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+
+        .layer-btn {
+            width: 18px;
+            height: 18px;
+            background: transparent;
+            border: 1px solid var(--brd);
+            border-radius: 3px;
+            color: var(--txt3);
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: all 0.2s;
+        }
+
+        .layer-btn:hover {
+            background: var(--bg3);
+            border-color: #7fa5df;
+            color: #7fa5df;
+        }
+
+        .layer-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
         }
 
         /* Right: Tools */
@@ -494,12 +750,7 @@
             align-items: center;
             gap: 6px;
             padding: 7px 8px;
-            cursor: pointer;
             user-select: none;
-        }
-
-        .tool-header:hover {
-            background: rgba(255, 255, 255, 0.02);
         }
 
         .tool-header .icon {
@@ -523,28 +774,6 @@
         .tool.active .tool-header .name {
             color: var(--txt);
             font-weight: 500;
-        }
-
-        .tool-header .toggle {
-            width: 14px;
-            height: 14px;
-            border: 1.5px solid var(--brd);
-            border-radius: 3px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .tool.active .tool-header .toggle {
-            border-color: #7fa5df;
-            background: #7fa5df;
-        }
-
-        .tool.active .tool-header .toggle::after {
-            content: '✓';
-            font-size: 9px;
-            color: #000;
-            font-weight: bold;
         }
 
         .tool-body {
@@ -639,6 +868,159 @@
             cursor: pointer;
             border-radius: 4px;
             border: 1px solid var(--brd);
+        }
+
+        /* Toggle buttons */
+        .toggle-btn {
+            padding: 5px 10px;
+            font-size: 10px;
+            background: var(--bg);
+            border: 1px solid var(--brd);
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--txt2);
+            transition: all 0.2s;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .toggle-btn:hover {
+            background: var(--bg2);
+            border-color: #7fa5df;
+        }
+
+        .toggle-btn.active {
+            background: #7fa5df;
+            color: #000;
+            border-color: #7fa5df;
+            font-weight: 600;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg2);
+            border: 1px solid var(--brd);
+            transition: 0.3s;
+            border-radius: 20px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 2px;
+            bottom: 2px;
+            background-color: var(--txt3);
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #7fa5df;
+            border-color: #7fa5df;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+            background-color: #fff;
+        }
+
+        /* Compact toggle button (Trans) */
+        #transparentBtn {
+            min-width: 50px;
+            padding: 5px 8px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+
+        /* Recent images list */
+        .recent-image-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px;
+            background: var(--bg);
+            border: 1px solid var(--brd);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .recent-image-item:hover {
+            background: var(--bg2);
+            border-color: #7fa5df;
+        }
+
+        .recent-image-item img {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 3px;
+            border: 1px solid var(--brd);
+        }
+
+        .recent-image-item .name {
+            flex: 1;
+            font-size: 10px;
+            color: var(--txt2);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .recent-image-item .insert-btn {
+            padding: 4px 8px;
+            font-size: 9px;
+            background: #7fa5df;
+            border: none;
+            border-radius: 3px;
+            color: #000;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .recent-image-item .insert-btn:hover {
+            background: #a3b8d9;
+        }
+
+        /* Color picker with label */
+        .color-input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-input-group .pickr {
+            flex-shrink: 0;
+        }
+
+        .color-input-group label {
+            font-size: 10px;
+            color: var(--txt2);
+            font-weight: 500;
         }
 
         /* Tabs */
@@ -771,10 +1153,13 @@
         <div class="header">
             <b>PDFile</b>
             <span id="fileName">No PDF loaded</span>
-            <button class="share-btn" onclick="exportPDF()" title="Export PDF" id="exportBtn">
+            <button class="header-btn" onclick="openMergePDF()" title="Merge PDF" id="mergeBtn" disabled>
+                <i data-lucide="file-plus"></i>
+            </button>
+            <button class="header-btn" onclick="exportPDF()" title="Export PDF" id="exportBtn">
                 <i data-lucide="download"></i>
             </button>
-            <button class="share-btn" onclick="shareApp()" title="Share PDFile">
+            <button class="header-btn" onclick="shareApp()" title="Share PDFile">
                 <i data-lucide="share-2"></i>
             </button>
         </div>
@@ -792,11 +1177,14 @@
 
                 <!-- Action Toolbar (always visible) -->
                 <div class="page-actions-toolbar">
-                    <button class="page-action-btn" onclick="insertPagesDialog()" title="Insert pages">
-                        <i data-lucide="file-plus" style="width: 14px; height: 14px;"></i>
+                    <div style="flex: 1;"></div>
+                    <button class="page-action-btn arrow-btn" id="moveUpBtn" onclick="moveSelectedPagesUp()" title="Move up" disabled>
+                        <i data-lucide="arrow-up" style="width: 14px; height: 14px;"></i>
                     </button>
-                    <div style="flex: 1; border-left: 1px solid var(--brd);"></div>
-                    <button class="page-action-btn" id="deleteSelectedBtn" onclick="removeSelectedPages()" title="Delete selected" disabled>
+                    <button class="page-action-btn arrow-btn" id="moveDownBtn" onclick="moveSelectedPagesDown()" title="Move down" disabled>
+                        <i data-lucide="arrow-down" style="width: 14px; height: 14px;"></i>
+                    </button>
+                    <button class="page-action-btn delete-btn" id="deleteSelectedBtn" onclick="removeSelectedPages()" title="Delete selected" disabled>
                         <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                     </button>
                 </div>
@@ -833,111 +1221,119 @@
             <!-- Right: Tools -->
             <div class="tools-panel">
                 <!-- Overlays Tool -->
-                <div class="tool" id="t-overlays">
-                    <div class="tool-header" onclick="toggleTool('t-overlays')">
+                <div class="tool active" id="t-overlays">
+                    <div class="tool-header">
                         <i class="icon" data-lucide="layers"></i>
                         <span class="name">Overlays</span>
-                        <div class="toggle"></div>
                     </div>
                     <div class="tool-body">
-                        <div class="tool-desc">Add draggable overlays to your PDF</div>
+                        <div class="tool-desc">Add and edit overlay layers</div>
 
-                        <!-- Tabs -->
-                        <div class="tabs">
-                            <div class="tab active" onclick="switchOverlayTab('date')">Date</div>
-                            <div class="tab" onclick="switchOverlayTab('text')">Text</div>
-                            <div class="tab" onclick="switchOverlayTab('image')">Image</div>
+                        <!-- Add New Section -->
+                        <div style="margin-bottom: 16px;">
+                            <label class="form-label" style="margin-bottom: 8px;">Add New</label>
+                            <div style="display: flex; gap: 4px;">
+                                <button class="tool-btn" style="flex: 1; font-size: 10px;" onclick="UIControls.showTextEditor()">
+                                    <i data-lucide="type" style="width: 12px; height: 12px;"></i> Text
+                                </button>
+                                <button class="tool-btn" style="flex: 1; font-size: 10px;" onclick="browseImage()">
+                                    <i data-lucide="image" style="width: 12px; height: 12px;"></i> Image
+                                </button>
+                            </div>
+                            <input type="file" id="imageFile" accept="image/*" style="display: none;">
                         </div>
 
-                        <!-- Date Tab -->
-                        <div class="tab-content active" id="overlay-date">
-                            <div class="form-group">
-                                <label class="form-label">Date</label>
-                                <input type="text" class="form-input" id="dateValue" placeholder="Select date...">
+                        <!-- Text Editor Modal (hidden by default) -->
+                        <div id="textEditorSection" style="display: none; padding: 12px; background: var(--bg); border: 1px solid var(--brd); border-radius: 4px; margin-bottom: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label class="form-label" style="margin: 0;">Text Editor</label>
+                                <button onclick="UIControls.closeTextEditor()" style="background: none; border: none; color: var(--txt3); cursor: pointer; padding: 4px;">
+                                    <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                                </button>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Format</label>
-                                <select class="form-select" id="dateFormat">
-                                    <option>MM/DD/YYYY</option>
-                                    <option>DD/MM/YYYY</option>
-                                    <option>YYYY-MM-DD</option>
-                                    <option>Month DD, YYYY</option>
-                                </select>
+                                <div style="display: flex; gap: 4px;">
+                                    <input type="text" class="form-input" id="textContent" placeholder="Enter text..." style="flex: 1;">
+                                    <button class="toggle-btn" onclick="openDatePicker()" title="Pick Date">
+                                        <i data-lucide="calendar" style="width: 12px; height: 12px;"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Font Size</label>
-                                <input type="number" class="form-input" id="dateFontSize" value="12" min="8" max="72">
+                                <button class="toggle-btn" id="dateFormatBtn" onclick="cycleDateFormat()" style="width: 100%; display: none;">
+                                    MM/DD/YYYY
+                                </button>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">Text Color</label>
-                                <div id="textColorPicker"></div>
+                            <button class="tool-btn" id="addTextBtn" onclick="addTextOverlay()" disabled style="width: 100%;">Add Text</button>
+                        </div>
+
+                        <!-- Selected Layer Editor (context-sensitive) -->
+                        <div id="selectedLayerEditor" style="display: none; padding: 12px; background: var(--bg); border: 1px solid var(--brd); border-radius: 4px; margin-bottom: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label class="form-label" style="margin: 0;" id="selectedLayerTitle">Edit Layer</label>
+                                <button onclick="SelectionManager.deselectOverlay()" style="background: none; border: none; color: var(--txt3); cursor: pointer; padding: 4px;">
+                                    <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                                </button>
                             </div>
+
+                            <!-- Text-specific controls -->
+                            <div id="textLayerControls" style="display: none;">
+                                <div class="form-group">
+                                    <label class="form-label">Text Content</label>
+                                    <input type="text" class="form-input" id="editTextContent" placeholder="Enter text..." oninput="UIControls.updateLayerText(this.value)">
+                                </div>
+                                <div class="form-group">
+                                    <div class="color-input-group">
+                                        <div id="textColorPicker"></div>
+                                        <label>Text Color</label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="color-input-group">
+                                        <div id="bgColorPicker"></div>
+                                        <label>Background</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Common controls (background, opacity) -->
                             <div class="form-group">
-                                <label class="form-label">Background</label>
-                                <label style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 10px;">
-                                    <input type="checkbox" id="dateBgTransparent" checked> Transparent
+                                <label class="form-label" style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span id="transparentBtnText">Background Box</span>
+                                    <label class="switch" style="margin: 0;">
+                                        <input type="checkbox" id="layerTransparentCheckbox" onchange="UIControls.toggleLayerTransparency()">
+                                        <span class="slider"></span>
+                                    </label>
                                 </label>
-                                <div id="bgColorPicker" style="display: none;"></div>
+                                <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;" id="transparentHelpText">
+                                    Show colored background box
+                                </div>
                             </div>
-                            <button class="tool-btn" onclick="addDateOverlay()">Add Date</button>
+
+                            <div class="form-group">
+                                <label class="form-label">Layer Opacity: <span id="opacityValue">100</span>%</label>
+                                <input type="range" min="10" max="100" value="100" id="opacitySlider" style="width: 100%;" oninput="UIControls.updateLayerOpacity(this.value)">
+                                <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">
+                                    Controls overall transparency
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Text Tab -->
-                        <div class="tab-content" id="overlay-text">
-                            <div class="form-group">
-                                <label class="form-label">Text Content</label>
-                                <input type="text" class="form-input" id="textContent" placeholder="Enter text...">
+                        <!-- Recent Images Section -->
+                        <div id="recentImagesGroup" style="display: none; margin-bottom: 12px;">
+                            <label class="form-label" style="margin-bottom: 8px;">Recent Images</label>
+                            <div id="recentImagesList" style="max-height: 100px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+                                <!-- Recent images will be populated here -->
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">Font Size</label>
-                                <input type="number" class="form-input" id="textFontSize" value="14" min="8" max="72">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Background Color</label>
-                                <input type="color" class="color-picker" id="textBgColor" value="#ffffff">
-                                <label style="display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 10px;">
-                                    <input type="checkbox" id="textBgTransparent"> Transparent
-                                </label>
-                            </div>
-                            <button class="tool-btn" onclick="addTextOverlay()">Add Text Overlay</button>
                         </div>
 
-                        <!-- Image Tab -->
-                        <div class="tab-content" id="overlay-image">
-                            <div class="form-group">
-                                <label class="form-label">Select Image</label>
-                                <input type="file" class="form-input" id="imageFile" accept="image/*">
+                        <!-- Layers List -->
+                        <div id="layersList" style="display: none;">
+                            <label class="form-label" style="margin-bottom: 8px;">Layers</label>
+                            <div id="layersContainer" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+                                <!-- Layers will be populated here -->
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">Opacity</label>
-                                <input type="range" class="form-input" id="imageOpacity" min="0" max="100" value="100">
-                                <span style="font-size: 10px; color: var(--txt3);" id="imageOpacityLabel">100%</span>
-                            </div>
-                            <div class="form-group">
-                                <label style="display: flex; align-items: center; gap: 6px; font-size: 10px;">
-                                    <input type="checkbox" id="useAsSignature"> Use as signature (removes white background)
-                                </label>
-                            </div>
-                            <button class="tool-btn" onclick="addImageOverlay()">Add Image</button>
-                            <button class="tool-btn tool-btn-secondary" onclick="quickSign()" id="quickSignBtn" style="display: none;">
-                                Quick Sign
-                            </button>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Merge PDFs -->
-                <div class="tool" id="t-merge">
-                    <div class="tool-header" onclick="toggleTool('t-merge')">
-                        <i class="icon" data-lucide="file-plus"></i>
-                        <span class="name">Merge PDFs</span>
-                        <div class="toggle"></div>
-                    </div>
-                    <div class="tool-body">
-                        <div class="tool-desc">Add pages from another PDF</div>
-                        <button class="tool-btn" onclick="mergePDFs('end')">Add to End</button>
-                        <button class="tool-btn tool-btn-secondary" onclick="mergePDFs('beginning')">Add to Beginning</button>
-                        <button class="tool-btn tool-btn-secondary" onclick="mergePDFs('replace')">Replace All Pages</button>
                     </div>
                 </div>
             </div>
@@ -969,7 +1365,364 @@
         let pageOrder = [];
         let mergedPagesData = []; // Stores info about merged pages including images
         let selectedPages = new Set();
+        let lastSelectedPage = null; // Track the last selected page for preview
         let pendingOverlays = []; // Store overlays to apply on export
+        let selectedOverlayIndex = null; // Track selected overlay for editing
+        let currentDateFormat = 'MM/DD/YYYY';
+        let dateFormats = ['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD', 'Month DD, YYYY'];
+        let lastPickedDate = null;
+        let recentImages = []; // Store recent images {name, data}
+        let textContentIsDate = false; // Track if text content is from date picker
+
+        // ================================================================
+        // MODULE: State Management
+        // Centralized state access and mutations
+        // ================================================================
+        const AppState = {
+            // PDF State
+            getPdfDocument: () => pdfDocument,
+            setPdfDocument: (doc) => { pdfDocument = doc; },
+            getCurrentFile: () => currentPdfFile,
+            setCurrentFile: (file) => { currentPdfFile = file; },
+
+            // Overlay State
+            getOverlays: () => pendingOverlays,
+            getOverlay: (index) => pendingOverlays[index],
+            addOverlay: (overlay) => pendingOverlays.push(overlay),
+            removeOverlay: (index) => pendingOverlays.splice(index, 1),
+            updateOverlay: (index, updates) => Object.assign(pendingOverlays[index], updates),
+
+            // Selection State
+            getSelectedIndex: () => selectedOverlayIndex,
+            setSelectedIndex: (index) => { selectedOverlayIndex = index; },
+
+            // Page State
+            getSelectedPages: () => selectedPages,
+            getLastSelectedPage: () => lastSelectedPage,
+            setLastSelectedPage: (page) => { lastSelectedPage = page; }
+        };
+
+        // ================================================================
+        // MODULE: UI Controls
+        // Handles UI interactions and updates
+        // ================================================================
+        const UIControls = {
+            showTextEditor() {
+                document.getElementById('textEditorSection').style.display = 'block';
+                document.getElementById('selectedLayerEditor').style.display = 'none';
+                document.getElementById('textContent').focus();
+            },
+
+            closeTextEditor() {
+                document.getElementById('textEditorSection').style.display = 'none';
+                document.getElementById('textContent').value = '';
+                document.getElementById('dateFormatBtn').style.display = 'none';
+                updateAddTextButtonState();
+            },
+
+            showLayerEditor(overlay, index) {
+                const editor = document.getElementById('selectedLayerEditor');
+                const textControls = document.getElementById('textLayerControls');
+                const transparentCheckbox = document.getElementById('layerTransparentCheckbox');
+                const transparentBtnText = document.getElementById('transparentBtnText');
+                const transparentHelpText = document.getElementById('transparentHelpText');
+                const titleEl = document.getElementById('selectedLayerTitle');
+                const opacitySlider = document.getElementById('opacitySlider');
+                const opacityValue = document.getElementById('opacityValue');
+
+                editor.style.display = 'block';
+                document.getElementById('textEditorSection').style.display = 'none';
+
+                const isText = overlay.type === 'date' || overlay.type === 'text';
+
+                // Set title
+                titleEl.textContent = isText ? 'Edit Text' : 'Edit Image';
+
+                // Show/hide text-specific controls
+                textControls.style.display = isText ? 'block' : 'none';
+
+                // Update transparency checkbox label and help text
+                if (isText) {
+                    transparentBtnText.textContent = 'Background Box';
+                    transparentHelpText.textContent = 'Show colored background box';
+                    // For text: checkbox ON = background visible, OFF = transparent
+                    const hasBg = !overlay.transparentBg && overlay.bgColor;
+                    transparentCheckbox.checked = hasBg;
+                } else {
+                    transparentBtnText.textContent = 'Remove Background';
+                    transparentHelpText.textContent = 'Remove image background (uses AI)';
+                    // For images: checkbox ON = remove background
+                    transparentCheckbox.checked = overlay.removeBackground || false;
+                }
+
+                // Set opacity
+                const opacity = overlay.opacity || 100;
+                opacitySlider.value = opacity;
+                opacityValue.textContent = opacity;
+
+                // Load text content if text overlay
+                if (isText) {
+                    document.getElementById('editTextContent').value = overlay.dateText || '';
+
+                    // Update color pickers
+                    if (textColorPicker) {
+                        const textColor = overlay.textColor || '#000000';
+                        textColorPicker.setColor(textColor);
+                        selectedTextColor = textColor;
+                    }
+
+                    if (bgColorPicker) {
+                        const bgColor = overlay.bgColor || '#ffffff';
+                        bgColorPicker.setColor(bgColor);
+                        selectedBgColor = bgColor;
+                    }
+
+                    // Show date format button if this is a date overlay
+                    if (overlay.type === 'date') {
+                        document.getElementById('dateFormatBtn').style.display = 'block';
+                        document.getElementById('dateFormatBtn').textContent = currentDateFormat;
+                    } else {
+                        document.getElementById('dateFormatBtn').style.display = 'none';
+                    }
+                } else {
+                    // Hide date format button for non-text overlays
+                    document.getElementById('dateFormatBtn').style.display = 'none';
+                }
+
+                lucide.createIcons();
+            },
+
+            toggleLayerTransparency() {
+                const index = AppState.getSelectedIndex();
+                if (index === null) return;
+
+                const overlay = AppState.getOverlay(index);
+                const isText = overlay.type === 'date' || overlay.type === 'text';
+                const checkbox = document.getElementById('layerTransparentCheckbox');
+
+                if (isText) {
+                    // For text: checkbox ON = show background, OFF = transparent
+                    const showBg = checkbox.checked;
+                    overlay.transparentBg = !showBg;
+                    overlay.bgColor = showBg ? selectedBgColor : null;
+
+                    // Update gizmo background color
+                    const gizmo = document.querySelector(`.overlay-gizmo[data-overlay-index="${index}"]`);
+                    if (gizmo) {
+                        const textEl = gizmo.querySelector('.overlay-gizmo-text');
+                        if (textEl) {
+                            textEl.style.backgroundColor = showBg ? selectedBgColor : 'transparent';
+                        }
+                    }
+                } else {
+                    // For images: checkbox ON = remove background
+                    overlay.removeBackground = checkbox.checked;
+                }
+
+                lucide.createIcons();
+            },
+
+            updateLayerOpacity(value) {
+                document.getElementById('opacityValue').textContent = value;
+                const index = AppState.getSelectedIndex();
+                if (index !== null) {
+                    AppState.updateOverlay(index, { opacity: parseInt(value) });
+                    // Update gizmo opacity in real-time
+                    const gizmo = document.querySelector(`.overlay-gizmo[data-overlay-index="${index}"]`);
+                    if (gizmo) {
+                        gizmo.style.opacity = parseInt(value) / 100;
+                    }
+                }
+            },
+
+            updateLayerText(newText) {
+                const index = AppState.getSelectedIndex();
+                if (index === null) return;
+
+                const overlay = AppState.getOverlay(index);
+                if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+                AppState.updateOverlay(index, { dateText: newText });
+
+                // Update gizmo with new text
+                const label = newText.length > 20 ? `${newText.substring(0, 20)}...` : newText;
+                const gizmo = document.querySelector(`.overlay-gizmo[data-overlay-index="${index}"]`);
+                if (gizmo) {
+                    const labelEl = gizmo.querySelector('.overlay-gizmo-label');
+                    if (labelEl) labelEl.textContent = label;
+                    const textEl = gizmo.querySelector('.overlay-gizmo-text');
+                    if (textEl) textEl.textContent = newText;
+                }
+
+                LayerManager.updateLayersList();
+            },
+
+            updateLayerColor(color, isBackground = false) {
+                const index = AppState.getSelectedIndex();
+                if (index === null) return;
+
+                const overlay = AppState.getOverlay(index);
+                if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+                if (isBackground) {
+                    selectedBgColor = color;
+                    if (!overlay.transparentBg) {
+                        AppState.updateOverlay(index, { bgColor: color });
+                        // Update gizmo
+                        const gizmo = document.querySelector(`.overlay-gizmo[data-overlay-index="${index}"]`);
+                        if (gizmo) {
+                            const textEl = gizmo.querySelector('.overlay-gizmo-text');
+                            if (textEl) textEl.style.backgroundColor = color;
+                        }
+                    }
+                } else {
+                    selectedTextColor = color;
+                    AppState.updateOverlay(index, { textColor: color });
+                    // Update gizmo
+                    const gizmo = document.querySelector(`.overlay-gizmo[data-overlay-index="${index}"]`);
+                    if (gizmo) {
+                        const textEl = gizmo.querySelector('.overlay-gizmo-text');
+                        if (textEl) textEl.style.color = color;
+                    }
+                }
+            }
+        };
+
+        // ================================================================
+        // MODULE: Selection Manager
+        // Handles overlay selection and deselection
+        // ================================================================
+        const SelectionManager = {
+            selectOverlay(index) {
+                const overlay = AppState.getOverlay(index);
+                if (!overlay) return;
+
+                AppState.setSelectedIndex(index);
+
+                // Update layer item selection
+                const layerItems = document.querySelectorAll('.layer-item');
+                layerItems.forEach((item, i) => {
+                    item.classList.toggle('selected', i === index);
+                });
+
+                // Update gizmo selection
+                const gizmos = document.querySelectorAll('.overlay-gizmo');
+                gizmos.forEach((gizmo) => {
+                    const gizmoIndex = parseInt(gizmo.dataset.overlayIndex);
+                    gizmo.classList.toggle('selected', gizmoIndex === index);
+                });
+
+                // Show layer editor
+                UIControls.showLayerEditor(overlay, index);
+            },
+
+            deselectOverlay() {
+                AppState.setSelectedIndex(null);
+
+                // Clear layer selection
+                const layerItems = document.querySelectorAll('.layer-item');
+                layerItems.forEach(item => item.classList.remove('selected'));
+
+                // Clear gizmo selection
+                const gizmos = document.querySelectorAll('.overlay-gizmo');
+                gizmos.forEach(gizmo => gizmo.classList.remove('selected'));
+
+                // Hide layer editor
+                document.getElementById('selectedLayerEditor').style.display = 'none';
+
+                lucide.createIcons();
+            }
+        };
+
+        // ================================================================
+        // MODULE: Layer Manager
+        // Manages layer list and operations
+        // ================================================================
+        const LayerManager = {
+            updateLayersList() {
+                const layersList = document.getElementById('layersList');
+                const layersContainer = document.getElementById('layersContainer');
+                const overlays = AppState.getOverlays();
+
+                if (overlays.length === 0) {
+                    layersList.style.display = 'none';
+                    return;
+                }
+
+                layersList.style.display = 'block';
+                layersContainer.innerHTML = '';
+
+                overlays.forEach((overlay, index) => {
+                    const layerItem = document.createElement('div');
+                    layerItem.className = 'layer-item';
+                    if (AppState.getSelectedIndex() === index) {
+                        layerItem.classList.add('selected');
+                    }
+
+                    const iconName = overlay.type === 'date' || overlay.type === 'text' ? 'type' : 'image';
+                    const displayName = overlay.dateText || overlay.type || 'Layer';
+
+                    layerItem.innerHTML = `
+                        <i class="layer-icon" data-lucide="${iconName}" style="width: 14px; height: 14px;"></i>
+                        <span class="layer-name">${displayName}</span>
+                        <div class="layer-controls">
+                            <button class="layer-btn" onclick="LayerManager.moveLayerUp(${index})" ${index === 0 ? 'disabled' : ''} title="Move up">
+                                <i data-lucide="arrow-up" style="width: 10px; height: 10px;"></i>
+                            </button>
+                            <button class="layer-btn" onclick="LayerManager.moveLayerDown(${index})" ${index === overlays.length - 1 ? 'disabled' : ''} title="Move down">
+                                <i data-lucide="arrow-down" style="width: 10px; height: 10px;"></i>
+                            </button>
+                        </div>
+                    `;
+
+                    layerItem.addEventListener('click', (e) => {
+                        if (!e.target.closest('.layer-controls')) {
+                            SelectionManager.selectOverlay(index);
+                        }
+                    });
+
+                    layersContainer.appendChild(layerItem);
+                });
+
+                lucide.createIcons();
+            },
+
+            moveLayerUp(index) {
+                if (index === 0) return;
+
+                const overlays = AppState.getOverlays();
+                [overlays[index - 1], overlays[index]] = [overlays[index], overlays[index - 1]];
+
+                // Update selected index if needed
+                const selectedIndex = AppState.getSelectedIndex();
+                if (selectedIndex === index) {
+                    AppState.setSelectedIndex(index - 1);
+                } else if (selectedIndex === index - 1) {
+                    AppState.setSelectedIndex(index);
+                }
+
+                updateGizmosForPage(currentPreviewPage);
+                this.updateLayersList();
+            },
+
+            moveLayerDown(index) {
+                const overlays = AppState.getOverlays();
+                if (index === overlays.length - 1) return;
+
+                [overlays[index], overlays[index + 1]] = [overlays[index + 1], overlays[index]];
+
+                // Update selected index if needed
+                const selectedIndex = AppState.getSelectedIndex();
+                if (selectedIndex === index) {
+                    AppState.setSelectedIndex(index + 1);
+                } else if (selectedIndex === index + 1) {
+                    AppState.setSelectedIndex(index);
+                }
+
+                updateGizmosForPage(currentPreviewPage);
+                this.updateLayersList();
+            }
+        };
 
         // ===== PANEL COLLAPSE =====
         function togglePagesPanel() {
@@ -1040,11 +1793,46 @@
                     currentPdfFile = data.fileName;
                     document.getElementById('fileName').textContent = data.fileName;
 
+                    // Enable merge button
+                    document.getElementById('mergeBtn').disabled = false;
+
                     // Load PDF preview
                     const previewArea = document.getElementById('previewArea');
-                    previewArea.innerHTML = `<canvas id="pdfCanvas" style="max-width: 100%; max-height: 100%; display: block; margin: auto;"></canvas>`;
+                    previewArea.innerHTML = `<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>`;
 
-                    // Generate thumbnails and render first page
+                    // Add click handler to deselect overlays when clicking canvas background
+                    const canvasWrapper = document.querySelector('.canvas-wrapper');
+                    if (canvasWrapper) {
+                        canvasWrapper.addEventListener('click', (e) => {
+                            // Only deselect if clicking directly on canvas or wrapper, not on gizmos
+                            if (e.target === canvasWrapper || e.target.id === 'pdfCanvas') {
+                                SelectionManager.deselectOverlay();
+                            }
+                        });
+                    }
+
+                    // Add mouse wheel zoom handler to preview area
+                    if (previewArea) {
+                        let zoomTimeout;
+                        previewArea.addEventListener('wheel', (e) => {
+                            // Only zoom when Ctrl key is held, otherwise allow normal scrolling
+                            if (!e.ctrlKey) return;
+
+                            e.preventDefault();
+
+                            // Zoom in (scroll up) or zoom out (scroll down)
+                            const delta = e.deltaY < 0 ? 0.1 : -0.1;
+
+                            // Debounce zoom updates to reduce glitchiness
+                            clearTimeout(zoomTimeout);
+                            zoomTimeout = setTimeout(() => {
+                                setZoomLevel(zoomLevel + delta);
+                            }, 10);
+                        }, { passive: false });
+                    }
+
+                    // Reset zoom to 100% and render first page
+                    zoomLevel = 1.0;
                     await generateThumbnails(data.filePath);
                     await renderPreviewPage(1);
                 }
@@ -1073,13 +1861,23 @@
                 currentPdfFile = file.name;
                 document.getElementById('fileName').textContent = file.name;
 
+                // Enable merge button
+                document.getElementById('mergeBtn').disabled = false;
+
+                // Clear merged pages data when loading new PDF
+                mergedPagesData = [];
+
                 // Show preview
                 const previewArea = document.getElementById('previewArea');
-                previewArea.innerHTML = `<canvas id="pdfCanvas" style="max-width: 100%; max-height: 100%; display: block; margin: auto;"></canvas>`;
+                previewArea.innerHTML = `<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>`;
 
                 // Load PDF for thumbnails
                 const arrayBuffer = await file.arrayBuffer();
                 pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+                // Reset zoom to 100%
+                zoomLevel = 1.0;
+
                 await generateThumbnailsFromDoc();
                 await renderPreviewPage(1);
 
@@ -1126,24 +1924,17 @@
                 item.innerHTML = `
                     <canvas class="thumbnail-canvas"></canvas>
                     <div class="thumbnail-number">${pageNum}</div>
-                    <input type="checkbox" class="thumbnail-checkbox" data-page="${pageNum}">
                 `;
                 const thumbCanvas = item.querySelector('canvas');
                 thumbCanvas.width = canvas.width;
                 thumbCanvas.height = canvas.height;
                 thumbCanvas.getContext('2d').drawImage(canvas, 0, 0);
 
-                // Checkbox selection
-                const checkbox = item.querySelector('.thumbnail-checkbox');
-                checkbox.addEventListener('change', (e) => {
-                    e.stopPropagation();
-                    handlePageSelection(pageNum, checkbox.checked);
-                });
-
-                // Click to preview page
+                // Click to toggle selection
                 item.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('thumbnail-checkbox')) return;
-                    renderPreviewPage(pageNum);
+                    const currentPageNum = parseInt(e.currentTarget.dataset.pageNum);
+                    const isSelected = selectedPages.has(currentPageNum);
+                    handlePageSelection(currentPageNum, !isSelected);
                 });
 
                 // Drag and drop for reordering
@@ -1159,6 +1950,7 @@
         // ===== PDF PREVIEW RENDERING =====
         let currentPreviewPage = 1;
         let previewScale = 1;
+        let zoomLevel = 1.0; // 1.0 = 100%, 2.0 = 200%
 
         async function renderPreviewPage(pageNum) {
             if (!pdfDocument) return;
@@ -1170,15 +1962,15 @@
 
                 const page = await pdfDocument.getPage(pageNum);
 
-                // Calculate scale to fit preview area
+                // Calculate base scale to fill width
                 const previewArea = document.getElementById('previewArea');
-                const containerWidth = previewArea.clientWidth - 40;
-                const containerHeight = previewArea.clientHeight - 40;
+                const containerWidth = previewArea.clientWidth - 20;
                 const pageViewport = page.getViewport({ scale: 1 });
 
-                const scaleX = containerWidth / pageViewport.width;
-                const scaleY = containerHeight / pageViewport.height;
-                const scale = Math.min(scaleX, scaleY, 2); // Max scale of 2 for quality
+                const baseScale = containerWidth / pageViewport.width; // Fill width
+
+                // Apply zoom level (100% to 200%)
+                const scale = baseScale * zoomLevel;
                 previewScale = scale;
 
                 const viewport = page.getViewport({ scale });
@@ -1189,72 +1981,32 @@
                 const context = canvas.getContext('2d');
                 await page.render({ canvasContext: context, viewport }).promise;
 
-                // Render overlays on top of the PDF
-                await renderOverlaysOnCanvas(context, viewport.width, viewport.height, pageNum);
+                // Update gizmos visibility for current page (overlays are only rendered server-side on export)
+                updateGizmosForPage(pageNum);
             } catch (err) {
                 console.error('Error rendering preview page:', err);
             }
         }
 
-        async function renderOverlaysOnCanvas(context, canvasWidth, canvasHeight, pageNum) {
-            // Filter overlays for this page (currently all overlays are shown, need to track page)
-            const pageOverlays = pendingOverlays.filter(overlay => !overlay.pageIndex || overlay.pageIndex === pageNum - 1);
+        function setZoomLevel(newZoom) {
+            zoomLevel = Math.max(0.5, Math.min(3.0, newZoom)); // Clamp between 50% and 300%
+            renderPreviewPage(currentPreviewPage);
+        }
 
-            for (const overlay of pageOverlays) {
-                if (overlay.type === 'date') {
-                    // Render date overlay
-                    context.save();
-                    context.font = `${overlay.fontSize || 12}px Arial`;
-                    context.fillStyle = overlay.textColor || '#000000';
-                    context.globalAlpha = (overlay.opacity || 100) / 100;
+        function updateGizmosForPage(pageNum) {
+            // Remove all existing gizmos
+            document.querySelectorAll('.overlay-gizmo').forEach(g => g.remove());
 
-                    if (overlay.rotation) {
-                        const centerX = overlay.x + 50;
-                        const centerY = overlay.y + 10;
-                        context.translate(centerX, centerY);
-                        context.rotate((overlay.rotation * Math.PI) / 180);
-                        context.translate(-centerX, -centerY);
-                    }
-
-                    if (overlay.bgColor && !overlay.transparentBg) {
-                        const metrics = context.measureText(overlay.dateText);
-                        const textHeight = overlay.fontSize || 12;
-                        context.fillStyle = overlay.bgColor;
-                        context.fillRect(overlay.x - 2, overlay.y - textHeight, metrics.width + 4, textHeight + 4);
-                        context.fillStyle = overlay.textColor || '#000000';
-                    }
-
-                    context.fillText(overlay.dateText, overlay.x, overlay.y);
-                    context.restore();
-                } else if (overlay.type === 'image' || overlay.type === 'signature') {
-                    // Render image/signature overlay
-                    const img = new Image();
-                    img.src = overlay.imageData;
-
-                    await new Promise((resolve) => {
-                        if (img.complete) {
-                            resolve();
-                        } else {
-                            img.onload = resolve;
-                            img.onerror = resolve;
-                        }
-                    });
-
-                    context.save();
-                    context.globalAlpha = (overlay.opacity || 100) / 100;
-
-                    if (overlay.rotation) {
-                        const centerX = overlay.x + overlay.width / 2;
-                        const centerY = overlay.y + overlay.height / 2;
-                        context.translate(centerX, centerY);
-                        context.rotate((overlay.rotation * Math.PI) / 180);
-                        context.translate(-centerX, -centerY);
-                    }
-
-                    context.drawImage(img, overlay.x, overlay.y, overlay.width, overlay.height);
-                    context.restore();
+            // Recreate gizmos only for the current page
+            pendingOverlays.forEach((overlay, i) => {
+                const overlayPage = (overlay.pageIndex || 0) + 1;
+                if (overlayPage === pageNum) {
+                    const label = overlay.type === 'date' ? `Date: ${overlay.dateText || 'Today'}` :
+                                 overlay.type === 'text' ? `Text: ${overlay.text || overlay.dateText}` :
+                                 overlay.type === 'image' ? 'Image' : 'Signature';
+                    addOverlayGizmo(overlay.type, label, overlay.x, overlay.y, i);
                 }
-            }
+            });
         }
 
         let draggedElement = null;
@@ -1268,6 +2020,11 @@
         function handleDragOver(e) {
             if (e.preventDefault) e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
+
+            // Remove dragover from all items first
+            document.querySelectorAll('.thumbnail-item.dragover').forEach(item => {
+                item.classList.remove('dragover');
+            });
 
             const target = e.target.closest('.thumbnail-item');
             if (target && target !== draggedElement) {
@@ -1300,9 +2057,15 @@
                 updatePageNumbers();
 
                 // Show reorder button
-                document.getElementById('reorderBtn').style.display = 'block';
+                const reorderBtn = document.getElementById('reorderBtn');
+                if (reorderBtn) reorderBtn.style.display = 'block';
             }
-            target.classList.remove('dragover');
+
+            // Clean up drag classes
+            document.querySelectorAll('.thumbnail-item').forEach(item => {
+                item.classList.remove('dragover', 'dragging');
+            });
+
             return false;
         }
 
@@ -1312,45 +2075,200 @@
             });
         }
 
-        // Handle page selection via checkbox
+        // Handle page selection
         function handlePageSelection(pageNum, isSelected) {
             if (isSelected) {
                 selectedPages.add(pageNum);
+                lastSelectedPage = pageNum;
+                // Show the selected page in preview (always show the last selected one)
+                renderPreviewPage(pageNum);
             } else {
                 selectedPages.delete(pageNum);
+                // If we're unselecting the last selected page, update to another selected page
+                if (lastSelectedPage === pageNum) {
+                    lastSelectedPage = selectedPages.size > 0 ? Array.from(selectedPages)[0] : null;
+                }
+                // If there are still selected pages, show one of them
+                if (selectedPages.size > 0 && lastSelectedPage) {
+                    renderPreviewPage(lastSelectedPage);
+                }
             }
 
             // Update visual selection
-            const item = document.querySelector(`.thumbnail-item[data-page-num="${pageNum}"]`);
-            if (item) {
-                item.classList.toggle('selected', isSelected);
+            const items = document.querySelectorAll('.thumbnail-item');
+            items.forEach(item => {
+                const num = parseInt(item.dataset.pageNum);
+                const isItemSelected = selectedPages.has(num);
+                item.classList.toggle('selected', isItemSelected);
+
+                // Add or remove checkmark
+                let checkmark = item.querySelector('.thumbnail-checkmark');
+                if (isItemSelected && !checkmark) {
+                    checkmark = document.createElement('div');
+                    checkmark.className = 'thumbnail-checkmark';
+                    checkmark.innerHTML = '<i data-lucide="check" style="width: 18px; height: 18px;"></i>';
+                    item.appendChild(checkmark);
+                    lucide.createIcons();
+                } else if (!isItemSelected && checkmark) {
+                    checkmark.remove();
+                }
+            });
+
+            // Update button states
+            const hasSelection = selectedPages.size > 0;
+            document.getElementById('deleteSelectedBtn').disabled = !hasSelection;
+
+            // Smart disable for arrows based on position
+            if (hasSelection) {
+                const selectedArray = Array.from(selectedPages);
+                const minPage = Math.min(...selectedArray);
+                const maxPage = Math.max(...selectedArray);
+                const totalPages = document.querySelectorAll('.thumbnail-item').length;
+
+                document.getElementById('moveUpBtn').disabled = minPage === 1;
+                document.getElementById('moveDownBtn').disabled = maxPage === totalPages;
+            } else {
+                document.getElementById('moveUpBtn').disabled = true;
+                document.getElementById('moveDownBtn').disabled = true;
+            }
+        }
+
+        function moveSelectedPagesUp() {
+            if (selectedPages.size === 0) return;
+
+            const items = Array.from(document.querySelectorAll('.thumbnail-item'));
+            const selectedArray = Array.from(selectedPages).sort((a, b) => a - b);
+
+            // Can't move up if first page is selected
+            if (selectedArray[0] === 1) return;
+
+            // Move each selected page up by swapping with the page above
+            for (const pageNum of selectedArray) {
+                const currentIndex = pageNum - 1;
+                const targetIndex = currentIndex - 1;
+
+                if (targetIndex >= 0 && !selectedPages.has(targetIndex + 1)) {
+                    // Swap in DOM
+                    const currentItem = items[currentIndex];
+                    const targetItem = items[targetIndex];
+                    targetItem.parentNode.insertBefore(currentItem, targetItem);
+
+                    // Update items array
+                    [items[currentIndex], items[targetIndex]] = [items[targetIndex], items[currentIndex]];
+                }
             }
 
-            // Update delete button state
-            const deleteBtn = document.getElementById('deleteSelectedBtn');
-            deleteBtn.disabled = selectedPages.size === 0;
+            updatePageNumbers();
+            lucide.createIcons();
+        }
+
+        function moveSelectedPagesDown() {
+            if (selectedPages.size === 0) return;
+
+            const items = Array.from(document.querySelectorAll('.thumbnail-item'));
+            const selectedArray = Array.from(selectedPages).sort((a, b) => b - a); // Reverse order
+
+            // Can't move down if last page is selected
+            if (selectedArray[0] === items.length) return;
+
+            // Move each selected page down by swapping with the page below
+            for (const pageNum of selectedArray) {
+                const currentIndex = pageNum - 1;
+                const targetIndex = currentIndex + 1;
+
+                if (targetIndex < items.length && !selectedPages.has(targetIndex + 1)) {
+                    // Swap in DOM
+                    const currentItem = items[currentIndex];
+                    const targetItem = items[targetIndex];
+                    targetItem.parentNode.insertBefore(targetItem, currentItem);
+
+                    // Update items array
+                    [items[currentIndex], items[targetIndex]] = [items[targetIndex], items[currentIndex]];
+                }
+            }
+
+            updatePageNumbers();
+            lucide.createIcons();
         }
 
         function updatePageNumbers() {
             const items = document.querySelectorAll('.thumbnail-item');
+            const oldToNew = new Map();
+
             items.forEach((item, index) => {
+                const oldPageNum = parseInt(item.dataset.pageNum);
+                // Preserve original page number on first reorder
+                if (!item.dataset.originalPage) {
+                    item.dataset.originalPage = oldPageNum;
+                }
                 const newPageNum = index + 1;
                 item.querySelector('.thumbnail-number').textContent = newPageNum;
                 item.dataset.pageNum = newPageNum;
+                oldToNew.set(oldPageNum, newPageNum);
+            });
 
-                // Update checkbox data attribute
-                const checkbox = item.querySelector('.thumbnail-checkbox');
-                if (checkbox) {
-                    const oldPageNum = parseInt(checkbox.dataset.page);
-                    checkbox.dataset.page = newPageNum;
-
-                    // Update selectedPages set
-                    if (selectedPages.has(oldPageNum)) {
-                        selectedPages.delete(oldPageNum);
-                        selectedPages.add(newPageNum);
-                    }
+            // Update selectedPages set with new page numbers
+            const newSelectedPages = new Set();
+            selectedPages.forEach(oldNum => {
+                if (oldToNew.has(oldNum)) {
+                    newSelectedPages.add(oldToNew.get(oldNum));
                 }
             });
+            selectedPages = newSelectedPages;
+
+            // Update lastSelectedPage with new page number
+            if (lastSelectedPage && oldToNew.has(lastSelectedPage)) {
+                lastSelectedPage = oldToNew.get(lastSelectedPage);
+            }
+
+            // Refresh visual selection with checkmarks
+            items.forEach(item => {
+                const num = parseInt(item.dataset.pageNum);
+                const isSelected = selectedPages.has(num);
+                item.classList.toggle('selected', isSelected);
+
+                // Add or remove checkmark
+                let checkmark = item.querySelector('.thumbnail-checkmark');
+                if (isSelected && !checkmark) {
+                    checkmark = document.createElement('div');
+                    checkmark.className = 'thumbnail-checkmark';
+                    checkmark.innerHTML = '<i data-lucide="check" style="width: 18px; height: 18px;"></i>';
+                    item.appendChild(checkmark);
+                    lucide.createIcons();
+                } else if (!isSelected && checkmark) {
+                    checkmark.remove();
+                }
+            });
+
+            // Update button states after reordering
+            if (selectedPages.size > 0) {
+                const selectedArray = Array.from(selectedPages);
+                const minPage = Math.min(...selectedArray);
+                const maxPage = Math.max(...selectedArray);
+                const totalPages = items.length;
+
+                document.getElementById('moveUpBtn').disabled = minPage === 1;
+                document.getElementById('moveDownBtn').disabled = maxPage === totalPages;
+            }
+
+            // Update overlay page indices based on new page order
+            pendingOverlays.forEach(overlay => {
+                // Convert 0-indexed pageIndex to 1-indexed page number
+                const oldPageNum = overlay.pageIndex + 1;
+
+                // Get new page number from mapping
+                if (oldToNew.has(oldPageNum)) {
+                    const newPageNum = oldToNew.get(oldPageNum);
+                    // Convert back to 0-indexed
+                    overlay.pageIndex = newPageNum - 1;
+                }
+            });
+
+            // Rebuild pageOrder array from current DOM order
+            pageOrder = Array.from(items).map((item, index) => index + 1);
+
+            // Update gizmos for current page since overlays may have changed
+            updateGizmosForPage(currentPreviewPage);
         }
 
         async function applyReorder() {
@@ -1415,180 +2333,240 @@
 
         function switchOverlayTab(tabName) {
             document.querySelectorAll('.tabs .tab').forEach((tab, i) => {
-                tab.classList.toggle('active', ['date', 'text', 'image'][i] === tabName);
+                tab.classList.toggle('active', ['text', 'image'][i] === tabName);
             });
             document.querySelectorAll('.tab-content').forEach((content, i) => {
-                content.classList.toggle('active', ['date', 'text', 'image'][i] === tabName);
+                content.classList.toggle('active', ['text', 'image'][i] === tabName);
             });
         }
 
-        // Update opacity label
-        document.getElementById('imageOpacity')?.addEventListener('input', (e) => {
-            document.getElementById('imageOpacityLabel').textContent = e.target.value + '%';
-        });
+        function cycleDateFormat() {
+            const currentIndex = dateFormats.indexOf(currentDateFormat);
+            const nextIndex = (currentIndex + 1) % dateFormats.length;
+            currentDateFormat = dateFormats[nextIndex];
+            document.getElementById('dateFormatBtn').textContent = currentDateFormat;
 
-        async function addDateOverlay() {
+            // If a date was already picked, update the text field with new format
+            if (lastPickedDate) {
+                const textInput = document.getElementById('textContent');
+                textInput.value = formatDateByFormat(lastPickedDate, currentDateFormat);
+                textContentIsDate = true; // Mark as date content
+            }
+        }
+
+        function updateAddTextButtonState() {
+            const textInput = document.getElementById('textContent');
+            const addTextBtn = document.getElementById('addTextBtn');
+            const hasContent = textInput.value.trim().length > 0;
+            addTextBtn.disabled = !hasContent;
+        }
+
+        function onTextContentChange() {
+            updateAddTextButtonState();
+
+            // If manually edited, hide date format button (user typed custom text)
+            if (!textContentIsDate) {
+                document.getElementById('dateFormatBtn').style.display = 'none';
+            }
+        }
+
+        function browseImage() {
+            document.getElementById('imageFile').click();
+        }
+
+        // toggleOverlayTransparent removed - now using UIControls.toggleLayerTransparency from panel
+
+        function loadRecentImages() {
+            try {
+                const stored = localStorage.getItem('pdfile_recent_images');
+                if (stored) {
+                    recentImages = JSON.parse(stored);
+                    updateRecentImagesList();
+                }
+            } catch (e) {
+                console.error('Failed to load recent images:', e);
+            }
+        }
+
+        function saveRecentImages() {
+            try {
+                localStorage.setItem('pdfile_recent_images', JSON.stringify(recentImages));
+            } catch (e) {
+                console.error('Failed to save recent images:', e);
+            }
+        }
+
+        function addToRecentImages(name, data) {
+            // Remove if already exists
+            recentImages = recentImages.filter(img => img.name !== name);
+
+            // Add to beginning
+            recentImages.unshift({ name, data });
+
+            // Keep only last 5
+            if (recentImages.length > 5) {
+                recentImages = recentImages.slice(0, 5);
+            }
+
+            saveRecentImages();
+            updateRecentImagesList();
+        }
+
+        function updateRecentImagesList() {
+            const listEl = document.getElementById('recentImagesList');
+            const groupEl = document.getElementById('recentImagesGroup');
+
+            if (recentImages.length === 0) {
+                groupEl.style.display = 'none';
+                return;
+            }
+
+            groupEl.style.display = 'block';
+            listEl.innerHTML = '';
+
+            recentImages.forEach((img, index) => {
+                const item = document.createElement('div');
+                item.className = 'recent-image-item';
+                item.innerHTML = `
+                    <img src="${img.data}" alt="${img.name}">
+                    <span class="name">${img.name}</span>
+                    <button class="insert-btn" onclick="insertRecentImage(${index})">Insert</button>
+                `;
+                listEl.appendChild(item);
+            });
+        }
+
+        function insertRecentImage(index) {
             if (!currentPdfFile) return;
 
-            const dateInput = document.getElementById('dateValue').value;
-            if (!dateInput) return;
+            const img = recentImages[index];
+            if (!img) return;
 
-            const format = document.getElementById('dateFormat').value;
-            const fontSize = parseInt(document.getElementById('dateFontSize').value);
-            const textColor = selectedTextColor;
-            const bgColor = selectedBgColor;
-            const transparent = document.getElementById('dateBgTransparent').checked;
+            const overlayIndex = AppState.getOverlays().length;
 
-            // Format the date according to selected format
-            const date = new Date(dateInput);
-            let formattedDate = '';
+            AppState.addOverlay({
+                type: 'image',
+                imageData: img.data,
+                x: 100,
+                y: 100,
+                width: 150,
+                height: 150,
+                opacity: 100,
+                removeBackground: false,
+                pageIndex: currentPreviewPage - 1
+            });
+
+            addOverlayGizmo('image', 'Image', 100, 100, overlayIndex);
+            LayerManager.updateLayersList();
+        }
+
+        function openDatePicker() {
+            if (datePicker) {
+                datePicker.open();
+            }
+        }
+
+        function openMergePDF() {
+            if (!currentPdfFile) return;
+
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf,image/*';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    showMergeDialog(file);
+                }
+            };
+            input.click();
+        }
+
+        function showMergeDialog(file) {
+            const modal = document.getElementById('modalOverlay');
+            const header = document.getElementById('modalHeader');
+            const body = document.getElementById('modalBody');
+            const footer = document.getElementById('modalFooter');
+
+            // Determine file type
+            const fileType = file.type.toLowerCase();
+            const fileName = file.name.toLowerCase();
+            const isImage = fileType.startsWith('image/') || fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
+            const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
+
+            let fileTypeLabel = 'file';
+            if (isImage) fileTypeLabel = 'image';
+            else if (isPdf) fileTypeLabel = 'PDF';
+
+            header.textContent = `Merge ${fileTypeLabel.charAt(0).toUpperCase() + fileTypeLabel.slice(1)}`;
+            body.innerHTML = `
+                <p>How would you like to merge "${file.name}"?</p>
+                ${isImage ? '<p style="font-size: 10px; color: var(--txt3); margin-top: 8px;">Image will be added as a full page.</p>' : ''}
+            `;
+            footer.innerHTML = `
+                <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="modal-btn modal-btn-secondary" onclick="closeModal(); mergeFiles('beginning', '${file.name}')">Add to Beginning</button>
+                <button class="modal-btn modal-btn-primary" onclick="closeModal(); mergeFiles('end', '${file.name}')">Add to End</button>
+            `;
+
+            // Store file for merge
+            window.pendingMergeFile = file;
+            modal.classList.add('active');
+        }
+
+        function formatDateByFormat(date, format) {
+            const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
 
             const mm = String(date.getMonth() + 1).padStart(2, '0');
             const dd = String(date.getDate()).padStart(2, '0');
             const yyyy = date.getFullYear();
 
-            const months = ['January', 'February', 'March', 'April', 'May', 'June',
-                          'July', 'August', 'September', 'October', 'November', 'December'];
-
             switch(format) {
                 case 'MM/DD/YYYY':
-                    formattedDate = `${mm}/${dd}/${yyyy}`;
-                    break;
+                    return `${mm}/${dd}/${yyyy}`;
                 case 'DD/MM/YYYY':
-                    formattedDate = `${dd}/${mm}/${yyyy}`;
-                    break;
+                    return `${dd}/${mm}/${yyyy}`;
                 case 'YYYY-MM-DD':
-                    formattedDate = `${yyyy}-${mm}-${dd}`;
-                    break;
+                    return `${yyyy}-${mm}-${dd}`;
                 case 'Month DD, YYYY':
-                    formattedDate = `${months[date.getMonth()]} ${dd}, ${yyyy}`;
-                    break;
+                    return `${months[date.getMonth()]} ${dd}, ${yyyy}`;
+                default:
+                    return `${mm}/${dd}/${yyyy}`;
             }
-
-            // Add to pending overlays
-            const overlayIndex = pendingOverlays.length;
-            pendingOverlays.push({
-                type: 'date',
-                dateText: formattedDate, // Use dateText for consistency
-                format,
-                fontSize,
-                textColor,
-                bgColor: transparent ? null : bgColor,
-                transparentBg: transparent,
-                x: 100,
-                y: 100,
-                rotation: 0,
-                opacity: 100,
-                scale: 1,
-                pageIndex: 0  // TODO: Get current page from PDF viewer
-            });
-
-            // Add visual gizmo to preview
-            addOverlayGizmo('date', `Date: ${formattedDate}`, 100, 100, overlayIndex);
-
-            // Refresh preview to show overlay
-            renderPreviewPage(currentPreviewPage);
         }
 
-        async function addTextOverlay() {
-            const text = document.getElementById('textContent').value;
+        function addTextOverlay() {
+            const textInput = document.getElementById('textContent');
+            const text = textInput.value;
             if (!text.trim()) return;
 
-            const fontSize = parseInt(document.getElementById('textFontSize')?.value || '12');
-            const textColor = '#000000'; // TODO: Add color picker for text overlays
+            const textColor = selectedTextColor;
 
-            // Add to pending overlays
-            const overlayIndex = pendingOverlays.length;
-            pendingOverlays.push({
+            // Add new overlay (default to transparent background)
+            const overlayIndex = AppState.getOverlays().length;
+            AppState.addOverlay({
                 type: 'date', // Using date type since it handles text rendering
                 dateText: text,
                 x: 100,
                 y: 100,
-                fontSize: fontSize,
+                fontSize: 12, // Base font size, will be scaled by gizmo
+                baseFontSize: 12, // Store base font size for scaling
                 textColor: textColor,
+                bgColor: null, // Default to transparent
+                transparentBg: true, // Default to transparent
                 opacity: 100,
                 scale: 1,
-                pageIndex: 0
+                pageIndex: currentPreviewPage - 1
             });
 
             // Add visual gizmo to preview
-            addOverlayGizmo('text', `Text: ${text.substring(0, 20)}...`, 100, 100, overlayIndex);
+            const label = text.length > 20 ? `${text.substring(0, 20)}...` : text;
+            addOverlayGizmo('text', label, 100, 100, overlayIndex);
 
-            // Refresh preview to show overlay
-            renderPreviewPage(currentPreviewPage);
+            LayerManager.updateLayersList();
+            UIControls.closeTextEditor();
         }
 
-        // Store signature image for quick signing
-        let savedSignatureData = null;
-
-        async function addImageOverlay() {
-            const file = document.getElementById('imageFile').files[0];
-            if (!file || !currentPdfFile) return;
-
-            const opacity = parseInt(document.getElementById('imageOpacity').value);
-            const isSignature = document.getElementById('useAsSignature').checked;
-
-            // Read file as base64
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const imageData = e.target.result;
-
-                // If marked as signature, save it for quick signing
-                if (isSignature) {
-                    savedSignatureData = imageData;
-                    document.getElementById('quickSignBtn').style.display = 'block';
-                }
-
-                // Add to pending overlays
-                const overlayIndex = pendingOverlays.length;
-                const type = isSignature ? 'signature' : 'image';
-
-                pendingOverlays.push({
-                    type: type,
-                    imageData: imageData,
-                    x: 100,
-                    y: 100,
-                    width: isSignature ? 200 : 150,
-                    height: isSignature ? 60 : 150,
-                    opacity: opacity,
-                    removeBackground: isSignature
-                });
-
-                // Add visual gizmo to preview
-                const label = isSignature ? 'Signature' : 'Image';
-                addOverlayGizmo(type, label, 100, 100, overlayIndex);
-
-                // Refresh preview to show overlay
-                renderPreviewPage(currentPreviewPage);
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function quickSign() {
-            if (!savedSignatureData || !currentPdfFile) return;
-
-            // Get preview area dimensions to center the signature
-            const previewArea = document.getElementById('previewArea');
-            const centerX = (previewArea.clientWidth / 2) - 100; // Center minus half width
-            const centerY = (previewArea.clientHeight / 2) - 30; // Center minus half height
-
-            const overlayIndex = pendingOverlays.length;
-            pendingOverlays.push({
-                type: 'signature',
-                imageData: savedSignatureData,
-                x: Math.max(0, centerX),
-                y: Math.max(0, centerY),
-                width: 200,
-                height: 60,
-                opacity: 100,
-                removeBackground: true
-            });
-
-            addOverlayGizmo('signature', 'Signature', Math.max(0, centerX), Math.max(0, centerY), overlayIndex);
-
-            // Refresh preview to show overlay
-            renderPreviewPage(currentPreviewPage);
-        }
 
         async function convertToWord() {
             if (!currentPdfFile) {
@@ -1624,232 +2602,214 @@
             }
         }
 
-        // Insert pages dialog (simplified UI)
-        function insertPagesDialog() {
+        async function mergeFiles(position, fileName) {
             if (!currentPdfFile) {
                 showModal('Error', 'Please load a PDF file first');
                 return;
             }
 
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.pdf,.png,.jpg,.jpeg';
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    mergePDFs('end'); // Default to end, can add position selection later
-                }
-            };
-            input.click();
-        }
+            // Use the pending merge file
+            const file = window.pendingMergeFile;
+            if (!file) return;
 
-        async function mergePDFs(position) {
-            if (!currentPdfFile) {
-                showModal('Error', 'Please load a PDF file first');
-                return;
-            }
-
-            // Create file input for selecting PDF or image to merge
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.pdf,.png,.jpg,.jpeg';
-            input.onchange = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                const fileName = file.name.toLowerCase();
-                const isPdf = fileName.endsWith('.pdf');
-                const isImage = fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg');
+            try {
+                const fileNameLower = file.name.toLowerCase();
+                const fileType = file.type.toLowerCase();
+                const isPdf = fileNameLower.endsWith('.pdf') || fileType === 'application/pdf';
+                const isImage = fileType.startsWith('image/') || fileNameLower.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
 
                 if (!isPdf && !isImage) {
-                    showModal('Invalid File', 'Please select a PDF or image file (PNG, JPG, JPEG)');
+                    showModal('Invalid File', 'Please select a PDF or image file');
                     return;
                 }
 
-                try {
-                    showModal('Processing', isImage ? 'Loading image...' : 'Loading PDF pages...');
+                // If it's an image, convert to PDF via backend first
+                if (isImage) {
+                    showModal('Processing', 'Converting image to PDF...');
 
-                    let newPdfDoc = null;
-                    let newPageCount = 0;
-                    let imageData = null;
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const imageData = e.target.result;
 
-                    if (isImage) {
-                        // Load image and create preview
-                        const img = new Image();
-                        const reader = new FileReader();
-
-                        await new Promise((resolve, reject) => {
-                            reader.onload = (e) => {
-                                imageData = e.target.result;
-                                img.onload = resolve;
-                                img.onerror = reject;
-                                img.src = imageData;
-                            };
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
-                        });
-
-                        // Image will be treated as 1 page
-                        newPageCount = 1;
-                    } else {
-                        // Load the new PDF using PDF.js
-                        const arrayBuffer = await file.arrayBuffer();
-                        newPdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                        newPageCount = newPdfDoc.numPages;
-                    }
-
-                    // Load current PDF if not already loaded
-                    if (!pdfDocument) {
-                        const response = await fetch(`/pdf/${encodeURIComponent(currentPdfFile)}`);
-                        const currentArrayBuffer = await response.arrayBuffer();
-                        pdfDocument = await pdfjsLib.getDocument({ data: currentArrayBuffer }).promise;
-                    }
-
-                    const currentPageCount = pdfDocument.numPages;
-
-                    // Store the new pages (PDF or image)
-                    const mergedPages = [];
-
-                    if (position === 'beginning') {
-                        // Add new pages first, then current pages
-                        for (let i = 1; i <= newPageCount; i++) {
-                            mergedPages.push({
-                                doc: newPdfDoc,
-                                pageNum: i,
-                                source: 'new',
-                                isImage: isImage,
-                                imageData: imageData
+                        try {
+                            const response = await fetch('/api/merge-pdfs', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    pdfData: imageData,
+                                    position: position,
+                                    isImage: true
+                                })
                             });
-                        }
-                        for (let i = 1; i <= currentPageCount; i++) {
-                            mergedPages.push({ doc: pdfDocument, pageNum: i, source: 'current' });
-                        }
-                    } else if (position === 'replace') {
-                        // Replace with new pages
-                        for (let i = 1; i <= newPageCount; i++) {
-                            mergedPages.push({
-                                doc: newPdfDoc,
-                                pageNum: i,
-                                source: 'new',
-                                isImage: isImage,
-                                imageData: imageData
-                            });
-                        }
-                    } else { // 'end' or default
-                        // Add current pages first, then new pages
-                        for (let i = 1; i <= currentPageCount; i++) {
-                            mergedPages.push({ doc: pdfDocument, pageNum: i, source: 'current' });
-                        }
-                        for (let i = 1; i <= newPageCount; i++) {
-                            mergedPages.push({
-                                doc: newPdfDoc,
-                                pageNum: i,
-                                source: 'new',
-                                isImage: isImage,
-                                imageData: imageData
-                            });
-                        }
-                    }
 
-                    // Generate thumbnails for all pages
-                    const thumbnailsList = document.getElementById('thumbnailsList');
-                    thumbnailsList.innerHTML = '';
+                            if (!response.ok) {
+                                throw new Error('Failed to merge image');
+                            }
 
-                    for (let i = 0; i < mergedPages.length; i++) {
-                        const pageInfo = mergedPages[i];
-                        const canvas = document.createElement('canvas');
-                        const context = canvas.getContext('2d');
+                            // Download the merged PDF
+                            const blob = await response.blob();
 
-                        if (pageInfo.isImage) {
-                            // Create thumbnail from image
-                            const img = new Image();
-                            img.src = pageInfo.imageData;
-                            await new Promise(resolve => {
-                                if (img.complete) {
-                                    resolve();
-                                } else {
-                                    img.onload = resolve;
+                            // Create a file object from the blob
+                            const mergedFile = new File([blob], `${currentPdfFile.replace('.pdf', '')}_merged.pdf`, { type: 'application/pdf' });
+
+                            // Convert blob to base64 and update server's working file
+                            const reader2 = new FileReader();
+                            reader2.onload = async (e2) => {
+                                const pdfData = e2.target.result;
+                                try {
+                                    await fetch('/api/update-working-file', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ pdfData })
+                                    });
+                                } catch (err) {
+                                    console.warn('Failed to update working file on server:', err);
                                 }
-                            });
 
-                            // Scale image to thumbnail size (similar to PDF scale 0.3)
-                            const scale = 0.3;
-                            canvas.width = img.width * scale;
-                            canvas.height = img.height * scale;
-                            context.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        } else {
-                            // Render PDF page
-                            const page = await pageInfo.doc.getPage(pageInfo.pageNum);
-                            const viewport = page.getViewport({ scale: 0.3 });
-                            canvas.width = viewport.width;
-                            canvas.height = viewport.height;
-                            await page.render({ canvasContext: context, viewport }).promise;
+                                // Load the merged PDF
+                                await loadPDFFile(mergedFile);
+
+                                // Clear merged pages data since PDF is now merged
+                                mergedPagesData = [];
+
+                                closeModal();
+                                showModal('Success', 'Image merged successfully!', 2000);
+                            };
+                            reader2.readAsDataURL(blob);
+                        } catch (error) {
+                            console.error('Merge error:', error);
+                            showModal('Error', `Failed to merge image: ${error.message}`);
                         }
+                    };
+                    reader.readAsDataURL(file);
+                    return;
+                }
 
-                        const item = document.createElement('div');
-                        item.className = 'thumbnail-item';
-                        item.draggable = true;
-                        item.dataset.pageNum = i + 1;
-                        item.dataset.source = pageInfo.source;
-                        item.dataset.originalPage = pageInfo.pageNum;
-                        item.innerHTML = `
-                            <canvas class="thumbnail-canvas"></canvas>
-                            <div class="thumbnail-number">${i + 1}</div>
-                            <input type="checkbox" class="thumbnail-checkbox" data-page="${i + 1}">
-                        `;
+                showModal('Processing', 'Merging PDF pages...');
 
-                        if (pageInfo.source === 'new') {
-                            item.style.borderColor = '#4CAF50'; // Green border for new pages
-                        }
+                // Load the new PDF using PDF.js
+                const arrayBuffer = await file.arrayBuffer();
+                const newPdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const newPageCount = newPdfDoc.numPages;
 
-                        const thumbCanvas = item.querySelector('canvas');
-                        thumbCanvas.width = canvas.width;
-                        thumbCanvas.height = canvas.height;
-                        thumbCanvas.getContext('2d').drawImage(canvas, 0, 0);
+                // Load current PDF if not already loaded
+                if (!pdfDocument) {
+                    const response = await fetch(`/pdf/${encodeURIComponent(currentPdfFile)}`);
+                    const currentArrayBuffer = await response.arrayBuffer();
+                    pdfDocument = await pdfjsLib.getDocument({ data: currentArrayBuffer }).promise;
+                }
 
-                        // Checkbox selection
-                        const checkbox = item.querySelector('.thumbnail-checkbox');
-                        checkbox.addEventListener('change', (e) => {
-                            e.stopPropagation();
-                            handlePageSelection(i + 1, checkbox.checked);
-                        });
+                // Get current state: either existing merged pages or create from thumbnails
+                let currentPages = [];
+                if (mergedPagesData.length > 0) {
+                    // Already have merged pages - use them in current order
+                    const thumbnails = document.querySelectorAll('.thumbnail-item');
+                    currentPages = Array.from(thumbnails).map((item, idx) => {
+                        const pageNum = parseInt(item.dataset.pageNum);
+                        const source = item.dataset.source || 'current';
+                        const originalPage = parseInt(item.dataset.originalPage) || pageNum;
 
-                        // Click to preview
-                        item.addEventListener('click', (e) => {
-                            if (e.target.classList.contains('thumbnail-checkbox')) return;
-                            // TODO: Preview page from merged document
-                        });
+                        // Find the page info from mergedPagesData
+                        const pageInfo = mergedPagesData.find((p, i) => i + 1 === pageNum) ||
+                                       { doc: pdfDocument, pageNum: originalPage, source };
+                        return pageInfo;
+                    });
+                } else {
+                    // No merged pages yet - use original document
+                    for (let i = 1; i <= pdfDocument.numPages; i++) {
+                        currentPages.push({ doc: pdfDocument, pageNum: i, source: 'original' });
+                    }
+                }
 
-                        // Drag events for reordering
-                        item.addEventListener('dragstart', handleDragStart);
-                        item.addEventListener('dragover', handleDragOver);
-                        item.addEventListener('drop', handleDrop);
-                        item.addEventListener('dragend', handleDragEnd);
+                // Create merged pages array
+                const mergedPages = [];
 
-                        thumbnailsList.appendChild(item);
+                if (position === 'beginning') {
+                    // Add new pages first, then current pages
+                    for (let i = 1; i <= newPageCount; i++) {
+                        mergedPages.push({ doc: newPdfDoc, pageNum: i, source: 'new' });
+                    }
+                    mergedPages.push(...currentPages);
+                } else { // 'end' or default
+                    // Add current pages first, then new pages
+                    mergedPages.push(...currentPages);
+                    for (let i = 1; i <= newPageCount; i++) {
+                        mergedPages.push({ doc: newPdfDoc, pageNum: i, source: 'new' });
+                    }
+                }
+
+                // Generate thumbnails for all pages
+                const thumbnailsList = document.getElementById('thumbnailsList');
+                thumbnailsList.innerHTML = '';
+
+                for (let i = 0; i < mergedPages.length; i++) {
+                    const pageInfo = mergedPages[i];
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+
+                    // Render PDF page
+                    const page = await pageInfo.doc.getPage(pageInfo.pageNum);
+                    const viewport = page.getViewport({ scale: 0.3 });
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    await page.render({ canvasContext: context, viewport }).promise;
+
+                    const item = document.createElement('div');
+                    item.className = 'thumbnail-item';
+                    item.draggable = true;
+                    item.dataset.pageNum = i + 1;
+                    item.dataset.source = pageInfo.source;
+                    item.dataset.originalPage = pageInfo.pageNum;
+                    item.innerHTML = `
+                        <canvas class="thumbnail-canvas"></canvas>
+                        <div class="thumbnail-number">${i + 1}</div>
+                    `;
+
+                    if (pageInfo.source === 'new') {
+                        item.style.borderColor = '#4CAF50'; // Green border for new pages
                     }
 
-                    // Store merged pages data for export
-                    mergedPagesData = mergedPages;
+                    const thumbCanvas = item.querySelector('canvas');
+                    thumbCanvas.width = canvas.width;
+                    thumbCanvas.height = canvas.height;
+                    thumbCanvas.getContext('2d').drawImage(canvas, 0, 0);
 
-                    // Update page order
-                    pageOrder = Array.from({ length: mergedPages.length }, (_, i) => i + 1);
+                    // Click to toggle selection
+                    item.addEventListener('click', (e) => {
+                        const currentPageNum = parseInt(e.currentTarget.dataset.pageNum);
+                        const isSelected = selectedPages.has(currentPageNum);
+                        handlePageSelection(currentPageNum, !isSelected);
+                    });
 
-                    // Store merged state
-                    window.mergedPdfData = { mergedPages, arrayBuffer: await file.arrayBuffer() };
+                    // Drag events for reordering
+                    item.addEventListener('dragstart', handleDragStart);
+                    item.addEventListener('dragover', handleDragOver);
+                    item.addEventListener('drop', handleDrop);
+                    item.addEventListener('dragend', handleDragEnd);
 
-                    closeModal();
-                } catch (err) {
-                    closeModal();
-                    showModal('Error', `Failed to merge: ${err.message}`);
+                    thumbnailsList.appendChild(item);
                 }
-            };
-            input.click();
+
+                // Store merged pages data for export
+                mergedPagesData = mergedPages;
+
+                // Update page order
+                pageOrder = Array.from({ length: mergedPages.length }, (_, i) => i + 1);
+
+                // Store merged state
+                window.mergedPdfData = { mergedPages, arrayBuffer };
+
+                closeModal();
+                showModal('Success', `Merged ${newPageCount} pages successfully!`);
+            } catch (err) {
+                closeModal();
+                showModal('Error', `Failed to merge: ${err.message}`);
+            }
         }
 
         async function removeSelectedPages() {
             if (selectedPages.size === 0) {
-                showModal('No Pages Selected', 'Hold Ctrl and click pages to select them for removal');
+                showModal('No Pages Selected', 'Click pages to select them for removal');
                 return;
             }
 
@@ -1858,12 +2818,14 @@
                 return;
             }
 
+            const pageCount = selectedPages.size;
+
             showConfirmModal(
                 'Remove Pages',
-                `Are you sure you want to remove ${selectedPages.size} page(s)? This will download a new PDF file.`,
+                `Are you sure you want to remove ${pageCount} page(s)?`,
                 async () => {
                     try {
-                        showModal('Processing', `Removing ${selectedPages.size} page(s)...`);
+                        showModal('Processing', `Removing ${pageCount} page(s)...`);
 
                         const response = await fetch('/api/remove-pages', {
                             method: 'POST',
@@ -1874,19 +2836,35 @@
                         if (!response.ok) throw new Error('Remove failed');
 
                         const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `${currentPdfFile.replace('.pdf', '')}_removed.pdf`;
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        document.body.removeChild(a);
 
-                        closeModal();
-                        showModal('Success', `Removed ${selectedPages.size} page(s) successfully!`);
-                        selectedPages.clear();
-                        document.getElementById('removePageBtn').style.display = 'none';
+                        // Create a file object from the blob
+                        const modifiedFile = new File([blob], `${currentPdfFile.replace('.pdf', '')}_removed.pdf`, { type: 'application/pdf' });
+
+                        // Convert blob to base64 and update server's working file
+                        const reader = new FileReader();
+                        reader.onload = async (e) => {
+                            const pdfData = e.target.result;
+                            try {
+                                await fetch('/api/update-working-file', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ pdfData })
+                                });
+                            } catch (err) {
+                                console.warn('Failed to update working file on server:', err);
+                            }
+
+                            // Load the modified PDF
+                            await loadPDFFile(modifiedFile);
+
+                            // Clear selection
+                            selectedPages.clear();
+                            document.getElementById('removePageBtn').style.display = 'none';
+
+                            closeModal();
+                            showModal('Success', `Removed ${pageCount} page(s) successfully!`, 2000);
+                        };
+                        reader.readAsDataURL(blob);
                     } catch (err) {
                         closeModal();
                         showModal('Error', `Failed to remove pages: ${err.message}`);
@@ -1902,14 +2880,17 @@
 
         // ===== OVERLAY GIZMO =====
         function addOverlayGizmo(type, label, x, y, overlayIndex) {
-            const previewArea = document.getElementById('previewArea');
-            const overlay = pendingOverlays[overlayIndex];
+            const canvasWrapper = document.querySelector('.canvas-wrapper');
+            if (!canvasWrapper) return; // Canvas not loaded yet
+
+            const overlay = AppState.getOverlay(overlayIndex);
 
             // Create gizmo element
             const gizmo = document.createElement('div');
             gizmo.className = 'overlay-gizmo';
             gizmo.style.left = x + 'px';
             gizmo.style.top = y + 'px';
+            gizmo.style.opacity = (overlay.opacity || 100) / 100;
             gizmo.dataset.overlayIndex = overlayIndex;
 
             // Set gizmo size based on overlay dimensions
@@ -1926,95 +2907,202 @@
                     ? `<img src="${overlay.imageData}" alt="${label}">`
                     : `<div class="overlay-gizmo-text">${label}</div>`;
             } else {
-                // Show text label for date/text overlays
-                content = `<div class="overlay-gizmo-text">${label}</div>`;
+                // Show text label for date/text overlays with colors
+                const textColor = overlay.textColor || '#000000';
+                const bgColor = overlay.transparentBg ? 'transparent' : (overlay.bgColor || '#ffffff');
+                const fontSize = overlay.fontSize || 12;
+                content = `<div class="overlay-gizmo-text" style="color: ${textColor}; background-color: ${bgColor}; font-size: ${fontSize}px;">${label}</div>`;
             }
 
+            // Transparency control removed - now in overlays panel
             gizmo.innerHTML = `
                 <div class="overlay-gizmo-label">${label}</div>
-                <div class="overlay-gizmo-handle"></div>
+                <div class="overlay-gizmo-handle resize-handle" data-action="resize" title="Drag to resize"></div>
+                <div class="overlay-gizmo-rotate" data-action="rotate" title="Drag to rotate">⟳</div>
                 <button class="overlay-gizmo-delete" onclick="removeOverlay(${overlayIndex})" title="Remove">✕</button>
                 ${content}
             `;
 
-            // Make draggable
-            let isDragging = false;
-            let startX, startY, initialLeft, initialTop;
+            // Handle drag, resize, and rotate
+            let action = null;
+            let startX, startY, initialLeft, initialTop, initialWidth, initialHeight;
+            let centerX, centerY, initialAngle;
 
             gizmo.addEventListener('mousedown', (e) => {
                 if (e.target.classList.contains('overlay-gizmo-delete')) return;
 
-                isDragging = true;
-                startX = e.clientX;
-                startY = e.clientY;
-                initialLeft = parseInt(gizmo.style.left) || 0;
-                initialTop = parseInt(gizmo.style.top) || 0;
-                gizmo.style.cursor = 'grabbing';
+                const targetAction = e.target.dataset.action;
+
+                // If no special action, select this overlay (unless starting drag/resize/rotate)
+                if (!targetAction) {
+                    SelectionManager.selectOverlay(overlayIndex);
+                }
+
+                if (targetAction === 'resize') {
+                    action = 'resize';
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    initialWidth = gizmo.offsetWidth;
+                    initialHeight = gizmo.offsetHeight;
+                } else if (targetAction === 'rotate') {
+                    action = 'rotate';
+                    const rect = gizmo.getBoundingClientRect();
+                    centerX = rect.left + rect.width / 2;
+                    centerY = rect.top + rect.height / 2;
+                    initialAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+                    const currentRotation = AppState.getOverlay(overlayIndex)?.rotation || 0;
+                    initialAngle = initialAngle - currentRotation;
+                } else {
+                    action = 'move';
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    initialLeft = parseInt(gizmo.style.left) || 0;
+                    initialTop = parseInt(gizmo.style.top) || 0;
+                    gizmo.style.cursor = 'grabbing';
+                }
                 e.preventDefault();
+                e.stopPropagation();
             });
 
             document.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
+                if (!action) return;
 
-                const deltaX = e.clientX - startX;
-                const deltaY = e.clientY - startY;
-
-                const newLeft = Math.max(0, initialLeft + deltaX);
-                const newTop = Math.max(0, initialTop + deltaY);
-
-                gizmo.style.left = newLeft + 'px';
-                gizmo.style.top = newTop + 'px';
-
-                // Update pending overlay position
                 const index = parseInt(gizmo.dataset.overlayIndex);
-                if (pendingOverlays[index]) {
-                    pendingOverlays[index].x = newLeft;
-                    pendingOverlays[index].y = newTop;
+
+                if (action === 'move') {
+                    const deltaX = e.clientX - startX;
+                    const deltaY = e.clientY - startY;
+
+                    const newLeft = Math.max(0, initialLeft + deltaX);
+                    const newTop = Math.max(0, initialTop + deltaY);
+
+                    gizmo.style.left = newLeft + 'px';
+                    gizmo.style.top = newTop + 'px';
+
+                    AppState.updateOverlay(index, { x: newLeft, y: newTop });
+                } else if (action === 'resize') {
+                    const deltaX = e.clientX - startX;
+                    const deltaY = e.clientY - startY;
+
+                    const newWidth = Math.max(30, initialWidth + deltaX);
+                    const newHeight = Math.max(20, initialHeight + deltaY);
+
+                    gizmo.style.width = newWidth + 'px';
+                    gizmo.style.height = newHeight + 'px';
+
+                    const currentOverlay = AppState.getOverlay(index);
+                    if (currentOverlay) {
+                        const updates = { width: newWidth, height: newHeight };
+
+                        // Scale font size for text overlays
+                        if (currentOverlay.type === 'date' || currentOverlay.type === 'text') {
+                            const scale = newWidth / initialWidth;
+                            const baseFontSize = currentOverlay.baseFontSize || 12;
+                            const newFontSize = Math.max(8, Math.round(baseFontSize * scale));
+                            updates.fontSize = newFontSize;
+
+                            // Update visual text size in gizmo
+                            const textElement = gizmo.querySelector('.overlay-gizmo-text');
+                            if (textElement) {
+                                textElement.style.fontSize = newFontSize + 'px';
+                            }
+
+                            // Store the initial base font size
+                            if (!currentOverlay.baseFontSize) {
+                                updates.baseFontSize = 12;
+                            }
+                        }
+
+                        AppState.updateOverlay(index, updates);
+                    }
+                } else if (action === 'rotate') {
+                    const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+                    const rotation = currentAngle - initialAngle;
+
+                    gizmo.style.transform = `rotate(${rotation}deg)`;
+
+                    AppState.updateOverlay(index, { rotation });
                 }
             });
 
-            document.addEventListener('mouseup', async () => {
-                if (isDragging) {
-                    isDragging = false;
+            document.addEventListener('mouseup', () => {
+                if (action) {
+                    action = null;
                     gizmo.style.cursor = 'move';
-                    // Re-render preview to show updated overlay position
-                    await renderPreviewPage(currentPreviewPage);
                 }
             });
 
-            previewArea.appendChild(gizmo);
+            canvasWrapper.appendChild(gizmo);
+
+            // Initialize Lucide icons in the gizmo
+            lucide.createIcons();
         }
 
-        async function removeOverlay(index) {
-            pendingOverlays.splice(index, 1);
+        function removeOverlay(index) {
+            const overlay = AppState.getOverlay(index);
+            if (!overlay) return;
 
-            // Remove all gizmos and recreate them with updated indices
-            document.querySelectorAll('.overlay-gizmo').forEach(g => g.remove());
+            const label = overlay.dateText || overlay.type || 'overlay';
 
-            pendingOverlays.forEach((overlay, i) => {
-                const label = overlay.type === 'date' ? `Date: ${overlay.dateText || 'Today'}` :
-                             overlay.type === 'text' ? `Text: ${overlay.text}` :
-                             overlay.type === 'image' ? 'Image' : 'Signature';
-                addOverlayGizmo(overlay.type, label, overlay.x, overlay.y, i);
-            });
+            showConfirmModal(
+                'Remove Overlay',
+                `Remove this ${overlay.type === 'signature' ? 'signature' : overlay.type}?`,
+                () => {
+                    AppState.removeOverlay(index);
 
-            // Re-render preview to remove the overlay from canvas
-            await renderPreviewPage(currentPreviewPage);
+                    // Deselect if this was selected
+                    const selectedIndex = AppState.getSelectedIndex();
+                    if (selectedIndex === index) {
+                        SelectionManager.deselectOverlay();
+                    } else if (selectedIndex > index) {
+                        AppState.setSelectedIndex(selectedIndex - 1);
+                    }
+
+                    // Remove all gizmos and recreate them with updated indices for current page
+                    updateGizmosForPage(currentPreviewPage);
+                    LayerManager.updateLayersList();
+                }
+            );
         }
+
+        // ===== LAYERS MANAGEMENT =====
+        // Old functions removed - now using LayerManager and SelectionManager modules
 
         // ===== EXPORT PDF =====
         async function exportPDF() {
             if (!currentPdfFile) return;
 
+            const exportBtn = document.getElementById('exportBtn');
+            if (!exportBtn) return;
+
+            const originalHtml = exportBtn.innerHTML;
+
             try {
                 // Show subtle processing indicator instead of modal
-                const exportBtn = document.getElementById('exportBtn');
-                const originalHtml = exportBtn.innerHTML;
                 exportBtn.innerHTML = '<i data-lucide="loader" style="animation: spin 1s linear infinite;"></i>';
                 exportBtn.disabled = true;
 
-                // If no overlays, just download the current PDF
-                if (pendingOverlays.length === 0) {
+                // Build the current page order from thumbnails
+                const thumbnails = Array.from(document.querySelectorAll('.thumbnail-item'));
+                const pageOrder = thumbnails.map((item, idx) => ({
+                    pageNum: parseInt(item.dataset.originalPage) || parseInt(item.dataset.pageNum),
+                    source: item.dataset.source || 'original',
+                    displayOrder: idx + 1
+                }));
+
+                // Check if pages have been reordered (compare to natural order)
+                const hasReordering = pageOrder.some((item, idx) => item.pageNum !== idx + 1);
+
+                // Debug logging
+                console.log('Export PDF - Page Order:', pageOrder);
+                console.log('Export PDF - hasReordering:', hasReordering);
+
+                // Check if we have merged pages or page reordering or overlays
+                const hasMergedPages = mergedPagesData.length > 0;
+                const hasOverlays = pendingOverlays.length > 0;
+
+                // If no changes, just download the current PDF
+                if (!hasMergedPages && !hasOverlays && !hasReordering) {
                     const response = await fetch(`/pdf/${encodeURIComponent(currentPdfFile)}`);
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
@@ -2032,23 +3120,30 @@
                     return;
                 }
 
-                // Send all overlays in a single request to process sequentially
-                const response = await fetch('/api/apply-overlays', {
+                // Send request with both page order and overlays
+                const response = await fetch('/api/export-pdf', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ overlays: pendingOverlays })
+                    body: JSON.stringify({
+                        hasMergedPages,
+                        hasReordering,
+                        pageOrder,
+                        overlays: pendingOverlays,
+                        mergedPagesData: hasMergedPages ? mergedPagesData : null
+                    })
                 });
 
                 if (!response.ok) {
                     const error = await response.json();
-                    throw new Error(error.error || 'Failed to apply overlays');
+                    throw new Error(error.error || 'Failed to export PDF');
                 }
 
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${currentPdfFile.replace('.pdf', '')}_with_overlays.pdf`;
+                const suffix = hasOverlays ? '_abused' : '_modified';
+                a.download = `${currentPdfFile.replace('.pdf', '')}${suffix}.pdf`;
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
@@ -2073,6 +3168,100 @@
 
                 showModal('Error', `Failed to export: ${err.message}`);
                 console.error('Export error:', err);
+            }
+        }
+
+        // ===== IMAGE DROP HANDLER =====
+        async function handleImageDrop(file) {
+            if (!currentPdfFile) {
+                showModal('No PDF Loaded', 'Please load a PDF file first');
+                return;
+            }
+
+            try {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    const imageData = event.target.result;
+
+                    // Create an image element to get dimensions
+                    const img = new Image();
+                    img.onload = () => {
+                        // Get canvas dimensions for centering
+                        const canvas = document.getElementById('pdfCanvas');
+                        const canvasWidth = canvas?.width || 800;
+                        const canvasHeight = canvas?.height || 1000;
+
+                        // Determine if image is large enough to be used as a page
+                        const isLargeImage = img.width >= 300 || img.height >= 300;
+
+                        let width, height, x, y;
+
+                        if (isLargeImage) {
+                            // Calculate dimensions to fit the page while maintaining aspect ratio
+                            const pageAspect = canvasWidth / canvasHeight;
+                            const imgAspect = img.width / img.height;
+
+                            if (imgAspect > pageAspect) {
+                                // Image is wider - fit to width
+                                width = canvasWidth * 0.9;
+                                height = width / imgAspect;
+                            } else {
+                                // Image is taller - fit to height
+                                height = canvasHeight * 0.9;
+                                width = height * imgAspect;
+                            }
+
+                            // Center on page
+                            x = (canvasWidth - width) / 2;
+                            y = (canvasHeight - height) / 2;
+                        } else {
+                            // Small image - use original size and center
+                            width = img.width;
+                            height = img.height;
+                            x = (canvasWidth - width) / 2;
+                            y = (canvasHeight - height) / 2;
+                        }
+
+                        // Add to recent images
+                        addToRecentImages(file.name, imageData);
+
+                        // Add to pending overlays
+                        const overlayIndex = pendingOverlays.length;
+
+                        pendingOverlays.push({
+                            type: 'image',
+                            imageData: imageData,
+                            x: Math.max(0, x),
+                            y: Math.max(0, y),
+                            width: width,
+                            height: height,
+                            opacity: 100,
+                            removeBackground: false,
+                            pageIndex: currentPreviewPage - 1
+                        });
+
+                        // Add visual gizmo to preview
+                        const label = isLargeImage ? 'Image (Full Page)' : 'Image';
+                        addOverlayGizmo('image', label, Math.max(0, x), Math.max(0, y), overlayIndex);
+                        updateLayersList();
+
+                        console.log(`Image dropped: ${file.name} (${img.width}x${img.height}) - ${isLargeImage ? 'large' : 'small'} - centered at (${x}, ${y})`);
+                    };
+
+                    img.onerror = () => {
+                        showModal('Error', 'Failed to load image');
+                    };
+
+                    img.src = imageData;
+                };
+
+                reader.onerror = () => {
+                    showModal('Error', 'Failed to read image file');
+                };
+
+                reader.readAsDataURL(file);
+            } catch (err) {
+                showModal('Error', `Failed to process image: ${err.message}`);
             }
         }
 
@@ -2108,12 +3297,95 @@
             loadInitialPDF();
             lucide.createIcons();
 
-            // Initialize Flatpickr date picker
-            datePicker = flatpickr('#dateValue', {
+            // Load recent images from localStorage
+            loadRecentImages();
+
+            // Set up file input change listener
+            document.getElementById('imageFile').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file || !currentPdfFile) return;
+
+                // Read file as base64
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const imageData = event.target.result;
+
+                    // Add to recent images
+                    addToRecentImages(file.name, imageData);
+
+                    // Add to pending overlays
+                    const overlayIndex = AppState.getOverlays().length;
+
+                    const overlayData = {
+                        type: 'image',
+                        imageData: imageData,
+                        x: 100,
+                        y: 100,
+                        width: 150,
+                        height: 150,
+                        opacity: 100,
+                        removeBackground: false,
+                        pageIndex: currentPreviewPage - 1
+                    };
+
+                    AppState.addOverlay(overlayData);
+
+                    // Add visual gizmo to preview
+                    addOverlayGizmo('image', 'Image', 100, 100, overlayIndex);
+                    LayerManager.updateLayersList();
+
+                    // Clear file input
+                    e.target.value = '';
+                };
+                reader.readAsDataURL(file);
+            });
+
+            // Initialize Flatpickr date picker (hidden input)
+            const hiddenDateInput = document.createElement('input');
+            hiddenDateInput.type = 'text';
+            hiddenDateInput.style.display = 'none';
+            document.body.appendChild(hiddenDateInput);
+
+            datePicker = flatpickr(hiddenDateInput, {
                 defaultDate: 'today',
                 dateFormat: 'Y-m-d',
-                allowInput: true,
-                theme: 'dark'
+                allowInput: false,
+                theme: 'dark',
+                positionElement: document.getElementById('textContent'), // Position relative to text input
+                position: 'below', // Show below the input
+                onReady: function(selectedDates, dateStr, instance) {
+                    const todayBtn = document.createElement('button');
+                    todayBtn.textContent = 'Today';
+                    todayBtn.className = 'flatpickr-today-button';
+                    todayBtn.style.cssText = 'margin: 8px; padding: 6px 12px; background: #7fa5df; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;';
+                    todayBtn.onclick = function(e) {
+                        e.preventDefault();
+                        instance.setDate(new Date(), true);
+                        instance.close(); // Close the picker after applying today's date
+                    };
+                    instance.calendarContainer.appendChild(todayBtn);
+                },
+                onChange: function(selectedDates, dateStr, instance) {
+                    if (selectedDates.length > 0) {
+                        lastPickedDate = selectedDates[0];
+                        const textInput = document.getElementById('textContent');
+                        textInput.value = formatDateByFormat(lastPickedDate, currentDateFormat);
+
+                        // Mark as date content and show format toggle button
+                        textContentIsDate = true;
+                        document.getElementById('dateFormatBtn').style.display = 'block';
+
+                        // Enable Add Text button
+                        updateAddTextButtonState();
+                    }
+                }
+            });
+
+            // Add listener to text content input
+            const textContentInput = document.getElementById('textContent');
+            textContentInput.addEventListener('input', () => {
+                textContentIsDate = false; // User is typing, not from date picker
+                onTextContentChange();
             });
 
             // Initialize Pickr color pickers
@@ -2129,17 +3401,29 @@
                     preview: true,
                     opacity: false,
                     hue: true,
+                    palette: true,
                     interaction: {
                         hex: true,
                         input: true,
-                        save: true
+                        save: false,
+                        clear: false,
+                        cancel: false
                     }
-                }
+                },
+                useAsButton: false,
+                inline: false,
+                autoReposition: true
             });
 
-            textColorPicker.on('save', (color) => {
-                selectedTextColor = color.toHEXA().toString();
-                textColorPicker.hide();
+            // Initialize with default color
+            textColorPicker.on('init', (instance) => {
+                selectedTextColor = instance.getColor().toHEXA().toString();
+            });
+
+            // Update color in real-time as user selects
+            textColorPicker.on('change', (color) => {
+                const hexColor = color.toHEXA().toString();
+                UIControls.updateLayerColor(hexColor, false);
             });
 
             bgColorPicker = Pickr.create({
@@ -2154,23 +3438,116 @@
                     preview: true,
                     opacity: false,
                     hue: true,
+                    palette: true,
                     interaction: {
                         hex: true,
                         input: true,
-                        save: true
+                        save: false,
+                        clear: false,
+                        cancel: false
+                    }
+                },
+                useAsButton: false,
+                inline: false,
+                autoReposition: true
+            });
+
+            // Initialize with default color
+            bgColorPicker.on('init', (instance) => {
+                selectedBgColor = instance.getColor().toHEXA().toString();
+            });
+
+            // Update color in real-time as user selects
+            bgColorPicker.on('change', (color) => {
+                const hexColor = color.toHEXA().toString();
+                UIControls.updateLayerColor(hexColor, true);
+            });
+
+            // Set up drag & drop for PDF, image, and document files
+            const thumbnailsPanel = document.getElementById('thumbnailsPanel');
+            const previewArea = document.getElementById('previewArea');
+
+            // Thumbnails panel - always merge as page
+            thumbnailsPanel.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                thumbnailsPanel.style.opacity = '0.7';
+                thumbnailsPanel.style.backgroundColor = 'rgba(127, 165, 223, 0.1)';
+            });
+
+            thumbnailsPanel.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                thumbnailsPanel.style.opacity = '';
+                thumbnailsPanel.style.backgroundColor = '';
+            });
+
+            thumbnailsPanel.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                thumbnailsPanel.style.opacity = '';
+                thumbnailsPanel.style.backgroundColor = '';
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const file = files[0];
+                    const fileType = file.type.toLowerCase();
+                    const fileName = file.name.toLowerCase();
+
+                    const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
+                    const isImage = fileType.startsWith('image/') || fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
+
+                    if (isPdf || isImage) {
+                        // Merge as page
+                        window.pendingMergeFile = file;
+                        showMergeDialog(file);
+                    } else {
+                        showModal('Invalid File', 'Please drop a PDF or image file');
                     }
                 }
             });
 
-            bgColorPicker.on('save', (color) => {
-                selectedBgColor = color.toHEXA().toString();
-                bgColorPicker.hide();
+            // Preview area - images as overlay, PDFs as merge
+            previewArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                previewArea.style.opacity = '0.7';
+                previewArea.style.backgroundColor = 'rgba(127, 165, 223, 0.1)';
             });
 
-            // Toggle background color picker visibility
-            document.getElementById('dateBgTransparent').addEventListener('change', (e) => {
-                const bgPicker = document.getElementById('bgColorPicker');
-                bgPicker.style.display = e.target.checked ? 'none' : 'block';
+            previewArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                previewArea.style.opacity = '';
+                previewArea.style.backgroundColor = '';
+            });
+
+            previewArea.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                previewArea.style.opacity = '';
+                previewArea.style.backgroundColor = '';
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const file = files[0];
+                    const fileType = file.type.toLowerCase();
+                    const fileName = file.name.toLowerCase();
+
+                    const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
+                    const isImage = fileType.startsWith('image/') || fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
+
+                    if (isPdf) {
+                        // Merge as page
+                        window.pendingMergeFile = file;
+                        showMergeDialog(file);
+                    } else if (isImage) {
+                        // Add as overlay
+                        await handleImageDrop(file);
+                    } else {
+                        showModal('Invalid File', 'Please drop a PDF or image file');
+                    }
+                }
             });
         });
     </script>

@@ -49,9 +49,33 @@ export async function addImageOverlay(
 		} else if (imageExt === '.jpg' || imageExt === '.jpeg') {
 			image = await pdfDoc.embedJpg(imageBytes);
 		} else {
-			throw new Error(
-				'Unsupported image format. Use PNG or JPG/JPEG images only.',
-			);
+			// For other formats, convert to PNG using ImageMagick
+			const { checkImageMagick } = await import('../lib/magick.js');
+			const hasImageMagick = await checkImageMagick();
+
+			if (!hasImageMagick) {
+				throw new Error(
+					`Image format '${imageExt}' requires ImageMagick. Install it with: sudo apt install imagemagick`,
+				);
+			}
+
+			const { exec } = await import('node:child_process');
+			const { promisify } = await import('node:util');
+			const { tmpdir } = await import('node:os');
+			const execAsync = promisify(exec);
+
+			// Convert to PNG
+			const tempPngPath = path.join(tmpdir(), `temp_${Date.now()}.png`);
+			try {
+				await execAsync(`convert "${options.imagePath}" "PNG32:${tempPngPath}"`);
+				const pngBuffer = await fs.readFile(tempPngPath);
+				image = await pdfDoc.embedPng(pngBuffer);
+				await fs.unlink(tempPngPath);
+			} catch (error) {
+				throw new Error(
+					`Failed to convert ${imageExt} to PNG: ${(error as Error).message}`,
+				);
+			}
 		}
 
 		// Get image dimensions

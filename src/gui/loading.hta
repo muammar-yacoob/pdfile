@@ -27,9 +27,10 @@
   html,body{height:100%;width:100%;background:#000;overflow:hidden}
   body{display:flex;flex-direction:column;background-image:url('img/pdfile-loading-bg.png');background-size:cover;background-position:center;background-repeat:no-repeat;font-family:Segoe UI,sans-serif;color:#fff;opacity:1;transition:opacity .3s ease-out;border:none;box-sizing:border-box;justify-content:flex-end}
   body.fade-out{opacity:0}
+  .tagline{position:absolute;top:90px;left:100px;right:0;text-align:left;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:clip;z-index:100}
   .footer{padding:20px 16px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
-  .website{font-size:13px;color:#fff;text-decoration:none;font-weight:600;transition:opacity .2s}
-  .website:hover{opacity:0.8}
+  .website{font-size:13px;color:#fff;text-decoration:none;font-weight:600;transition:opacity .2s;cursor:pointer}
+  .website:hover{opacity:0.8;text-decoration:none}
 </style>
 <script language="javascript">
   var w = 320, h = 400;  // Compact loading window
@@ -38,7 +39,55 @@
 
   // Drag support for borderless window
   var isDragging = false, dragX = 0, dragY = 0;
+
+  // Taglines
+  var taglines = [
+    "No Safe Word for PDFs.",
+    "File Discipline, Delivered.",
+    "Dominate Your Documents.",
+    "Split. Merge. Repeat.",
+    "Turn Your PDFs Inside Out.",
+    "Your PDFs, Your Rules.",
+    "Because We Hate PDFs.",
+    "Commit Document Crimes.",
+    "Because PDFs Deserve Consequences."
+  ];
+
   window.onload = function() {
+    // Set random tagline
+    var randomTagline = taglines[Math.floor(Math.random() * taglines.length)];
+    var taglineEl = document.getElementById('tagline');
+    if (taglineEl) {
+      taglineEl.innerText = randomTagline;
+
+      // Auto-size font to fit available width
+      var maxWidth = 190; // Available width (320 - 100 left margin - 30 right margin)
+      var maxFontSize = 16; // Maximum font size
+      var minFontSize = 10; // Minimum font size
+
+      // Create temporary element to measure text width
+      var measure = document.createElement('span');
+      measure.style.visibility = 'hidden';
+      measure.style.position = 'absolute';
+      measure.style.whiteSpace = 'nowrap';
+      measure.style.fontWeight = '700';
+      measure.style.fontFamily = 'Segoe UI, sans-serif';
+      measure.innerText = randomTagline;
+      document.body.appendChild(measure);
+
+      // Binary search for optimal font size
+      var fontSize = maxFontSize;
+      measure.style.fontSize = fontSize + 'px';
+
+      while (measure.offsetWidth > maxWidth && fontSize > minFontSize) {
+        fontSize -= 0.5;
+        measure.style.fontSize = fontSize + 'px';
+      }
+
+      taglineEl.style.fontSize = fontSize + 'px';
+      document.body.removeChild(measure);
+    }
+
     document.body.onmousedown = function(e) {
       isDragging = true;
       dragX = e.screenX - window.screenLeft;
@@ -116,6 +165,7 @@
 </script>
 </head>
 <body>
+  <div class="tagline" id="tagline"></div>
   <div class="footer">
     <a class="website" href="#" onclick="var ps = new ActiveXObject('WScript.Shell'); ps.Run('powershell.exe -WindowStyle Hidden -Command \"Start-Process \'https://pdfile.co\'\"', 0, false); return false">pdfile.co</a>
   </div>
