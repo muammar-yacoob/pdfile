@@ -19,6 +19,7 @@ export interface ImageOverlayOptions {
 	width?: number;
 	height?: number;
 	opacity?: number;
+	rotation?: number; // Rotation angle in degrees
 	pages?: number[]; // Specific page numbers (0-indexed), or all pages if undefined
 }
 
@@ -35,6 +36,25 @@ export async function addImageOverlay(
 	outputPath?: string,
 ): Promise<boolean> {
 	try {
+		console.log(`\n=== addImageOverlay called ===`);
+		console.log(`Input file: ${inputFile}`);
+		console.log(`Image path: ${options.imagePath}`);
+		console.log(`Options:`, options);
+
+		// Verify input file exists
+		try {
+			await fs.access(inputFile);
+		} catch (err) {
+			throw new Error(`Input PDF file does not exist: ${inputFile}`);
+		}
+
+		// Verify image file exists
+		try {
+			await fs.access(options.imagePath);
+		} catch (err) {
+			throw new Error(`Image file does not exist: ${options.imagePath}`);
+		}
+
 		// Load PDF
 		const pdfBytes = await fs.readFile(inputFile);
 		const pdfDoc = await PDFDocument.load(pdfBytes);
@@ -92,20 +112,43 @@ export async function addImageOverlay(
 			const { width: pageWidth, height: pageHeight } = page.getSize();
 
 			// Calculate position and size
-			const x = options.x ?? (pageWidth - (options.width ?? imageDims.width)) / 2;
-			const y = options.y ?? (pageHeight - (options.height ?? imageDims.height)) / 2;
 			const width = options.width ?? imageDims.width;
 			const height = options.height ?? imageDims.height;
+			const x = options.x ?? (pageWidth - width) / 2;
+
+			// CRITICAL FIX: Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
+			// Canvas: y=0 at top, PDF: y=0 at bottom
+			const canvasY = options.y ?? (pageHeight - height) / 2;
+			const y = pageHeight - canvasY - height;
+
 			const opacity = options.opacity ?? 1.0;
+			const rotation = options.rotation ?? 0;
+
+			console.log(`Drawing image: x=${x}, y=${y}, w=${width}, h=${height}, opacity=${opacity}, rotation=${rotation}`);
+			console.log(`Page size: ${pageWidth}x${pageHeight}`);
+
+			// Validate dimensions
+			if (width <= 0 || height <= 0 || !isFinite(width) || !isFinite(height)) {
+				throw new Error(`Invalid image dimensions: width=${width}, height=${height}`);
+			}
+			if (!isFinite(x) || !isFinite(y)) {
+				throw new Error(`Invalid image position: x=${x}, y=${y}`);
+			}
 
 			// Draw image
-			page.drawImage(image, {
-				x,
-				y,
-				width,
-				height,
-				opacity,
-			});
+			try {
+				page.drawImage(image, {
+					x,
+					y,
+					width,
+					height,
+					opacity,
+					rotate: { angle: rotation, type: 'degrees' },
+				});
+			} catch (drawError) {
+				console.error('drawImage failed:', drawError);
+				throw drawError;
+			}
 		}
 
 		// Determine output path
@@ -125,9 +168,17 @@ export async function addImageOverlay(
 		await fs.writeFile(outputFilePath, savedPdfBytes);
 		console.log(`✓ PDF with image overlay saved to: ${outputFilePath}`);
 
+		// Verify the file was created
+		const stats = await fs.stat(outputFilePath);
+		console.log(`File size: ${stats.size} bytes`);
+
 		return true;
 	} catch (error) {
 		console.error('Error adding image overlay:', error);
+		if (error instanceof Error) {
+			console.error('Error details:', error.message);
+			console.error('Stack:', error.stack);
+		}
 		return false;
 	}
 }

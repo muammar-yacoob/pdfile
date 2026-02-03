@@ -162,12 +162,23 @@
       }
     }, 80);
   }, 100);
+
+  // Handle website link click
+  function openWebsite() {
+    try {
+      var ps = new ActiveXObject('WScript.Shell');
+      ps.Run('powershell.exe -WindowStyle Hidden -Command "Start-Process https://pdfile.co"', 0, false);
+    } catch(e) {
+      log("Error opening website: " + e.message);
+    }
+    return false;
+  }
 </script>
 </head>
 <body>
   <div class="tagline" id="tagline"></div>
   <div class="footer">
-    <a class="website" href="#" onclick="var ps = new ActiveXObject('WScript.Shell'); ps.Run('powershell.exe -WindowStyle Hidden -Command \"Start-Process \'https://pdfile.co\'\"', 0, false); return false">pdfile.co</a>
+    <a class="website" href="#" onclick="return openWebsite()">pdfile.co</a>
   </div>
 </body>
 </html>
