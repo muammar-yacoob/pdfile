@@ -65,14 +65,7 @@ const PDFExport = (() => {
 
             console.log('=== PENDING OVERLAYS (BEFORE CONVERSION) ===');
             pendingOverlays.forEach((o, i) => {
-                console.log(`Overlay ${i}:`, {
-                    type: o.type,
-                    width: o.width,
-                    height: o.height,
-                    x: o.x,
-                    y: o.y,
-                    imageData: o.imageData ? `${o.imageData.substring(0, 50)}...` : 'none'
-                });
+                console.log(`Overlay ${i}: type=${o.type}, w=${o.width}, h=${o.height}, x=${o.x}, y=${o.y}, hasImage=${!!o.imageData}`);
             });
 
             const convertedOverlays = await Promise.all(pendingOverlays.map(async (overlay, idx) => {
@@ -157,14 +150,7 @@ const PDFExport = (() => {
 
             console.log('=== CONVERTED OVERLAYS (BEING SENT) ===');
             convertedOverlays.forEach((o, i) => {
-                console.log(`Overlay ${i}:`, {
-                    type: o.type,
-                    width: o.width,
-                    height: o.height,
-                    x: o.x,
-                    y: o.y,
-                    pageIndex: o.pageIndex
-                });
+                console.log(`Overlay ${i}: type=${o.type}, w=${o.width}, h=${o.height}, x=${o.x}, y=${o.y}, page=${o.pageIndex}, hasImage=${!!o.imageData}`);
             });
 
             // Send request with page order and converted overlays

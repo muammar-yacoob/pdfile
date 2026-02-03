@@ -36,6 +36,25 @@ export async function addImageOverlay(
 	outputPath?: string,
 ): Promise<boolean> {
 	try {
+		console.log(`\n=== addImageOverlay called ===`);
+		console.log(`Input file: ${inputFile}`);
+		console.log(`Image path: ${options.imagePath}`);
+		console.log(`Options:`, options);
+
+		// Verify input file exists
+		try {
+			await fs.access(inputFile);
+		} catch (err) {
+			throw new Error(`Input PDF file does not exist: ${inputFile}`);
+		}
+
+		// Verify image file exists
+		try {
+			await fs.access(options.imagePath);
+		} catch (err) {
+			throw new Error(`Image file does not exist: ${options.imagePath}`);
+		}
+
 		// Load PDF
 		const pdfBytes = await fs.readFile(inputFile);
 		const pdfDoc = await PDFDocument.load(pdfBytes);
@@ -148,6 +167,10 @@ export async function addImageOverlay(
 
 		await fs.writeFile(outputFilePath, savedPdfBytes);
 		console.log(`✓ PDF with image overlay saved to: ${outputFilePath}`);
+
+		// Verify the file was created
+		const stats = await fs.stat(outputFilePath);
+		console.log(`File size: ${stats.size} bytes`);
 
 		return true;
 	} catch (error) {

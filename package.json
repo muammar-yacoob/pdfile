@@ -1,6 +1,6 @@
 {
 	"name": "@spark-apps/pdfile",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "Comprehensive PDF utility toolkit for document manipulation",
 	"type": "module",
 	"bin": {

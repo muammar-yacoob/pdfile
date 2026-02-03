@@ -156,6 +156,11 @@ export async function runGUI(file: string): Promise<boolean> {
 							? file.replace(/\.pdf$/i, '_abused.pdf')
 							: join(tmpDir, `temp_overlay_${i}_${Date.now()}.pdf`);
 
+						console.log(`\n=== Processing overlay ${i + 1}/${overlays.length} (${overlay.type}) ===`);
+						console.log(`Current input file: ${currentFile}`);
+						console.log(`Output file: ${outputPath}`);
+						console.log(`Is last: ${isLast}`);
+
 						let success = false;
 
 						if (overlay.type === 'date') {
@@ -172,13 +177,35 @@ export async function runGUI(file: string): Promise<boolean> {
 							}, outputPath);
 
 						} else if (overlay.type === 'image') {
-							const imageBuffer = Buffer.from(overlay.imageData.split(',')[1], 'base64');
-							const imagePath = join(tmpDir, `overlay_${Date.now()}.png`);
-							await writeFile(imagePath, imageBuffer);
-							tempFiles.push(imagePath);
+							let imagePath: string;
+							try {
+								// Extract image data
+								const imageDataParts = overlay.imageData.split(',');
+								if (imageDataParts.length !== 2) {
+									throw new Error(`Invalid image data format (expected data:type;base64,data)`);
+								}
 
-							// Log dimensions for debugging
-							console.log(`Image overlay dimensions: x=${overlay.x}, y=${overlay.y}, w=${overlay.width}, h=${overlay.height}`);
+								const imageBuffer = Buffer.from(imageDataParts[1], 'base64');
+								console.log(`Image buffer size: ${imageBuffer.length} bytes`);
+
+								// Determine image format from data URL
+								const mimeType = imageDataParts[0].match(/data:(.+);base64/)?.[1] || 'image/png';
+								console.log(`Image MIME type: ${mimeType}`);
+
+								// Use correct file extension based on MIME type
+								const imageExt = mimeType === 'image/jpeg' ? 'jpg' :
+								                 mimeType === 'image/png' ? 'png' :
+								                 mimeType.split('/')[1] || 'png';
+								imagePath = join(tmpDir, `overlay_${i}_${Date.now()}.${imageExt}`);
+								await writeFile(imagePath, imageBuffer);
+								tempFiles.push(imagePath);
+
+								// Log dimensions for debugging
+								console.log(`Image overlay dimensions: x=${overlay.x}, y=${overlay.y}, w=${overlay.width}, h=${overlay.height}`);
+							} catch (imageError) {
+								console.error(`Failed to process image data:`, imageError);
+								throw new Error(`Failed to process image data: ${(imageError as Error).message}`);
+							}
 
 							// Use signature processing if removeBackground is true
 							if (overlay.removeBackground) {
@@ -208,6 +235,7 @@ export async function runGUI(file: string): Promise<boolean> {
 
 							if (!success) {
 								console.error(`Failed to apply image overlay with dimensions: ${overlay.width}x${overlay.height}`);
+								throw new Error(`Image overlay returned false - check logs above for details`);
 							}
 
 						} else if (overlay.type === 'signature') {
@@ -230,18 +258,32 @@ export async function runGUI(file: string): Promise<boolean> {
 						}
 
 						if (!success) {
+							console.error(`Overlay ${i} failed!`);
 							throw new Error(`Failed to apply ${overlay.type} overlay`);
 						}
 
+						console.log(`Overlay ${i} succeeded!`);
+
+						// Verify output file was created
+						if (!existsSync(outputPath)) {
+							throw new Error(`Output file not created: ${outputPath}`);
+						}
+						console.log(`Output file verified: ${outputPath}`);
+
 						if (!isLast) {
-							if (currentFile !== file) {
+							if (currentFile !== file && existsSync(currentFile)) {
+								console.log(`Adding old currentFile to temp cleanup: ${currentFile}`);
 								tempFiles.push(currentFile);
 							}
+							console.log(`Updating currentFile from ${currentFile} to ${outputPath}`);
 							currentFile = outputPath;
 						} else {
+							console.log(`Final overlay - setting currentFile to ${outputPath}`);
 							currentFile = outputPath;
 						}
 					}
+
+					console.log(`\n=== All overlays processed successfully ===`);
 				}
 
 				// Return the final file

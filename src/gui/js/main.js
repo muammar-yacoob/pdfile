@@ -1438,7 +1438,6 @@ function addOverlayGizmo(type, label, x, y, overlayIndex) {
 
             if (isCorner) {
                 // Corner handles: maintain aspect ratio
-                // Use the larger delta to determine new size
                 let scale;
                 if (resizeHandle === 'se') {
                     // Bottom-right: expand from top-left anchor
@@ -1611,8 +1610,11 @@ async function handleImageDrop(file) {
                 // Add to recent images
                 addToRecentImages(file.name, imageData);
 
-                // Add to pending overlays
+                // Add to pending overlays with proper aspect ratio
                 const overlayIndex = pendingOverlays.length;
+
+                // Store original aspect ratio for this image
+                const aspectRatio = width / height;
 
                 pendingOverlays.push({
                     type: 'image',
@@ -1621,6 +1623,7 @@ async function handleImageDrop(file) {
                     y: Math.max(0, y),
                     width: width,
                     height: height,
+                    aspectRatio: aspectRatio, // Store for resize operations
                     opacity: 100,
                     removeBackground: false,
                     pageIndex: currentPreviewPage - 1
