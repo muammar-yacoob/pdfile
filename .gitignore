@@ -16,3 +16,4 @@ node_modules/
 
 # Generated social media cards (regenerate with: npm run social-cards)
 social-cards/*.png
+/pdfile-web
