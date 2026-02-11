@@ -4,14 +4,10 @@ const PageOperations = {
 	draggedElement: null,
 
 	selectPage(pageNum, isSelected) {
-		console.log(`[selectPage] Called with pageNum=${pageNum}, isSelected=${isSelected}`);
-		console.log(`[selectPage] BEFORE - lastSelectedPage=${window.lastSelectedPage}, selectedPages=`, Array.from(window.selectedPages || []));
-
 		if (isSelected) {
 			window.selectedPages.add(pageNum);
 			window.lastSelectedPage = pageNum;
 			window.AppState?.setLastSelectedPage(pageNum);
-			console.log(`[selectPage] SELECTED - Set lastSelectedPage to ${pageNum}`);
 		} else {
 			window.selectedPages.delete(pageNum);
 			const newLast =
@@ -20,16 +16,12 @@ const PageOperations = {
 					: null;
 			window.lastSelectedPage = newLast;
 			window.AppState?.setLastSelectedPage(newLast);
-			console.log(`[selectPage] DESELECTED - Set lastSelectedPage to ${newLast}`);
 		}
 
 		// Always preview the last selected page using original page number
 		if (window.lastSelectedPage) {
 			const originalPageNum = this.getOriginalPageNumber(window.lastSelectedPage);
-			console.log(`[selectPage] About to render original page ${originalPageNum}`);
 			window.PreviewController?.renderPage(originalPageNum);
-		} else {
-			console.log(`[selectPage] No lastSelectedPage to render`);
 		}
 
 		this.updateSelectionUI();
@@ -42,14 +34,9 @@ const PageOperations = {
 			if (Number.parseInt(item.dataset.pageNum) === displayPageNum) {
 				// Use originalPage if it exists (pages were reordered), otherwise use pageNum
 				const originalPageNum = Number.parseInt(item.dataset.originalPage || item.dataset.pageNum);
-				console.log(`[getOriginalPageNumber] display=${displayPageNum} -> original=${originalPageNum}, dataset:`, {
-					pageNum: item.dataset.pageNum,
-					originalPage: item.dataset.originalPage
-				});
 				return originalPageNum;
 			}
 		}
-		console.log(`[getOriginalPageNumber] No match found for display=${displayPageNum}, returning fallback`);
 		return displayPageNum; // Fallback
 	},
 

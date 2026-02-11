@@ -33,12 +33,10 @@ const PreviewController = {
 	},
 
 	async renderPage(pageNum) {
-		console.log(`[PreviewController.renderPage] Called with pageNum=${pageNum}`);
 		if (!window.pdfDocument) return;
 
 		// If already rendering, queue this render
 		if (this.isRendering) {
-			console.log(`[PreviewController.renderPage] Already rendering, queueing page ${pageNum}`);
 			this.pendingRender = pageNum;
 			return;
 		}
@@ -62,7 +60,6 @@ const PreviewController = {
 			}
 
 			window.currentPreviewPage = pageNum;
-			console.log(`[PreviewController.renderPage] Set currentPreviewPage to ${pageNum}, about to getPage(${pageNum})`);
 			const page = await window.pdfDocument.getPage(pageNum);
 
 			// Calculate scale
@@ -106,6 +103,7 @@ const PreviewController = {
 
 	setZoom(newZoom, mousePos = null) {
 		const oldZoom = window.zoomLevel === 'fit' ? 1.0 : window.zoomLevel;
+		const wasAtFit = window.zoomLevel === 'fit';
 
 		// Update zoom level
 		if (typeof newZoom === 'number') {
@@ -115,6 +113,7 @@ const PreviewController = {
 		}
 
 		const newZoomValue = window.zoomLevel === 'fit' ? 1.0 : window.zoomLevel;
+		const isNowAtFit = window.zoomLevel === 'fit';
 
 		// Update zoom display
 		this.updateZoomDisplay();
@@ -133,7 +132,18 @@ const PreviewController = {
 				area.scrollTop = (scrollTop + mousePos.y) * zoomRatio - mousePos.y;
 			});
 		} else {
-			this.renderPage(window.currentPreviewPage);
+			// When switching to fit mode (and not zooming with mouse), reset scroll to top
+			if (isNowAtFit && !wasAtFit) {
+				this.renderPage(window.currentPreviewPage).then(() => {
+					const area = document.getElementById('previewArea');
+					if (area) {
+						area.scrollTop = 0;
+						area.scrollLeft = 0;
+					}
+				});
+			} else {
+				this.renderPage(window.currentPreviewPage);
+			}
 		}
 	},
 

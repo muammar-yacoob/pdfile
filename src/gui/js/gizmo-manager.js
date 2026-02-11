@@ -50,38 +50,47 @@ const GizmoManager = {
 		const isText = type === 'text' || type === 'date';
 		const isRectangle = type === 'rectangle';
 
+		// Create resize handles HTML
+		const resizeHandles = `
+			<div class="overlay-gizmo-handle nw" data-action="resize" data-handle="nw"></div>
+			<div class="overlay-gizmo-handle ne" data-action="resize" data-handle="ne"></div>
+			<div class="overlay-gizmo-handle sw" data-action="resize" data-handle="sw"></div>
+			<div class="overlay-gizmo-handle se" data-action="resize" data-handle="se"></div>
+			<div class="overlay-gizmo-handle n" data-action="resize" data-handle="n"></div>
+			<div class="overlay-gizmo-handle s" data-action="resize" data-handle="s"></div>
+			<div class="overlay-gizmo-handle w" data-action="resize" data-handle="w"></div>
+			<div class="overlay-gizmo-handle e" data-action="resize" data-handle="e"></div>
+		`;
+
 		if (isText) {
 			gizmo.innerHTML = `
 				<div class="overlay-gizmo-text">${label}</div>
 				<div class="overlay-gizmo-delete" title="Delete (Del)">×</div>
-				<div class="overlay-gizmo-resize" data-action="resize" data-handle="se" title="Resize">
-					<i data-lucide="maximize-2" style="width: 10px; height: 10px;"></i>
-				</div>
+				${resizeHandles}
 				<div class="overlay-gizmo-rotate" data-action="rotate" title="Rotate">
 					<i data-lucide="refresh-cw" style="width: 10px; height: 10px;"></i>
 				</div>
+				<div class="rotation-guide" style="display: none;"></div>
 			`;
 		} else if (isRectangle) {
 			gizmo.innerHTML = `
 				<div class="overlay-gizmo-rectangle" style="width: 100%; height: 100%; background: rgba(0,0,0,0.1); border: 2px solid rgba(0,0,0,0.3);"></div>
 				<div class="overlay-gizmo-delete" title="Delete (Del)">×</div>
-				<div class="overlay-gizmo-resize" data-action="resize" data-handle="se" title="Resize">
-					<i data-lucide="maximize-2" style="width: 10px; height: 10px;"></i>
-				</div>
+				${resizeHandles}
 				<div class="overlay-gizmo-rotate" data-action="rotate" title="Rotate">
 					<i data-lucide="refresh-cw" style="width: 10px; height: 10px;"></i>
 				</div>
+				<div class="rotation-guide" style="display: none;"></div>
 			`;
 		} else {
 			gizmo.innerHTML = `
 				<div class="overlay-gizmo-image-preview"></div>
 				<div class="overlay-gizmo-delete" title="Delete (Del)">×</div>
-				<div class="overlay-gizmo-resize" data-action="resize" data-handle="se" title="Resize">
-					<i data-lucide="maximize-2" style="width: 10px; height: 10px;"></i>
-				</div>
+				${resizeHandles}
 				<div class="overlay-gizmo-rotate" data-action="rotate" title="Rotate">
 					<i data-lucide="refresh-cw" style="width: 10px; height: 10px;"></i>
 				</div>
+				<div class="rotation-guide" style="display: none;"></div>
 			`;
 		}
 
@@ -104,23 +113,26 @@ const GizmoManager = {
 	setupGizmoInteraction(gizmo, overlayIndex) {
 		let action = null;
 		let resizeHandle = null;
-		let offsetX, offsetY; // Mouse offset from gizmo top-left
+		let startX, startY;
 		let initialWidth, initialHeight, initialLeft, initialTop;
-		let centerX, centerY, initialAngle;
+		let centerX, centerY, startAngle, startRotation;
 		let initialAspectRatio = 1;
+		let rotationGuide = null;
 
 		gizmo.addEventListener('mousedown', (e) => {
 			// Don't start drag on delete button
 			if (e.target.classList.contains('overlay-gizmo-delete')) return;
 
 			const targetAction = e.target.dataset.action;
+			const canvas = document.getElementById('pdfCanvas');
+			const canvasRect = canvas.getBoundingClientRect();
 
 			// If no special action, select this overlay
 			if (!targetAction) {
 				window.SelectionManager.selectOverlay(overlayIndex);
 			}
 
-			// Get gizmo's current position
+			// Get gizmo's current position in canvas coordinates
 			const gizmoRect = gizmo.getBoundingClientRect();
 
 			if (targetAction === 'resize') {
@@ -134,25 +146,45 @@ const GizmoManager = {
 				initialTop = Number.parseInt(gizmo.style.top) || 0;
 				initialAspectRatio = initialWidth / initialHeight;
 
-				// Store mouse start position
-				offsetX = e.clientX;
-				offsetY = e.clientY;
+				// Store mouse start position in canvas coordinates
+				startX = e.clientX - canvasRect.left;
+				startY = e.clientY - canvasRect.top;
+
 			} else if (targetAction === 'rotate') {
 				action = 'rotate';
+
+				// Calculate center in screen coordinates
 				centerX = gizmoRect.left + gizmoRect.width / 2;
 				centerY = gizmoRect.top + gizmoRect.height / 2;
-				initialAngle =
-					Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-				const currentRotation =
-					window.AppState.getOverlay(overlayIndex)?.rotation || 0;
-				initialAngle = initialAngle - currentRotation;
+
+				// Get current rotation
+				startRotation = window.AppState.getOverlay(overlayIndex)?.rotation || 0;
+
+				// Calculate initial angle from center to mouse
+				startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+
+				// Show rotation guide
+				rotationGuide = gizmo.querySelector('.rotation-guide');
+				if (rotationGuide) {
+					const radius = Math.max(gizmoRect.width, gizmoRect.height) / 2 + 30;
+					rotationGuide.style.width = `${radius * 2}px`;
+					rotationGuide.style.height = `${radius * 2}px`;
+					rotationGuide.style.left = `${gizmoRect.width / 2 - radius}px`;
+					rotationGuide.style.top = `${gizmoRect.height / 2 - radius}px`;
+					rotationGuide.style.display = 'block';
+				}
+
 			} else {
-				// Move action - simple and clean
+				// Move action
 				action = 'move';
 
-				// Calculate offset from gizmo's top-left corner
-				offsetX = e.clientX - gizmoRect.left;
-				offsetY = e.clientY - gizmoRect.top;
+				// Store start position in canvas coordinates
+				startX = e.clientX - canvasRect.left;
+				startY = e.clientY - canvasRect.top;
+
+				// Store initial gizmo position
+				initialLeft = Number.parseInt(gizmo.style.left) || 0;
+				initialTop = Number.parseInt(gizmo.style.top) || 0;
 
 				gizmo.style.cursor = 'grabbing';
 			}
@@ -170,44 +202,47 @@ const GizmoManager = {
 
 			if (!canvasRect) return;
 
+			// Current mouse position in canvas coordinates
+			const currentX = e.clientX - canvasRect.left;
+			const currentY = e.clientY - canvasRect.top;
+
 			if (action === 'move') {
-				// Simple: position gizmo so mouse is at the same offset point
-				const newLeft = e.clientX - canvasRect.left - offsetX;
-				const newTop = e.clientY - canvasRect.top - offsetY;
+				// Calculate delta from start
+				const deltaX = currentX - startX;
+				const deltaY = currentY - startY;
+
+				// Apply delta to initial position
+				const newLeft = initialLeft + deltaX;
+				const newTop = initialTop + deltaY;
 
 				gizmo.style.left = `${newLeft}px`;
 				gizmo.style.top = `${newTop}px`;
 
-				// Store position in overlay data
-				// These are canvas pixel coordinates that will be scaled on export
-				const canvasWidth = canvas.width;
-				const canvasHeight = canvas.height;
-
+				// Update state
 				window.AppState.updateOverlay(index, {
 					x: newLeft,
 					y: newTop,
-					canvasWidth,
-					canvasHeight,
+					canvasWidth: canvas.width,
+					canvasHeight: canvas.height,
 				});
+
 			} else if (action === 'resize') {
-				const deltaX = e.clientX - offsetX;
-				const deltaY = e.clientY - offsetY;
+				const deltaX = currentX - startX;
+				const deltaY = currentY - startY;
 
 				let newWidth = initialWidth;
 				let newHeight = initialHeight;
 				let newLeft = initialLeft;
 				let newTop = initialTop;
 
-				const isCorner = resizeHandle === 'se' || resizeHandle === 'sw';
+				const currentOverlay = window.AppState.getOverlay(index);
+				const storedAspectRatio = currentOverlay?.aspectRatio || initialAspectRatio;
 
-				if (isCorner) {
-					// Corner handles: maintain aspect ratio
-					const currentOverlay = window.AppState.getOverlay(index);
-					const storedAspectRatio = currentOverlay?.aspectRatio || initialAspectRatio;
+				// Corner handles - maintain aspect ratio
+				if (resizeHandle === 'nw' || resizeHandle === 'ne' || resizeHandle === 'sw' || resizeHandle === 'se') {
+					let scale = 1;
 
-					let scale;
 					if (resizeHandle === 'se') {
-						// Use the dominant axis for scaling
 						const scaleX = (initialWidth + deltaX) / initialWidth;
 						const scaleY = (initialHeight + deltaY) / initialHeight;
 						scale = Math.max(scaleX, scaleY);
@@ -215,13 +250,34 @@ const GizmoManager = {
 						const scaleX = (initialWidth - deltaX) / initialWidth;
 						const scaleY = (initialHeight + deltaY) / initialHeight;
 						scale = Math.max(scaleX, scaleY);
+						newLeft = initialLeft + (initialWidth - initialWidth * scale);
+					} else if (resizeHandle === 'ne') {
+						const scaleX = (initialWidth + deltaX) / initialWidth;
+						const scaleY = (initialHeight - deltaY) / initialHeight;
+						scale = Math.max(scaleX, scaleY);
+						newTop = initialTop + (initialHeight - initialHeight * scale);
+					} else if (resizeHandle === 'nw') {
+						const scaleX = (initialWidth - deltaX) / initialWidth;
+						const scaleY = (initialHeight - deltaY) / initialHeight;
+						scale = Math.max(scaleX, scaleY);
+						newLeft = initialLeft + (initialWidth - initialWidth * scale);
+						newTop = initialTop + (initialHeight - initialHeight * scale);
 					}
 
 					newWidth = Math.max(30, initialWidth * scale);
 					newHeight = Math.max(20, newWidth / storedAspectRatio);
 
-					// Adjust left position for SW handle
-					if (resizeHandle === 'sw') {
+				// Side handles - free resize
+				} else {
+					if (resizeHandle === 's') {
+						newHeight = Math.max(20, initialHeight + deltaY);
+					} else if (resizeHandle === 'n') {
+						newHeight = Math.max(20, initialHeight - deltaY);
+						newTop = initialTop + (initialHeight - newHeight);
+					} else if (resizeHandle === 'e') {
+						newWidth = Math.max(30, initialWidth + deltaX);
+					} else if (resizeHandle === 'w') {
+						newWidth = Math.max(30, initialWidth - deltaX);
 						newLeft = initialLeft + (initialWidth - newWidth);
 					}
 				}
@@ -231,10 +287,6 @@ const GizmoManager = {
 				gizmo.style.height = `${newHeight}px`;
 				gizmo.style.left = `${newLeft}px`;
 				gizmo.style.top = `${newTop}px`;
-
-				const currentOverlay = window.AppState.getOverlay(index);
-				const canvasWidth = canvas.width;
-				const canvasHeight = canvas.height;
 
 				// For text overlays, scale font size
 				if (currentOverlay.type === 'date' || currentOverlay.type === 'text') {
@@ -249,8 +301,8 @@ const GizmoManager = {
 						height: newHeight,
 						fontSize: newFontSize,
 						scale: scale,
-						canvasWidth,
-						canvasHeight,
+						canvasWidth: canvas.width,
+						canvasHeight: canvas.height,
 					});
 
 					// Update gizmo text size
@@ -265,14 +317,18 @@ const GizmoManager = {
 						y: newTop,
 						width: newWidth,
 						height: newHeight,
-						canvasWidth,
-						canvasHeight,
+						canvasWidth: canvas.width,
+						canvasHeight: canvas.height,
 					});
 				}
+
 			} else if (action === 'rotate') {
-				const currentAngle =
-					Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-				let rotation = currentAngle - initialAngle;
+				// Calculate current angle from center to mouse
+				const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+
+				// Calculate rotation change (reduced sensitivity by factor of 0.7)
+				let angleDelta = (currentAngle - startAngle) * 0.7;
+				let rotation = startRotation + angleDelta;
 
 				// Snap to 15 degree increments if shift is held
 				if (e.shiftKey) {
@@ -291,7 +347,11 @@ const GizmoManager = {
 			if (action === 'move') {
 				gizmo.style.cursor = 'grab';
 			}
+			if (action === 'rotate' && rotationGuide) {
+				rotationGuide.style.display = 'none';
+			}
 			action = null;
+			resizeHandle = null;
 		});
 
 		// Delete button handler

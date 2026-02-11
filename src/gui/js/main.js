@@ -945,50 +945,6 @@ function addTextOverlay() {
 	}
 }
 
-function addRectangleOverlay() {
-	if (!currentPdfFile) return;
-
-	const overlayIndex = AppState.getOverlays().length;
-
-	const canvas = document.getElementById('pdfCanvas');
-	const canvasWidth = canvas ? canvas.width : 1;
-	const canvasHeight = canvas ? canvas.height : 1;
-
-	// Calculate center position for initial placement
-	const rectWidth = 200;
-	const rectHeight = 150;
-	const centerX = Math.max(0, (canvasWidth - rectWidth) / 2);
-	const centerY = Math.max(0, (canvasHeight - rectHeight) / 2);
-
-	AppState.addOverlay({
-		type: 'rectangle',
-		x: centerX,
-		y: centerY,
-		width: rectWidth,
-		height: rectHeight,
-		fillColor: window.selectedRectangleColor || '#000000',
-		fillAlpha: window.selectedRectangleAlpha || 0.5,
-		borderFade: window.selectedRectangleBorderFade || 0,
-		opacity: 100,
-		pageIndex: window.currentPreviewPage - 1,
-		canvasWidth,
-		canvasHeight,
-	});
-
-	AppState.markAsChanged();
-
-	// Add visual gizmo to preview
-	window.GizmoManager.createGizmo('rectangle', 'Shape', centerX, centerY, overlayIndex);
-
-	LayerManager.updateLayersList();
-	UIControls.closeRectangleEditor();
-
-	// Auto-select the newly added overlay
-	if (window.SelectionManager) {
-		window.SelectionManager.selectOverlay(overlayIndex);
-	}
-}
-
 async function convertToWord() {
 	if (!currentPdfFile) {
 		showModal('No PDF Loaded', 'Please load a PDF file first');
@@ -1212,10 +1168,6 @@ async function handleImageDrop(file) {
 					overlayIndex,
 				);
 				window.LayerManager.updateLayersList();
-
-				console.log(
-					`Image dropped: ${file.name} (${img.width}x${img.height}) - ${isLargeImage ? 'large' : 'small'} - centered at (${x}, ${y})`,
-				);
 			};
 
 			img.onerror = () => {
@@ -1520,33 +1472,6 @@ document.addEventListener('DOMContentLoaded', () => {
 	selectedHighlightColor = null; // Default: no highlight
 	window.selectedHighlightColor = selectedHighlightColor;
 	window.highlightColorPicker = highlightColorPicker;
-
-	// Rectangle Color Picker
-	rectangleColorPicker = new ColorPicker({
-		container: '#rectangleColorPicker',
-		default: '#000000',
-		alpha: 0.5,
-		label: 'Rectangle Color',
-		swatches: [
-			'#000000',
-			'#ffffff',
-			'#ff0000',
-			'#00ff00',
-			'#0000ff',
-			'#ffff00',
-			'#ff00ff',
-			'#00ffff',
-		],
-		onChange: (color, alpha) => {
-			window.selectedRectangleColor = color;
-			window.selectedRectangleAlpha = alpha;
-		},
-	});
-
-	window.selectedRectangleColor = '#000000';
-	window.selectedRectangleAlpha = 0.5;
-	window.selectedRectangleBorderFade = 0;
-	window.rectangleColorPicker = rectangleColorPicker;
 
 	// Set up drag & drop for PDF, image, and document files
 	const thumbnailsPanel = document.getElementById('thumbnailsPanel');

@@ -633,10 +633,7 @@
             z-index: 10;
             min-width: 60px;
             min-height: 30px;
-            padding: 10px 2px 2px 2px;
-            display: flex;
-            align-items: flex-start;
-            justify-content: flex-start;
+            padding: 4px;
             user-select: none;
             transition: all 0.15s ease;
             box-sizing: border-box;
@@ -654,13 +651,10 @@
             color: #7fa5df;
             text-align: left;
             word-break: break-word;
-            padding: 4px;
+            padding: 2px 4px;
             line-height: 1.2;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            justify-content: flex-start;
+            display: inline-block;
+            max-width: 100%;
         }
 
         .overlay-gizmo:hover {
@@ -684,12 +678,16 @@
 
         /* Corner handles - lock aspect ratio - larger and brighter */
         .overlay-gizmo-handle.se,
-        .overlay-gizmo-handle.sw {
+        .overlay-gizmo-handle.sw,
+        .overlay-gizmo-handle.ne,
+        .overlay-gizmo-handle.nw {
             width: 9px;
             height: 9px;
             background: #7fa5df;
         }
 
+        .overlay-gizmo-handle.nw { top: -5px; left: -5px; cursor: nwse-resize; }
+        .overlay-gizmo-handle.ne { top: -5px; right: -5px; cursor: nesw-resize; }
         .overlay-gizmo-handle.sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
         .overlay-gizmo-handle.se { bottom: -5px; right: -5px; cursor: nwse-resize; }
 
@@ -753,6 +751,28 @@
             transform: scale(0.95);
         }
 
+        /* Rotation guide circle */
+        .rotation-guide {
+            position: absolute;
+            border: 2px dashed rgba(127, 165, 223, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .rotation-guide::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 6px;
+            height: 6px;
+            background: #7fa5df;
+            border-radius: 50%;
+            box-shadow: 0 0 0 2px #fff;
+        }
+
         .overlay-gizmo-label {
             display: none; /* Hidden - unnecessary */
         }
@@ -767,7 +787,7 @@
             border: 2px solid #fff;
             border-radius: 50%;
             color: var(--txt3);
-            font-size: 13px;
+            font-size: 16px;
             font-weight: bold;
             cursor: pointer;
             display: flex;
@@ -1742,9 +1762,6 @@
                                 <button class="tool-btn" style="flex: 1; font-size: 10px;" onclick="browseImage()">
                                     <i data-lucide="image" style="width: 12px; height: 12px;"></i> Image
                                 </button>
-                                <button class="tool-btn" style="flex: 1; font-size: 10px;" onclick="UIControls.showRectangleEditor()">
-                                    <i data-lucide="square" style="width: 12px; height: 12px;"></i> Shape
-                                </button>
                             </div>
                             <input type="file" id="imageFile" accept="image/*" style="display: none;">
                         </div>
@@ -1771,30 +1788,6 @@
                                 </button>
                             </div>
                             <button class="tool-btn" id="addTextBtn" onclick="addTextOverlay()" disabled style="width: 100%;">Add Text</button>
-                        </div>
-
-                        <!-- Rectangle Editor Modal (hidden by default) -->
-                        <div id="rectangleEditorSection" style="display: none; padding: 12px; background: var(--bg); border: 1px solid var(--brd); border-radius: 4px; margin-bottom: 12px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                <label class="form-label" style="margin: 0;">Shape Editor</label>
-                                <button onclick="UIControls.closeRectangleEditor()" style="background: none; border: none; color: var(--txt3); cursor: pointer; padding: 4px;">
-                                    <i data-lucide="x" style="width: 14px; height: 14px;"></i>
-                                </button>
-                            </div>
-                            <div class="form-group">
-                                <div class="color-input-group">
-                                    <label>Fill Color</label>
-                                    <div id="rectangleColorPicker"></div>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Border Fade: <span id="rectangleBorderFadeValue">0</span>px</label>
-                                <input type="range" min="0" max="30" value="0" id="rectangleBorderFadeSlider" style="width: 100%;" oninput="UIControls.updateRectangleBorderFade(this.value)">
-                                <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">
-                                    Gradient fade at borders
-                                </div>
-                            </div>
-                            <button class="tool-btn" id="addRectangleBtn" onclick="addRectangleOverlay()" style="width: 100%;">Add Shape</button>
                         </div>
 
                         <!-- Selected Layer Editor (context-sensitive) -->

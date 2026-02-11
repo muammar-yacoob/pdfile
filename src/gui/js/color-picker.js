@@ -146,8 +146,7 @@ class ColorPicker {
 			const color = result.sRGBHex;
 			this.setColor(color, this.currentAlpha);
 		} catch (err) {
-			// User cancelled or error occurred
-			console.log('EyeDropper cancelled or error:', err);
+			// User cancelled or error occurred - silently ignore
 		}
 	}
 

@@ -72,13 +72,6 @@ const PDFExport = (() => {
 			// Convert overlay coordinates from canvas pixels to PDF points
 			const canvas = document.getElementById('pdfCanvas');
 
-			console.log('=== PENDING OVERLAYS (BEFORE CONVERSION) ===');
-			pendingOverlays.forEach((o, i) => {
-				console.log(
-					`Overlay ${i}: type=${o.type}, w=${o.width}, h=${o.height}, x=${o.x}, y=${o.y}, hasImage=${!!o.imageData}`,
-				);
-			});
-
 			const convertedOverlays = await Promise.all(
 				pendingOverlays.map(async (overlay, idx) => {
 					const pageIndex = overlay.pageIndex || 0;
@@ -182,13 +175,6 @@ const PDFExport = (() => {
 					return converted;
 				}),
 			);
-
-			console.log('=== CONVERTED OVERLAYS (BEING SENT) ===');
-			convertedOverlays.forEach((o, i) => {
-				console.log(
-					`Overlay ${i}: type=${o.type}, w=${o.width}, h=${o.height}, x=${o.x}, y=${o.y}, page=${o.pageIndex}, hasImage=${!!o.imageData}`,
-				);
-			});
 
 			// Send request with page order and converted overlays
 			const response = await fetch('/api/export-pdf', {
