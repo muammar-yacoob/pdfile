@@ -41,6 +41,16 @@ const GizmoManager = {
 		} else if (type === 'rectangle') {
 			width = 200;
 			height = 150;
+		} else if (type === 'text' || type === 'date') {
+			// Calculate better initial size based on text content
+			const overlay = window.AppState.getOverlay(overlayIndex);
+			if (overlay && overlay.dateText) {
+				const textLength = overlay.dateText.length;
+				const fontSize = overlay.fontSize || 12;
+				// Estimate width based on character count and font size
+				width = Math.max(60, Math.min(300, textLength * fontSize * 0.7));
+				height = Math.max(30, fontSize * 1.8);
+			}
 		}
 
 		gizmo.style.width = `${width}px`;
@@ -127,9 +137,17 @@ const GizmoManager = {
 			const canvas = document.getElementById('pdfCanvas');
 			const canvasRect = canvas.getBoundingClientRect();
 
-			// If no special action, select this overlay
+			// If no special action, select this overlay (will navigate to page if needed)
 			if (!targetAction) {
 				window.SelectionManager.selectOverlay(overlayIndex);
+				// Return early if on different page to avoid starting drag during navigation
+				const overlay = window.AppState.getOverlay(overlayIndex);
+				if (overlay) {
+					const overlayPageNumber = (overlay.pageIndex || 0) + 1;
+					if (window.currentPreviewPage !== overlayPageNumber) {
+						return;
+					}
+				}
 			}
 
 			// Get gizmo's current position in canvas coordinates
@@ -344,6 +362,11 @@ const GizmoManager = {
 		});
 
 		document.addEventListener('mouseup', () => {
+			// Save to history after drag/resize/rotate is complete
+			if (action === 'move' || action === 'resize' || action === 'rotate') {
+				window.AppState.saveToHistory();
+			}
+
 			if (action === 'move') {
 				gizmo.style.cursor = 'grab';
 			}
@@ -410,6 +433,38 @@ const GizmoManager = {
 
 				if (overlay.textColor) {
 					textEl.style.color = overlay.textColor;
+				}
+
+				// Apply text styling (bold, italic, underline)
+				textEl.style.fontWeight = overlay.bold ? 'bold' : 'normal';
+				textEl.style.fontStyle = overlay.italic ? 'italic' : 'normal';
+				textEl.style.textDecoration = overlay.underline ? 'underline' : 'none';
+
+				// Apply font family if set
+				if (overlay.fontFamily) {
+					if (overlay.fontFamily === 'Times') {
+						textEl.style.fontFamily = 'Times New Roman, Times, serif';
+					} else if (overlay.fontFamily === 'Courier') {
+						textEl.style.fontFamily = 'Courier New, Courier, monospace';
+					} else if (overlay.fontFamily === 'Helvetica') {
+						textEl.style.fontFamily = 'Helvetica, Arial, sans-serif';
+					} else {
+						textEl.style.fontFamily = overlay.fontFamily;
+					}
+				}
+
+				// Apply text blur if set
+				if (overlay.textBlur && overlay.textBlur > 0) {
+					textEl.style.filter = `blur(${overlay.textBlur}px)`;
+				} else {
+					textEl.style.filter = 'none';
+				}
+
+				// Apply letter spacing if set
+				if (overlay.letterSpacing !== undefined && overlay.letterSpacing !== 0) {
+					textEl.style.letterSpacing = `${overlay.letterSpacing}px`;
+				} else {
+					textEl.style.letterSpacing = 'normal';
 				}
 
 				// Apply highlight color as background (text highlight)

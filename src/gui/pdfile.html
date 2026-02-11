@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/flatpickr.min.css">
     <link rel="stylesheet" href="/css/pickr-nano.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Open+Sans:wght@400;700&family=Lato:wght@400;700&family=Source+Sans+Pro:wght@400;700&family=Montserrat:wght@400;700&family=Oswald:wght@400;700&family=Raleway:wght@400;700&family=PT+Sans:wght@400;700&family=Merriweather:wght@400;700&family=Nunito:wght@400;700&family=Playfair+Display:wght@400;700&family=Ubuntu:wght@400;700&family=Poppins:wght@400;700&family=Work+Sans:wght@400;700&family=Noto+Sans:wght@400;700&family=Fira+Sans:wght@400;700&family=Inter:wght@400;700&family=Quicksand:wght@400;700&family=Josefin+Sans:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
     <script src="/js/lucide.min.js"></script>
     <script src="/js/pdf.min.js"></script>
     <script src="/js/flatpickr.min.js"></script>
@@ -303,6 +306,35 @@
             background: rgba(127, 165, 223, 0.1);
         }
 
+        /* Drop zone highlighting */
+        .drop-zone-active {
+            position: relative;
+            outline: 3px dashed #7fa5df !important;
+            outline-offset: -8px;
+            background: rgba(127, 165, 223, 0.15) !important;
+        }
+
+        .drop-zone-active::before {
+            content: 'Drop here to merge as pages';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(127, 165, 223, 0.95);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .preview-area.drop-zone-active::before {
+            content: 'Drop here for options...';
+        }
+
         .thumbnail-canvas {
             width: 100%;
             height: auto;
@@ -380,10 +412,17 @@
             border: 1px solid var(--brd);
             overflow: auto;
             position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             cursor: grab;
+            text-align: center;
+            font-size: 0; /* Remove whitespace from inline-block */
+        }
+
+        /* Vertical centering helper */
+        .preview-area::after {
+            content: '';
+            display: inline-block;
+            height: 100%;
+            vertical-align: middle;
         }
 
         .preview-area.panning {
@@ -415,14 +454,14 @@
 
         .canvas-wrapper {
             position: relative;
-            display: inline-block;
             z-index: 1;
+            display: inline-block;
+            vertical-align: middle;
+            margin: 20px;
         }
 
         .preview-area canvas {
             display: block;
-            max-width: 100%;
-            max-height: 100%;
             background: #fff;
         }
 
@@ -455,9 +494,9 @@
 
         /* Hotkeys Display */
         .preview-hotkeys {
-            position: fixed;
+            position: absolute;
             bottom: 20px;
-            left: 220px;
+            left: 20px;
             background: rgba(26, 26, 29, 0.95);
             border: 1px solid var(--brd);
             border-radius: 50%;
@@ -536,9 +575,9 @@
 
         /* Zoom Controls */
         .zoom-controls {
-            position: fixed;
+            position: absolute;
             bottom: 20px;
-            right: 420px;
+            right: 20px;
             background: rgba(26, 26, 29, 0.95);
             border: 1px solid var(--brd);
             border-radius: 4px;
@@ -651,10 +690,18 @@
             color: #7fa5df;
             text-align: left;
             word-break: break-word;
-            padding: 2px 4px;
-            line-height: 1.2;
+            padding: 0;
+            line-height: 1;
             display: inline-block;
+            width: 100%;
+            height: 100%;
             max-width: 100%;
+            pointer-events: none;
+        }
+
+        .overlay-gizmo-rectangle,
+        .overlay-gizmo-image-preview {
+            pointer-events: none;
         }
 
         .overlay-gizmo:hover {
@@ -787,14 +834,14 @@
             border: 2px solid #fff;
             border-radius: 50%;
             color: var(--txt3);
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 0;
-            line-height: 1;
+            line-height: 0;
             opacity: 0;
             pointer-events: none;
             transition: all 0.2s;
@@ -1092,6 +1139,15 @@
         .form-select:focus {
             outline: none;
             border-color: #7fa5df;
+        }
+
+        .font-select {
+            max-height: none;
+        }
+
+        .font-select option {
+            padding: 6px 8px;
+            font-size: 13px;
         }
 
         .color-picker {
@@ -1698,9 +1754,9 @@
                     </div>
 
                     <!-- Hotkeys Display (Bottom Left) -->
-                    <div class="preview-hotkeys" id="previewHotkeys" onclick="toggleHotkeys()">
+                    <div class="preview-hotkeys" id="previewHotkeys" onclick="toggleHotkeys(event)">
                         <div class="hotkey-icon">
-                            <i data-lucide="info" style="width: 16px; height: 16px;"></i>
+                            <i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i>
                         </div>
                         <div class="hotkey-content">
                             <div class="hotkey-item">
@@ -1781,7 +1837,7 @@
                             </div>
                             <div class="form-group">
                                 <div style="display: flex; gap: 4px;">
-                                    <input type="text" class="form-input" id="textContent" placeholder="Enter text..." style="flex: 1;">
+                                    <input type="text" class="form-input" id="textContent" placeholder="Enter text..." style="flex: 1;" onkeypress="if(event.key === 'Enter' && !document.getElementById('addTextBtn').disabled) addTextOverlay()">
                                     <button class="toggle-btn" onclick="openDatePicker()" title="Pick Date">
                                         <i data-lucide="calendar" style="width: 12px; height: 12px;"></i>
                                     </button>
@@ -1818,13 +1874,18 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Font Family</label>
-                                    <select class="form-input" id="editFontFamily" onchange="UIControls.updateLayerFontFamily(this.value)">
+                                    <input class="form-input" id="editFontFamily" list="fontFamilyList" onchange="UIControls.updateLayerFontFamily(this.value)" placeholder="Select or type font name">
+                                    <datalist id="fontFamilyList">
                                         <option value="Helvetica">Helvetica</option>
                                         <option value="Times">Times New Roman</option>
                                         <option value="Courier">Courier</option>
+                                        <option value="Arial">Arial</option>
+                                        <option value="Georgia">Georgia</option>
+                                        <option value="Verdana">Verdana</option>
                                         <option value="Roboto">Roboto</option>
                                         <option value="Open Sans">Open Sans</option>
                                         <option value="Lato">Lato</option>
+                                        <option value="Source Sans Pro">Source Sans Pro</option>
                                         <option value="Montserrat">Montserrat</option>
                                         <option value="Oswald">Oswald</option>
                                         <option value="Raleway">Raleway</option>
@@ -1837,7 +1898,11 @@
                                         <option value="Work Sans">Work Sans</option>
                                         <option value="Noto Sans">Noto Sans</option>
                                         <option value="Fira Sans">Fira Sans</option>
-                                    </select>
+                                        <option value="Inter">Inter</option>
+                                        <option value="Quicksand">Quicksand</option>
+                                        <option value="Josefin Sans">Josefin Sans</option>
+                                        <option value="Bebas Neue">Bebas Neue</option>
+                                    </datalist>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Text Style</label>
@@ -1870,6 +1935,24 @@
                                     <input type="range" min="0" max="20" value="0" id="highlightBlurSlider" style="width: 100%;" oninput="UIControls.updateHighlightBlur(this.value)">
                                     <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">
                                         Gradient fade at highlight edges
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Text Blur: <span id="textBlurValue">0</span>px</label>
+                                    <input type="range" min="0" max="2" step="0.1" value="0" id="textBlurSlider" style="width: 100%;" oninput="UIControls.updateTextBlur(this.value)">
+                                    <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">
+                                        Blur preview (CSS effect)
+                                    </div>
+                                    <button class="tool-btn" id="convertToImageBtn" onclick="UIControls.convertBlurredTextToImage()" style="width: 100%; display: none; margin-top: 6px;">
+                                        <i data-lucide="image" style="width: 12px; height: 12px; margin-right: 4px;"></i>
+                                        Convert to Image (Permanent)
+                                    </button>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Character Spacing: <span id="letterSpacingValue">0</span>px</label>
+                                    <input type="range" min="-2" max="10" step="0.5" value="0" id="letterSpacingSlider" style="width: 100%;" oninput="UIControls.updateLetterSpacing(this.value)">
+                                    <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">
+                                        Adjust spacing between characters
                                     </div>
                                 </div>
                             </div>

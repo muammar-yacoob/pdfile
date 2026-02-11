@@ -51,7 +51,12 @@ const UIControls = (() => {
 
 		editor.style.display = 'block';
 		document.getElementById('textEditorSection').style.display = 'none';
-		document.getElementById('rectangleEditorSection').style.display = 'none';
+
+		// Hide rectangle editor if it exists
+		const rectangleEditor = document.getElementById('rectangleEditorSection');
+		if (rectangleEditor) {
+			rectangleEditor.style.display = 'none';
+		}
 
 		const isText = overlay.type === 'date' || overlay.type === 'text';
 		const isRectangle = overlay.type === 'rectangle';
@@ -172,6 +177,26 @@ const UIControls = (() => {
 			} else {
 				if (highlightBlurGroup) highlightBlurGroup.style.display = 'none';
 			}
+
+			// Update text blur slider
+			const textBlurSlider = document.getElementById('textBlurSlider');
+			const textBlurValue = document.getElementById('textBlurValue');
+			const convertToImageBtn = document.getElementById('convertToImageBtn');
+			const blurAmount = overlay.textBlur || 0;
+			if (textBlurSlider) textBlurSlider.value = blurAmount;
+			if (textBlurValue) textBlurValue.textContent = blurAmount;
+
+			// Show convert button only if blur is applied
+			if (convertToImageBtn) {
+				convertToImageBtn.style.display = blurAmount > 0 ? 'block' : 'none';
+			}
+
+			// Update letter spacing slider
+			const letterSpacingSlider = document.getElementById('letterSpacingSlider');
+			const letterSpacingValue = document.getElementById('letterSpacingValue');
+			const spacing = overlay.letterSpacing || 0;
+			if (letterSpacingSlider) letterSpacingSlider.value = spacing;
+			if (letterSpacingValue) letterSpacingValue.textContent = spacing;
 
 			if (window.bgColorPicker) {
 				const bgColor = overlay.bgColor || '#ffffff';
@@ -327,6 +352,7 @@ const UIControls = (() => {
 		if (overlay.type !== 'date' && overlay.type !== 'text') return;
 
 		AppState.updateOverlay(index, { dateText: newText });
+		AppState.saveToHistory();
 
 		const label =
 			newText.length > 20 ? `${newText.substring(0, 20)}...` : newText;
@@ -354,6 +380,7 @@ const UIControls = (() => {
 			window.selectedBgColor = color;
 			if (!overlay.transparentBg) {
 				AppState.updateOverlay(index, { bgColor: color, bgAlpha: alpha });
+		AppState.saveToHistory();
 				const gizmo = document.querySelector(
 					`.overlay-gizmo[data-overlay-index="${index}"]`,
 				);
@@ -398,6 +425,7 @@ const UIControls = (() => {
 		if (overlay.type !== 'date' && overlay.type !== 'text') return;
 
 		AppState.updateOverlay(index, { fontFamily });
+		AppState.saveToHistory();
 
 		// Update gizmo visual
 		const gizmo = document.querySelector(
@@ -406,15 +434,27 @@ const UIControls = (() => {
 		if (gizmo) {
 			const textEl = gizmo.querySelector('.overlay-gizmo-text');
 			if (textEl) {
-				// Load Google Font if needed
-				if (!['Helvetica', 'Times', 'Courier'].includes(fontFamily)) {
+				// System fonts that don't need to be loaded from Google
+				const systemFonts = ['Helvetica', 'Times', 'Courier', 'Arial', 'Georgia', 'Verdana'];
+
+				// Load Google Font if needed (fonts already loaded in HTML head, but this is a fallback)
+				if (!systemFonts.includes(fontFamily)) {
 					const link = document.createElement('link');
 					link.rel = 'stylesheet';
 					link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@400;700&display=swap`;
 					document.head.appendChild(link);
 				}
-				textEl.style.fontFamily =
-					fontFamily === 'Times' ? 'Times New Roman' : fontFamily;
+
+				// Apply font family with fallbacks
+				if (fontFamily === 'Times') {
+					textEl.style.fontFamily = 'Times New Roman, Times, serif';
+				} else if (fontFamily === 'Courier') {
+					textEl.style.fontFamily = 'Courier New, Courier, monospace';
+				} else if (fontFamily === 'Helvetica') {
+					textEl.style.fontFamily = 'Helvetica, Arial, sans-serif';
+				} else {
+					textEl.style.fontFamily = fontFamily;
+				}
 			}
 		}
 
@@ -499,6 +539,7 @@ const UIControls = (() => {
 
 		window.selectedHighlightColor = color;
 		AppState.updateOverlay(index, { highlightColor: color });
+		AppState.saveToHistory();
 
 		// Show blur slider if highlight is enabled
 		const highlightBlurGroup = document.getElementById('highlightBlurGroup');
@@ -538,6 +579,171 @@ const UIControls = (() => {
 		AppState.updateOverlay(index, { highlightBlur: Number.parseFloat(blurWidth) });
 
 		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateTextBlur(blurAmount) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		// Update value display
+		const textBlurValue = document.getElementById('textBlurValue');
+		if (textBlurValue) {
+			textBlurValue.textContent = blurAmount;
+		}
+
+		// Store blur amount in overlay
+		const blurValue = Number.parseFloat(blurAmount);
+		AppState.updateOverlay(index, { textBlur: blurValue });
+		AppState.saveToHistory();
+
+		// Show/hide convert button
+		const convertToImageBtn = document.getElementById('convertToImageBtn');
+		if (convertToImageBtn) {
+			convertToImageBtn.style.display = blurValue > 0 ? 'block' : 'none';
+		}
+
+		// Update gizmo visual with CSS filter
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				if (blurValue > 0) {
+					textEl.style.filter = `blur(${blurValue}px)`;
+				} else {
+					textEl.style.filter = 'none';
+				}
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateLetterSpacing(spacing) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		// Update value display
+		const letterSpacingValue = document.getElementById('letterSpacingValue');
+		if (letterSpacingValue) {
+			letterSpacingValue.textContent = spacing;
+		}
+
+		// Store letter spacing in overlay
+		const spacingValue = Number.parseFloat(spacing);
+		AppState.updateOverlay(index, { letterSpacing: spacingValue });
+		AppState.saveToHistory();
+
+		// Update gizmo visual with CSS
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				textEl.style.letterSpacing = `${spacingValue}px`;
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	async function convertBlurredTextToImage() {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+		if (!overlay.textBlur || overlay.textBlur <= 0) return;
+
+		// Confirm with user
+		const confirmed = await new Promise((resolve) => {
+			window.showConfirmModal(
+				'Convert to Image?',
+				'This will convert the blurred text to an image overlay. This action cannot be undone. Continue?',
+				() => resolve(true),
+				() => resolve(false),
+				true
+			);
+		});
+
+		if (!confirmed) return;
+
+		try {
+			// Get canvas for scaling
+			const canvas = document.getElementById('pdfCanvas');
+			if (!canvas) return;
+
+			// Prepare text rendering parameters
+			const params = {
+				text: overlay.dateText || '',
+				fontSize: overlay.fontSize || 12,
+				fontFamily: overlay.fontFamily || 'Helvetica',
+				bold: overlay.bold || false,
+				italic: overlay.italic || false,
+				underline: overlay.underline || false,
+				textColor: overlay.textColor || '#000000',
+				highlightColor: overlay.highlightColor || null,
+				bgColor: overlay.transparentBg ? null : overlay.bgColor,
+				blur: overlay.textBlur,
+				width: overlay.width || 150,
+				height: overlay.height || 50,
+			};
+
+			// Call API to render text as image
+			const response = await fetch('/api/render-text-to-image', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(params),
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to render text to image');
+			}
+
+			const result = await response.json();
+
+			// Create new image overlay with the rendered image
+			const newOverlay = {
+				type: 'image',
+				imageData: result.imageData,
+				x: overlay.x,
+				y: overlay.y,
+				width: overlay.width,
+				height: overlay.height,
+				rotation: overlay.rotation || 0,
+				opacity: overlay.opacity || 100,
+				pageIndex: overlay.pageIndex || 0,
+				canvasWidth: overlay.canvasWidth || canvas.width,
+				canvasHeight: overlay.canvasHeight || canvas.height,
+			};
+
+			// Replace text overlay with image overlay
+			AppState.updateOverlay(index, newOverlay);
+
+			// Deselect and update UI
+			window.SelectionManager.deselectOverlay();
+			window.LayerManager.updateLayersList();
+
+			// Re-render the page
+			if (window.PreviewController && window.currentPreviewPage) {
+				window.PreviewController.updateGizmosForPage(window.currentPreviewPage);
+			}
+
+			// Show success message
+			window.showModal('Success', 'Text converted to image successfully!');
+
+		} catch (error) {
+			console.error('Error converting text to image:', error);
+			window.showModal('Error', `Failed to convert text to image: ${error.message}`);
+		}
 	}
 
 	function togglePagesPanel() {
@@ -702,6 +908,9 @@ const UIControls = (() => {
 		updateLayerUnderline,
 		updateLayerHighlight,
 		updateHighlightBlur,
+		updateTextBlur,
+		updateLetterSpacing,
+		convertBlurredTextToImage,
 		togglePagesPanel,
 		toggleBold,
 		toggleItalic,
@@ -747,7 +956,7 @@ const LayerManager = (() => {
                 <div class="layer-icon">
                     <i data-lucide="${overlay.type === 'image' || overlay.type === 'signature' ? 'image' : 'type'}"></i>
                 </div>
-                <div class="layer-name">${displayLabel} <span style="opacity: 0.6; font-size: 11px;">(p${(overlay.pageIndex || 0) + 1})</span></div>
+                <div class="layer-name">${displayLabel} <span style="opacity: 0.6; font-size: 11px; display: inline-flex; align-items: center; gap: 2px;"><i data-lucide="file" style="width: 10px; height: 10px;"></i>${(overlay.pageIndex || 0) + 1}</span></div>
                 <div class="layer-controls">
                     <button class="layer-btn" onclick="LayerManager.moveLayerUp(${index})" title="Move up" ${isFirst ? 'disabled' : ''}>
                         <i data-lucide="chevron-up" style="width: 10px; height: 10px;"></i>
@@ -826,6 +1035,29 @@ const LayerManager = (() => {
 
 const SelectionManager = (() => {
 	function selectOverlay(index) {
+		const overlay = AppState.getOverlay(index);
+		if (!overlay) return;
+
+		// Navigate to the page this overlay is on first
+		const overlayPageIndex = overlay.pageIndex || 0;
+		const overlayPageNumber = overlayPageIndex + 1;
+
+		// If overlay is on a different page, navigate to it first
+		if (window.currentPreviewPage !== overlayPageNumber) {
+			if (window.PreviewController) {
+				window.PreviewController.renderPage(overlayPageNumber).then(() => {
+					// After page is rendered, select the overlay
+					completeSelection(index, overlay);
+				});
+			} else {
+				completeSelection(index, overlay);
+			}
+		} else {
+			completeSelection(index, overlay);
+		}
+	}
+
+	function completeSelection(index, overlay) {
 		AppState.setSelectedIndex(index);
 		LayerManager.updateLayersList();
 
@@ -842,7 +1074,6 @@ const SelectionManager = (() => {
 			selectedGizmo.classList.add('selected');
 		}
 
-		const overlay = AppState.getOverlay(index);
 		if (overlay) {
 			UIControls.showLayerEditor(overlay, index);
 		}

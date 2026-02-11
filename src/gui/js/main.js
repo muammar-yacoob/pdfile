@@ -65,6 +65,9 @@ async function loadInitialPDF() {
 		if (data.filePath) {
 			currentPdfPath = data.filePath;
 			currentPdfFile = data.fileName;
+			AppState.setCurrentFile(data.fileName); // Sync to AppState
+			window.currentPdfFile = data.fileName; // Expose to window for merge handler
+			window.mergedPagesData = []; // Initialize for merge handler
 			document.getElementById('fileName').textContent = data.fileName;
 
 			// Enable merge button
@@ -76,7 +79,7 @@ async function loadInitialPDF() {
 				<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>
 
 				<!-- Hotkeys Display (Bottom Left) -->
-				<div class="preview-hotkeys" id="previewHotkeys" onclick="toggleHotkeys()">
+				<div class="preview-hotkeys" id="previewHotkeys" onclick="toggleHotkeys(event)">
 					<div class="hotkey-icon">
 						<i data-lucide="keyboard" style="width: 16px; height: 16px;"></i>
 					</div>
@@ -165,6 +168,8 @@ async function loadPDFFile(file) {
 	try {
 		const objectUrl = URL.createObjectURL(file);
 		currentPdfFile = file.name;
+		AppState.setCurrentFile(file.name); // Sync to AppState
+		window.currentPdfFile = file.name; // Expose to window for merge handler
 		document.getElementById('fileName').textContent = file.name;
 
 		// Enable merge button
@@ -172,15 +177,16 @@ async function loadPDFFile(file) {
 
 		// Clear merged pages data when loading new PDF
 		mergedPagesData = [];
+		window.mergedPagesData = []; // Expose to window for merge handler
 
 		// Show preview
 		const previewArea = document.getElementById('previewArea');
 		previewArea.innerHTML = `
 			<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>
 			<!-- Hotkeys Display (Bottom Left) -->
-			<div class="preview-hotkeys">
+			<div class="preview-hotkeys" id="previewHotkeys" onclick="toggleHotkeys(event)">
 				<div class="hotkey-icon">
-					<i data-lucide="info" style="width: 16px; height: 16px;"></i>
+					<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i>
 				</div>
 				<div class="hotkey-content">
 					<div class="hotkey-item">
@@ -209,6 +215,9 @@ async function loadPDFFile(file) {
 				<button class="zoom-btn" onclick="PreviewController.zoomFit()" title="Fit to Width">
 					<i data-lucide="maximize-2" style="width: 11px; height: 11px;"></i>
 				</button>
+				<button class="zoom-btn" id="darkModeBtn" onclick="PreviewController.toggleDarkMode()" title="Toggle Dark Background">
+					<i data-lucide="moon" style="width: 11px; height: 11px;"></i>
+				</button>
 			</div>
 		`;
 
@@ -222,11 +231,19 @@ async function loadPDFFile(file) {
 		const arrayBuffer = await file.arrayBuffer();
 		pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 		window.pdfDocument = pdfDocument; // Expose to window
+		// Initialize undo/redo history
+		AppState.initHistory();
 
 		// Auto-fit to width
 		zoomLevel = window.zoomLevel = 'fit';
 
 		await generateThumbnailsFromDoc();
+
+		// Auto-select first page if PDF has only one page
+		if (pdfDocument.numPages === 1) {
+			handlePageSelection(1, true);
+		}
+
 		await PreviewController.renderPage(1);
 	} catch (err) {
 		showModal('Error', `Failed to load PDF: ${err.message}`);
@@ -243,6 +260,8 @@ async function generateThumbnails(filePath) {
 		const arrayBuffer = await response.arrayBuffer();
 		pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 		window.pdfDocument = pdfDocument; // Expose to window
+		// Initialize undo/redo history
+		AppState.initHistory();
 		await generateThumbnailsFromDoc();
 	} catch (err) {
 		console.error('Failed to generate thumbnails:', err);
@@ -1473,6 +1492,70 @@ document.addEventListener('DOMContentLoaded', () => {
 	window.selectedHighlightColor = selectedHighlightColor;
 	window.highlightColorPicker = highlightColorPicker;
 
+	// Show drop options dialog
+	function showDropOptionsDialog(file, isPdf, isImage) {
+		const modal = document.getElementById('modalOverlay');
+		const header = document.getElementById('modalHeader');
+		const body = document.getElementById('modalBody');
+		const footer = document.getElementById('modalFooter');
+
+		const fileTypeLabel = isPdf ? 'PDF' : 'Image';
+
+		header.textContent = `What would you like to do with "${file.name}"?`;
+
+		if (isPdf) {
+			body.innerHTML = `
+				<p style="margin-bottom: 12px;">Choose how to handle this PDF file:</p>
+			`;
+		} else {
+			body.innerHTML = `
+				<p style="margin-bottom: 12px;">Choose how to handle this image:</p>
+			`;
+		}
+
+		footer.innerHTML = `
+			<button class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
+			<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('replace')">Replace Current File</button>
+			<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('beginning')">Merge to Beginning</button>
+			<button class="modal-btn modal-btn-primary" onclick="closeModal(); handleDropOption('end')">Merge to End</button>
+		`;
+
+		// Store file for later use
+		window.pendingDropFile = file;
+		window.pendingDropIsPdf = isPdf;
+		window.pendingDropIsImage = isImage;
+
+		modal.classList.add('active');
+	}
+
+	// Handle drop option selection
+	async function handleDropOption(option) {
+		const file = window.pendingDropFile;
+		const isPdf = window.pendingDropIsPdf;
+		const isImage = window.pendingDropIsImage;
+
+		if (!file) return;
+
+		if (option === 'replace') {
+			// Load as new file (replace current)
+			await loadPDFFile(file);
+		} else if (option === 'beginning' || option === 'end') {
+			// Merge to beginning or end
+			window.pendingMergeFile = file;
+			if (isImage || isPdf) {
+				await MergeHandler.mergeFiles(option, file.name);
+			}
+		}
+
+		// Clear pending file
+		window.pendingDropFile = null;
+		window.pendingDropIsPdf = false;
+		window.pendingDropIsImage = false;
+	}
+
+	// Expose to window for onclick handlers
+	window.handleDropOption = handleDropOption;
+
 	// Set up drag & drop for PDF, image, and document files
 	const thumbnailsPanel = document.getElementById('thumbnailsPanel');
 	const previewArea = document.getElementById('previewArea');
@@ -1481,22 +1564,26 @@ document.addEventListener('DOMContentLoaded', () => {
 	thumbnailsPanel.addEventListener('dragover', (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		thumbnailsPanel.style.opacity = '0.7';
-		thumbnailsPanel.style.backgroundColor = 'rgba(127, 165, 223, 0.1)';
+		e.dataTransfer.dropEffect = 'copy';
+
+		// Only highlight if dragging files (not thumbnail reordering)
+		if (e.dataTransfer.types.includes('Files')) {
+			thumbnailsPanel.classList.add('drop-zone-active');
+		}
 	});
 
 	thumbnailsPanel.addEventListener('dragleave', (e) => {
-		e.preventDefault();
-		e.stopPropagation();
-		thumbnailsPanel.style.opacity = '';
-		thumbnailsPanel.style.backgroundColor = '';
+		// Check if we're actually leaving the thumbnailsPanel element
+		// relatedTarget is where the mouse is going
+		if (!thumbnailsPanel.contains(e.relatedTarget)) {
+			thumbnailsPanel.classList.remove('drop-zone-active');
+		}
 	});
 
 	thumbnailsPanel.addEventListener('drop', async (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		thumbnailsPanel.style.opacity = '';
-		thumbnailsPanel.style.backgroundColor = '';
+		thumbnailsPanel.classList.remove('drop-zone-active');
 
 		const files = e.dataTransfer.files;
 		if (files.length > 0) {
@@ -1519,26 +1606,38 @@ document.addEventListener('DOMContentLoaded', () => {
 		}
 	});
 
-	// Preview area - images as overlay, PDFs as merge
+	// Preview area - show options dialog
 	previewArea.addEventListener('dragover', (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		previewArea.style.opacity = '0.7';
-		previewArea.style.backgroundColor = 'rgba(127, 165, 223, 0.1)';
+		e.dataTransfer.dropEffect = 'copy';
+
+		// Only highlight if dragging files
+		if (e.dataTransfer.types.includes('Files')) {
+			previewArea.classList.add('drop-zone-active');
+		}
 	});
 
 	previewArea.addEventListener('dragleave', (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		previewArea.style.opacity = '';
-		previewArea.style.backgroundColor = '';
+
+		// Only remove highlight if leaving the preview area entirely
+		const rect = previewArea.getBoundingClientRect();
+		if (
+			e.clientX < rect.left ||
+			e.clientX >= rect.right ||
+			e.clientY < rect.top ||
+			e.clientY >= rect.bottom
+		) {
+			previewArea.classList.remove('drop-zone-active');
+		}
 	});
 
 	previewArea.addEventListener('drop', async (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		previewArea.style.opacity = '';
-		previewArea.style.backgroundColor = '';
+		previewArea.classList.remove('drop-zone-active');
 
 		const files = e.dataTransfer.files;
 		if (files.length > 0) {
@@ -1551,13 +1650,9 @@ document.addEventListener('DOMContentLoaded', () => {
 				fileType.startsWith('image/') ||
 				fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
 
-			if (isPdf) {
-				// Merge as page
-				window.pendingMergeFile = file;
-				showMergeDialog(file);
-			} else if (isImage) {
-				// Add as overlay
-				await handleImageDrop(file);
+			if (isPdf || isImage) {
+				// Show options dialog
+				showDropOptionsDialog(file, isPdf, isImage);
 			} else {
 				showModal('Invalid File', 'Please drop a PDF or image file');
 			}

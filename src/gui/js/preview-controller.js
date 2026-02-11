@@ -67,7 +67,9 @@ const PreviewController = {
 			const containerWidth = previewArea.clientWidth - 20;
 			const pageViewport = page.getViewport({ scale: 1 });
 			const baseScale = containerWidth / pageViewport.width;
-			const scale = window.zoomLevel === 'fit' ? baseScale : baseScale * window.zoomLevel;
+			// When zoomLevel is 'fit', use baseScale to fit container
+		// When zoomLevel is a number, use it directly (1.0 = 100% = actual PDF size)
+		const scale = window.zoomLevel === 'fit' ? baseScale : window.zoomLevel;
 			window.previewScale = scale;
 
 			const viewport = page.getViewport({ scale });
@@ -102,7 +104,8 @@ const PreviewController = {
 	},
 
 	setZoom(newZoom, mousePos = null) {
-		const oldZoom = window.zoomLevel === 'fit' ? 1.0 : window.zoomLevel;
+		// Get the actual current render scale (not just the zoom level setting)
+		const oldZoom = window.zoomLevel === 'fit' ? (window.previewScale || 1.0) : window.zoomLevel;
 		const wasAtFit = window.zoomLevel === 'fit';
 
 		// Update zoom level
@@ -112,7 +115,9 @@ const PreviewController = {
 			window.zoomLevel = 'fit';
 		}
 
-		const newZoomValue = window.zoomLevel === 'fit' ? 1.0 : window.zoomLevel;
+		// For calculating zoom ratio, we need to know what the new render scale will be
+		// If switching to fit, we'll use the oldZoom as approximation (will be corrected after render)
+		const newZoomValue = window.zoomLevel === 'fit' ? oldZoom : window.zoomLevel;
 		const isNowAtFit = window.zoomLevel === 'fit';
 
 		// Update zoom display
@@ -148,12 +153,24 @@ const PreviewController = {
 	},
 
 	zoomIn() {
-		const currentZoom = window.zoomLevel === 'fit' ? 1.0 : window.zoomLevel;
+		let currentZoom;
+		if (window.zoomLevel === 'fit') {
+			// When at fit mode, use the current render scale as baseline
+			currentZoom = window.previewScale || 1.0;
+		} else {
+			currentZoom = window.zoomLevel;
+		}
 		this.setZoom(Math.min(3.0, currentZoom + 0.25));
 	},
 
 	zoomOut() {
-		const currentZoom = window.zoomLevel === 'fit' ? 1.0 : window.zoomLevel;
+		let currentZoom;
+		if (window.zoomLevel === 'fit') {
+			// When at fit mode, use the current render scale as baseline
+			currentZoom = window.previewScale || 1.0;
+		} else {
+			currentZoom = window.zoomLevel;
+		}
 		this.setZoom(Math.max(0.5, currentZoom - 0.25));
 	},
 
@@ -268,17 +285,6 @@ const PreviewController = {
 				const scaledX = overlay.x * scaleX;
 				const scaledY = overlay.y * scaleY;
 
-				// Update overlay with scaled dimensions for gizmo rendering
-				const scaledOverlay = {
-					...overlay,
-					width: (overlay.width || 120) * scaleX,
-					height: (overlay.height || 60) * scaleY,
-					fontSize: overlay.fontSize ? overlay.fontSize * scaleX : undefined,
-				};
-
-				// Temporarily update for gizmo creation
-				AppState.updateOverlay(i, scaledOverlay);
-
 				const label =
 					overlay.type === 'date'
 						? `${overlay.dateText || 'Today'}`
@@ -288,13 +294,30 @@ const PreviewController = {
 								? 'Image'
 								: 'Signature';
 
-				// Use correct function name
+				// Create gizmo at scaled position
 				if (window.GizmoManager) {
 					window.GizmoManager.createGizmo(overlay.type, label, scaledX, scaledY, i);
 				}
 
-				// Restore original overlay data
-				AppState.updateOverlay(i, overlay);
+				// Manually scale the gizmo size and styling (don't modify AppState)
+				const gizmo = document.querySelector(`.overlay-gizmo[data-overlay-index="${i}"]`);
+				if (gizmo && overlay.width && overlay.height) {
+					gizmo.style.width = `${overlay.width * scaleX}px`;
+					gizmo.style.height = `${overlay.height * scaleY}px`;
+
+					// Scale font size for text overlays
+					if (overlay.type === 'date' || overlay.type === 'text') {
+						const textEl = gizmo.querySelector('.overlay-gizmo-text');
+						if (textEl && overlay.fontSize) {
+							textEl.style.fontSize = `${Math.min(overlay.fontSize * scaleX, 24)}px`;
+						}
+					}
+				}
+
+				// Apply all overlay styling to the gizmo (uses original overlay data)
+				if (window.GizmoManager) {
+					window.GizmoManager.updateGizmoFromOverlay(i);
+				}
 			}
 		});
 	},
@@ -319,7 +342,8 @@ const PreviewController = {
 
 				// Smooth zoom with smaller increments
 				const delta = e.deltaY < 0 ? 0.15 : -0.15;
-				const oldZoom = window.zoomLevel === 'fit' ? 1.0 : window.zoomLevel;
+				// Get current zoom (use actual render scale if in fit mode)
+			const oldZoom = window.zoomLevel === 'fit' ? (window.previewScale || 1.0) : window.zoomLevel;
 
 				// Calculate new zoom level
 				const newZoom = Math.max(0.5, Math.min(3.0, oldZoom + delta));

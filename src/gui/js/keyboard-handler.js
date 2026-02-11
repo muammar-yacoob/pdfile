@@ -21,27 +21,47 @@ const KeyboardHandler = (() => {
 			return;
 		}
 
-		// Zoom shortcuts (work globally)
-		if (e.ctrlKey || e.metaKey) {
-			// Ctrl+0 or Ctrl+F: Fit to width
-			if (e.key === '0' || e.key.toLowerCase() === 'f') {
-				e.preventDefault();
-				window.PreviewController?.zoomFit();
-				return;
+	// Zoom shortcuts (work globally)
+	if (e.ctrlKey || e.metaKey) {
+		// Ctrl+Z: Undo
+		if (e.key === 'z' && !e.shiftKey) {
+			e.preventDefault();
+			if (window.AppState?.undo()) {
+				// Refresh UI after undo
+				window.LayerManager?.updateLayersList();
+				window.PreviewController?.renderPage(window.currentPreviewPage);
 			}
-			// Ctrl++ or Ctrl+=: Zoom in
-			if (e.key === '+' || e.key === '=') {
-				e.preventDefault();
-				window.PreviewController?.zoomIn();
-				return;
-			}
-			// Ctrl+-: Zoom out
-			if (e.key === '-' || e.key === '_') {
-				e.preventDefault();
-				window.PreviewController?.zoomOut();
-				return;
-			}
+			return;
 		}
+		// Ctrl+Shift+Z or Ctrl+Y: Redo
+		if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+			e.preventDefault();
+			if (window.AppState?.redo()) {
+				// Refresh UI after redo
+				window.LayerManager?.updateLayersList();
+				window.PreviewController?.renderPage(window.currentPreviewPage);
+			}
+			return;
+		}
+		// Ctrl+0 or Ctrl+F: Fit to width
+		if (e.key === '0' || e.key.toLowerCase() === 'f') {
+			e.preventDefault();
+			window.PreviewController?.zoomFit();
+			return;
+		}
+		// Ctrl++ or Ctrl+=: Zoom in
+		if (e.key === '+' || e.key === '=') {
+			e.preventDefault();
+			window.PreviewController?.zoomIn();
+			return;
+		}
+		// Ctrl+-: Zoom out
+		if (e.key === '-' || e.key === '_') {
+			e.preventDefault();
+			window.PreviewController?.zoomOut();
+			return;
+		}
+	}
 
 		// Only handle arrow keys when an overlay is selected
 		const selectedIndex = window.AppState?.getSelectedIndex();
@@ -49,6 +69,11 @@ const KeyboardHandler = (() => {
 
 		// Arrow key movement
 		if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+			// Don't intercept arrow keys if user is focused on an input/slider/textarea
+			if (e.target.matches('input, textarea, select')) {
+				return;
+			}
+
 			e.preventDefault(); // Prevent page scroll
 
 			const overlay = window.AppState.getOverlay(selectedIndex);

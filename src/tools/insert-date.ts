@@ -31,6 +31,7 @@ export interface DateInsertOptions {
 	// Text highlight (background behind text)
 	highlightColor?: { r: number; g: number; b: number };
 	highlightBlur?: number; // Gradient fade width at highlight edges (in pixels)
+	letterSpacing?: number; // Character spacing in pixels
 }
 
 /**
@@ -201,7 +202,12 @@ export async function insertDate(
 			const { width, height } = page.getSize();
 
 			// Calculate position (default: bottom right with padding)
-			const textWidth = font.widthOfTextAtSize(dateText, fontSize);
+			// Account for letter spacing in width calculation
+			let textWidth = font.widthOfTextAtSize(dateText, fontSize);
+			if (options.letterSpacing && options.letterSpacing !== 0) {
+				// Add letter spacing for all characters except the last one
+				textWidth += options.letterSpacing * (dateText.length - 1);
+			}
 			const textHeight = fontSize;
 			const x = options.x ?? width - textWidth - 50;
 
@@ -275,14 +281,36 @@ export async function insertDate(
 			}
 
 			// Draw date text
-			page.drawText(dateText, {
-				x,
-				y,
-				size: fontSize,
-				font,
-				color: rgb(color.r, color.g, color.b),
-				rotate: { angle: rotation, type: 'degrees' },
-			});
+			// If letter spacing is specified, draw character by character
+			if (options.letterSpacing && options.letterSpacing !== 0) {
+				let currentX = x;
+				const chars = dateText.split('');
+
+				for (const char of chars) {
+					page.drawText(char, {
+						x: currentX,
+						y,
+						size: fontSize,
+						font,
+						color: rgb(color.r, color.g, color.b),
+						rotate: { angle: rotation, type: 'degrees' },
+					});
+
+					// Calculate character width and add letter spacing
+					const charWidth = font.widthOfTextAtSize(char, fontSize);
+					currentX += charWidth + options.letterSpacing;
+				}
+			} else {
+				// Normal rendering without letter spacing
+				page.drawText(dateText, {
+					x,
+					y,
+					size: fontSize,
+					font,
+					color: rgb(color.r, color.g, color.b),
+					rotate: { angle: rotation, type: 'degrees' },
+				});
+			}
 
 			// Draw underline if specified
 			if (options.underline) {

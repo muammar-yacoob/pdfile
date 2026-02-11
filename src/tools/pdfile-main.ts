@@ -124,6 +124,11 @@ export async function runGUI(file: string): Promise<boolean> {
 				const { mkdir } = await import('node:fs/promises');
 				await mkdir(tmpDir, { recursive: true });
 
+				// Create PDFile subdirectory in source file's directory
+				const sourceDir = dirname(file);
+				const outputDir = join(sourceDir, 'PDFile');
+				await mkdir(outputDir, { recursive: true });
+
 				let currentFile = currentWorkingFile;
 				const tempFiles: string[] = [];
 
@@ -173,7 +178,7 @@ export async function runGUI(file: string): Promise<boolean> {
 						const overlay = overlays[i];
 						const isLast = i === overlays.length - 1;
 						const outputPath = isLast
-							? file.replace(/\.pdf$/i, '_abused.pdf')
+							? join(outputDir, basename(file).replace(/\.pdf$/i, '_abused.pdf'))
 							: join(tmpDir, `temp_overlay_${i}_${Date.now()}.pdf`);
 
 						console.log(
@@ -473,11 +478,14 @@ export async function runGUI(file: string): Promise<boolean> {
 				}
 
 				if (existsSync(currentFile)) {
-					res.download(currentFile, basename(currentFile), (err) => {
-						tempFiles.forEach((f) => unlink(f).catch(() => {}));
-						if (err) {
-							console.error('Download error:', err);
-						}
+					// Clean up temp files
+					tempFiles.forEach((f) => unlink(f).catch(() => {}));
+
+					// Return the saved file path instead of downloading
+					res.json({
+						success: true,
+						filePath: currentFile,
+						fileName: basename(currentFile),
 					});
 				} else {
 					res.status(500).json({ error: 'Failed to create output file' });
@@ -1121,17 +1129,17 @@ export async function runGUI(file: string): Promise<boolean> {
 					await writeFile(uploadedPdfPath, pdfBuffer);
 				}
 
-				const outputPath = join(tmpDir, `${basename(file, '.pdf')}_merged.pdf`);
+				const outputPath = join(tmpDir, `${basename(currentWorkingFile, '.pdf')}_merged.pdf`);
 
 				// Merge based on position
 				let filesToMerge = [];
 				if (position === 'beginning') {
-					filesToMerge = [uploadedPdfPath, file];
+					filesToMerge = [uploadedPdfPath, currentWorkingFile];
 				} else if (position === 'replace') {
 					filesToMerge = [uploadedPdfPath];
 				} else {
 					// 'end' or default
-					filesToMerge = [file, uploadedPdfPath];
+					filesToMerge = [currentWorkingFile, uploadedPdfPath];
 				}
 
 				const success = await mergePdfs(filesToMerge, outputPath);
@@ -1139,7 +1147,7 @@ export async function runGUI(file: string): Promise<boolean> {
 				if (success && existsSync(outputPath)) {
 					res.download(
 						outputPath,
-						`${basename(file, '.pdf')}_merged.pdf`,
+						`${basename(currentWorkingFile, '.pdf')}_merged.pdf`,
 						(err) => {
 							unlink(outputPath).catch(() => {});
 							unlink(uploadedPdfPath).catch(() => {});
@@ -1157,7 +1165,26 @@ export async function runGUI(file: string): Promise<boolean> {
 			}
 		});
 
-		// Start server on random port
+		// API: Open folder in Windows Explorer
+		app.post('/api/open-folder', async (req, res) => {
+			try {
+				const { folderPath } = req.body;
+				if (!folderPath) {
+					return res.status(400).json({ error: 'No folder path provided' });
+				}
+
+				// Use explorer.exe to open the folder
+				const { execSync } = await import('node:child_process');
+				execSync(`explorer.exe "${folderPath}"`, { stdio: 'ignore' });
+
+				res.json({ success: true });
+			} catch (error) {
+				console.error('Open folder error:', error);
+				res.status(500).json({ error: 'Failed to open folder' });
+			}
+		});
+
+				// Start server on random port
 		const server = createServer(app);
 		server.listen(0, '127.0.0.1', () => {
 			const addr = server.address();

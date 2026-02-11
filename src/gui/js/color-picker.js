@@ -157,6 +157,12 @@ class ColorPicker {
 		if (this.pickr) {
 			const rgba = this.hexToRgba(color, alpha);
 			this.pickr.setColor(rgba, true);
+
+			// Manually update the button background to ensure visual update
+			const button = this.pickr.getRoot().button;
+			if (button) {
+				button.style.setProperty('--pcr-color', rgba);
+			}
 		}
 	}
 

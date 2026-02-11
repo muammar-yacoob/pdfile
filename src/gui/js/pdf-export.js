@@ -198,16 +198,24 @@ const PDFExport = (() => {
 				throw new Error(error.error || 'Failed to export PDF');
 			}
 
-			const blob = await response.blob();
-			const url = window.URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			const suffix = hasOverlays ? '_abused' : '_modified';
-			a.download = `${currentPdfFile.replace('.pdf', '')}${suffix}.pdf`;
-			document.body.appendChild(a);
-			a.click();
-			window.URL.revokeObjectURL(url);
-			document.body.removeChild(a);
+			const result = await response.json();
+
+			// Show success message with file location
+			if (window.showModal) {
+				const folderPath = result.filePath.substring(
+					0,
+					result.filePath.lastIndexOf('\\'),
+				);
+				window.showModal(
+					'PDF Saved Successfully',
+					`<p>Your PDF has been saved to:</p>
+					<p style="font-family: monospace; background: var(--bg3); padding: 8px; border-radius: 4px; margin: 12px 0; word-break: break-all;">${result.filePath}</p>
+					<button onclick="window.openFolder('${folderPath.replace(/\\/g, '\\\\')}')" class="modal-btn modal-btn-primary" style="margin-top: 12px;">
+						<i data-lucide="folder-open" style="width: 16px; height: 16px; margin-right: 6px;"></i>
+						Open Folder
+					</button>`,
+				);
+			}
 
 			// DON'T clear overlays - user may want to export again or continue editing
 			// AppState.clearOverlays();
