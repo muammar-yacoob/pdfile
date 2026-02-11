@@ -52,7 +52,10 @@ async function generateSocialCards() {
 
 			console.log(`✓ Generated: ${outputPath}`);
 		} catch (error) {
-			console.error(`✗ Failed to generate card ${i + 1}:`, (error as Error).message);
+			console.error(
+				`✗ Failed to generate card ${i + 1}:`,
+				(error as Error).message,
+			);
 		}
 	}
 

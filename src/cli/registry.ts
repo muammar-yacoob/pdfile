@@ -2,7 +2,12 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { wslToWindows } from '../lib/paths.js';
 import { addRegistryKey, deleteRegistryKey } from '../lib/registry.js';
-import { getAllExtensions, getToolsForExtension, pdfileTool, tuiTools } from './tools.js';
+import {
+	getAllExtensions,
+	getToolsForExtension,
+	pdfileTool,
+	tuiTools,
+} from './tools.js';
 import { getDistDir, getMenuBasePath } from './utils.js';
 
 /** Tool registration result */
@@ -24,14 +29,22 @@ async function registerUnifiedMenu(
 
 	// Create direct PDFile menu item (not a submenu)
 	const menuSuccess = await addRegistryKey(basePath, 'MUIVerb', 'PDFile');
-	const iconSuccess = await addRegistryKey(basePath, 'Icon', `${iconsDirWin}\\pdfile.ico`);
+	const iconSuccess = await addRegistryKey(
+		basePath,
+		'Icon',
+		`${iconsDirWin}\\pdfile.ico`,
+	);
 
 	// Enable multi-select
 	await addRegistryKey(basePath, 'MultiSelectModel', 'Player');
 
 	// Command - opens unified GUI/app
 	const commandValue = `wscript.exe //B "${launcherWin}" pdfile "%1" -g`;
-	const cmdSuccess = await addRegistryKey(`${basePath}\\command`, '', commandValue);
+	const cmdSuccess = await addRegistryKey(
+		`${basePath}\\command`,
+		'',
+		commandValue,
+	);
 
 	return {
 		extension,
@@ -166,10 +179,22 @@ const LEGACY_TOOL_NAMES = [
 ];
 
 /** All extensions that might have legacy entries (including old PicLet image extensions) */
-const ALL_PDF_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp'];
+const ALL_PDF_EXTENSIONS = [
+	'.pdf',
+	'.png',
+	'.jpg',
+	'.jpeg',
+	'.gif',
+	'.bmp',
+	'.ico',
+	'.webp',
+];
 
 /** Clean up legacy registry entries from older installations */
-export async function cleanupLegacyEntries(): Promise<{ removed: string[]; failed: string[] }> {
+export async function cleanupLegacyEntries(): Promise<{
+	removed: string[];
+	failed: string[];
+}> {
 	const removed: string[] = [];
 	const failed: string[] = [];
 
@@ -198,7 +223,10 @@ export async function unregisterAllTools(): Promise<RegistrationResult[]> {
 	const results: RegistrationResult[] = [];
 
 	// Unregister from all extensions (both unified and legacy)
-	const allExts = new Set([...getAllExtensions(), ...pdfileTool.config.extensions]);
+	const allExts = new Set([
+		...getAllExtensions(),
+		...pdfileTool.config.extensions,
+	]);
 	for (const extension of allExts) {
 		const basePath = getMenuBasePath(extension);
 
@@ -260,7 +288,10 @@ function generateUninstallRegContent(): string {
 	const lines: string[] = ['Windows Registry Editor Version 5.00', ''];
 
 	// Delete from all extensions (both unified and legacy)
-	const allExts = new Set([...getAllExtensions(), ...pdfileTool.config.extensions]);
+	const allExts = new Set([
+		...getAllExtensions(),
+		...pdfileTool.config.extensions,
+	]);
 	for (const extension of allExts) {
 		const basePath = `HKEY_CURRENT_USER\\Software\\Classes\\SystemFileAssociations\\${extension}\\shell\\PDFile`;
 

@@ -1,6 +1,6 @@
-import { PDFDocument } from 'pdf-lib';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { PDFDocument } from 'pdf-lib';
 
 export interface AddImageOverlayConfig {
 	extensions: string[];
@@ -87,7 +87,9 @@ export async function addImageOverlay(
 			// Convert to PNG
 			const tempPngPath = path.join(tmpdir(), `temp_${Date.now()}.png`);
 			try {
-				await execAsync(`convert "${options.imagePath}" "PNG32:${tempPngPath}"`);
+				await execAsync(
+					`convert "${options.imagePath}" "PNG32:${tempPngPath}"`,
+				);
 				const pngBuffer = await fs.readFile(tempPngPath);
 				image = await pdfDoc.embedPng(pngBuffer);
 				await fs.unlink(tempPngPath);
@@ -124,12 +126,16 @@ export async function addImageOverlay(
 			const opacity = options.opacity ?? 1.0;
 			const rotation = options.rotation ?? 0;
 
-			console.log(`Drawing image: x=${x}, y=${y}, w=${width}, h=${height}, opacity=${opacity}, rotation=${rotation}`);
+			console.log(
+				`Drawing image: x=${x}, y=${y}, w=${width}, h=${height}, opacity=${opacity}, rotation=${rotation}`,
+			);
 			console.log(`Page size: ${pageWidth}x${pageHeight}`);
 
 			// Validate dimensions
 			if (width <= 0 || height <= 0 || !isFinite(width) || !isFinite(height)) {
-				throw new Error(`Invalid image dimensions: width=${width}, height=${height}`);
+				throw new Error(
+					`Invalid image dimensions: width=${width}, height=${height}`,
+				);
 			}
 			if (!isFinite(x) || !isFinite(y)) {
 				throw new Error(`Invalid image position: x=${x}, y=${y}`);

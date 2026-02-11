@@ -7,11 +7,11 @@
     <link rel="icon" href="img/logo.ico">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/flatpickr.min.css">
-    <link rel="stylesheet" href="/css/pickr.min.css">
     <script src="/js/lucide.min.js"></script>
     <script src="/js/pdf.min.js"></script>
     <script src="/js/flatpickr.min.js"></script>
-    <script src="/js/pickr.min.js"></script>
+    <script src="/js/color-picker.js"></script>
+    <script src="/js/font-style-dialog.js"></script>
     <style>
         * { box-sizing: border-box; }
 
@@ -132,50 +132,6 @@
 
         .flatpickr-day.today {
             border-color: #7fa5df !important;
-        }
-
-        /* Dark mode for Pickr color picker */
-        .pcr-app {
-            background: var(--bg2) !important;
-            border: 1px solid var(--brd) !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-        }
-
-        .pcr-app .pcr-interaction .pcr-result,
-        .pcr-app .pcr-interaction input {
-            background: var(--bg) !important;
-            color: var(--txt) !important;
-            border-color: var(--brd) !important;
-        }
-
-        .pcr-app .pcr-interaction .pcr-save {
-            background: #7fa5df !important;
-        }
-
-        .pcr-app .pcr-interaction .pcr-save:hover {
-            background: #6a8fc7 !important;
-        }
-
-        .pcr-app .pcr-interaction .pcr-clear,
-        .pcr-app .pcr-interaction .pcr-cancel {
-            background: #f44250 !important;
-        }
-
-        .pcr-app .pcr-swatches > button {
-            border: 1px solid var(--brd) !important;
-        }
-
-        /* Smaller color picker button */
-        .pickr {
-            width: 24px !important;
-            height: 24px !important;
-        }
-
-        .pickr .pcr-button {
-            width: 24px !important;
-            height: 24px !important;
-            border-radius: 4px !important;
-            border: 1px solid var(--brd) !important;
         }
 
         /* Main 3-column layout */
@@ -425,6 +381,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: grab;
+        }
+
+        .preview-area.panning {
+            cursor: grabbing;
         }
 
         .preview-area::-webkit-scrollbar {
@@ -1086,14 +1047,315 @@
             gap: 8px;
         }
 
-        .color-input-group .pickr {
-            flex-shrink: 0;
-        }
-
         .color-input-group label {
             font-size: 10px;
             color: var(--txt2);
             font-weight: 500;
+        }
+
+        /* Color Picker Component - Compact with Popover */
+        .color-picker-compact {
+            display: inline-block;
+        }
+
+        .color-picker-box {
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            border: 2px solid var(--brd);
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .color-picker-box:hover {
+            border-color: #7fa5df;
+            box-shadow: 0 2px 8px rgba(127, 165, 223, 0.4);
+        }
+
+        .color-picker-popover {
+            position: fixed;
+            z-index: 10000;
+            background: var(--bg2);
+            border: 1px solid var(--brd);
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.15s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .color-picker-popover-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 200px;
+        }
+
+        .color-picker-preview {
+            width: 100%;
+            height: 48px;
+            border-radius: 6px;
+            border: 2px solid var(--brd);
+            cursor: pointer;
+            transition: border-color 0.2s;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .color-picker-preview:hover {
+            border-color: #7fa5df;
+        }
+
+        .color-picker-input {
+            width: 0;
+            height: 0;
+            opacity: 0;
+            position: absolute;
+            pointer-events: none;
+        }
+
+        .color-picker-eyedropper {
+            width: 100%;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: var(--bg3);
+            border: 1px solid var(--brd);
+            border-radius: 6px;
+            color: var(--txt2);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 11px;
+        }
+
+        .color-picker-eyedropper:hover {
+            background: var(--bg2);
+            border-color: #7fa5df;
+            color: #7fa5df;
+        }
+
+        .color-picker-swatches {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+
+        .color-swatch {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 4px;
+            border: 2px solid var(--brd);
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .color-swatch:hover {
+            transform: scale(1.1);
+            border-color: #7fa5df;
+            box-shadow: 0 0 12px rgba(127, 165, 223, 0.5);
+        }
+
+        /* Font Style Dialog */
+        .font-style-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10001;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .font-style-dialog-content {
+            background: var(--bg2);
+            border: 1px solid var(--brd);
+            border-radius: 8px;
+            padding: 20px;
+            width: 400px;
+            max-width: 90vw;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            animation: slideUp 0.2s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .font-style-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--brd);
+        }
+
+        .font-style-header h3 {
+            margin: 0;
+            font-size: 16px;
+            color: var(--txt);
+        }
+
+        .font-style-close {
+            background: none;
+            border: none;
+            color: var(--txt3);
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .font-style-close:hover {
+            background: var(--bg3);
+            color: var(--txt);
+        }
+
+        .font-style-section {
+            margin-bottom: 16px;
+        }
+
+        .font-style-label {
+            display: block;
+            font-size: 11px;
+            color: var(--txt2);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .font-style-select {
+            width: 100%;
+            padding: 8px 10px;
+            background: var(--bg);
+            border: 1px solid var(--brd);
+            border-radius: 6px;
+            color: var(--txt);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .font-style-select:focus {
+            outline: none;
+            border-color: #7fa5df;
+            box-shadow: 0 0 0 3px rgba(127, 165, 223, 0.1);
+        }
+
+        .font-style-select optgroup {
+            background: var(--bg2);
+            color: var(--txt2);
+            font-weight: 600;
+        }
+
+        .font-style-select option {
+            background: var(--bg);
+            color: var(--txt);
+        }
+
+        .font-size-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .font-size-input {
+            flex: 1;
+            padding: 8px 10px;
+            background: var(--bg);
+            border: 1px solid var(--brd);
+            border-radius: 6px;
+            color: var(--txt);
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .font-size-input:focus {
+            outline: none;
+            border-color: #7fa5df;
+            box-shadow: 0 0 0 3px rgba(127, 165, 223, 0.1);
+        }
+
+        .font-size-unit {
+            font-size: 12px;
+            color: var(--txt3);
+            min-width: 24px;
+        }
+
+        .font-style-toggles {
+            display: flex;
+            gap: 8px;
+        }
+
+        .font-style-toggle {
+            flex: 1;
+            padding: 8px;
+            background: var(--bg);
+            border: 1px solid var(--brd);
+            border-radius: 6px;
+            color: var(--txt3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .font-style-toggle:hover {
+            background: var(--bg3);
+            border-color: #7fa5df;
+            color: var(--txt);
+        }
+
+        .font-style-toggle.active {
+            background: #7fa5df;
+            border-color: #7fa5df;
+            color: #000;
+        }
+
+        .font-style-preview-section {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid var(--brd);
+        }
+
+        .font-style-preview {
+            background: var(--bg);
+            border: 1px solid var(--brd);
+            border-radius: 6px;
+            padding: 16px;
+            color: var(--txt);
+            text-align: center;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         /* Tabs */
@@ -1381,6 +1643,12 @@
                 <!-- Action Toolbar (always visible) -->
                 <div class="page-actions-toolbar">
                     <div style="flex: 1;"></div>
+                    <button class="page-action-btn arrow-btn" id="rotateLeftBtn" onclick="rotateSelectedPages(-90)" title="Rotate left 90°" disabled>
+                        <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
+                    </button>
+                    <button class="page-action-btn arrow-btn" id="rotateRightBtn" onclick="rotateSelectedPages(90)" title="Rotate right 90°" disabled>
+                        <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
+                    </button>
                     <button class="page-action-btn arrow-btn" id="moveUpBtn" onclick="moveSelectedPagesUp()" title="Move up" disabled>
                         <i data-lucide="arrow-up" style="width: 14px; height: 14px;"></i>
                     </button>
@@ -1492,6 +1760,13 @@
                                     </button>
                                 </div>
                                 <div class="form-group">
+                                    <label class="form-label">Font Style</label>
+                                    <button class="tool-btn" id="fontStyleBtn" onclick="openFontStyleDialog()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                        <i data-lucide="type" style="width: 16px; height: 16px;"></i>
+                                        <span>Customize Font</span>
+                                    </button>
+                                </div>
+                                <div class="form-group">
                                     <div class="color-input-group">
                                         <div id="textColorPicker"></div>
                                         <label>Text Color</label>
@@ -1501,6 +1776,12 @@
                                     <div class="color-input-group">
                                         <div id="bgColorPicker"></div>
                                         <label>Background</label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="color-input-group">
+                                        <div id="borderColorPicker"></div>
+                                        <label>Text Border</label>
                                     </div>
                                 </div>
                             </div>
@@ -1621,6 +1902,12 @@
     <script src="/js/app-state.js"></script>
     <script src="/js/modal-manager.js"></script>
     <script src="/js/share-modal.js"></script>
+    <script src="/js/date-utils.js"></script>
+    <script src="/js/image-manager.js"></script>
+    <script src="/js/pdf-loader.js"></script>
+    <script src="/js/thumbnail-renderer.js"></script>
+    <script src="/js/preview-controller.js"></script>
+    <script src="/js/page-operations.js"></script>
     <script src="/js/pdf-export.js"></script>
     <script src="/js/background-remover.js"></script>
     <script src="/js/ui-controls.js"></script>

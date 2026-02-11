@@ -76,17 +76,24 @@ export function signalLoadingComplete(url: string): void {
 
 		// Use cmd.exe to launch Edge with app mode
 		// Disable tracking prevention to allow localStorage and cookies
-		spawn('cmd.exe', [
-			'/c', 'start', '', 'msedge',
-			`--app=${url}`,
-			`--window-position=${x},${y}`,
-			'--disable-features=msEdgeEnhancedTrackingPrevention',
-			'--disable-blink-features=AutomationControlled'
-		], {
-			detached: true,
-			stdio: 'ignore',
-			windowsHide: true,
-		}).unref();
+		spawn(
+			'cmd.exe',
+			[
+				'/c',
+				'start',
+				'',
+				'msedge',
+				`--app=${url}`,
+				`--window-position=${x},${y}`,
+				'--disable-features=msEdgeEnhancedTrackingPrevention',
+				'--disable-blink-features=AutomationControlled',
+			],
+			{
+				detached: true,
+				stdio: 'ignore',
+				windowsHide: true,
+			},
+		).unref();
 
 		// Give Edge a moment to start and gain focus, then signal HTA to close
 		setTimeout(() => {

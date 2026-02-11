@@ -1,6 +1,7 @@
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { PDFDocument, StandardFonts, rgb, PDFFont } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 
 export interface InsertDateConfig {
 	extensions: string[];
@@ -22,6 +23,14 @@ export interface DateInsertOptions {
 	pages?: number[]; // Specific page numbers (0-indexed), or all pages if undefined
 	rotation?: number; // Rotation angle in degrees
 	bgColor?: { r: number; g: number; b: number }; // Background color
+	// Font styling
+	fontFamily?: string;
+	bold?: boolean;
+	italic?: boolean;
+	underline?: boolean;
+	// Text border
+	borderColor?: { r: number; g: number; b: number };
+	borderWidth?: number;
 }
 
 /**
@@ -63,6 +72,91 @@ function formatDate(date: Date, format: string): string {
 }
 
 /**
+ * Load font from Google Fonts or use standard font
+ */
+async function loadFont(
+	pdfDoc: PDFDocument,
+	fontFamily: string,
+	bold: boolean,
+	italic: boolean,
+): Promise<PDFFont> {
+	// Map font family to appropriate variant
+	const fontName = fontFamily || 'Helvetica';
+
+	// Handle standard fonts
+	const standardFonts: Record<string, StandardFonts> = {
+		Helvetica: bold && italic
+			? StandardFonts.HelveticaBoldOblique
+			: bold
+				? StandardFonts.HelveticaBold
+				: italic
+					? StandardFonts.HelveticaOblique
+					: StandardFonts.Helvetica,
+		'Times New Roman': bold && italic
+			? StandardFonts.TimesRomanBoldItalic
+			: bold
+				? StandardFonts.TimesRomanBold
+				: italic
+					? StandardFonts.TimesRomanItalic
+					: StandardFonts.TimesRoman,
+		Courier: bold && italic
+			? StandardFonts.CourierBoldOblique
+			: bold
+				? StandardFonts.CourierBold
+				: italic
+					? StandardFonts.CourierOblique
+					: StandardFonts.Courier,
+	};
+
+	// Use standard font if available
+	if (standardFonts[fontName]) {
+		return await pdfDoc.embedFont(standardFonts[fontName]);
+	}
+
+	// For non-standard fonts, try to load from Google Fonts
+	try {
+		pdfDoc.registerFontkit(fontkit);
+
+		// Determine font weight and style
+		const weight = bold ? 700 : 400;
+		const italicParam = italic ? 'ital,' : '';
+
+		// Build Google Fonts URL
+		const fontUrlName = fontName.replace(/ /g, '+');
+		const fontUrl = `https://fonts.googleapis.com/css2?family=${fontUrlName}:${italicParam}wght@${weight}&display=swap`;
+
+		// Fetch CSS to get font URL
+		const cssResponse = await fetch(fontUrl);
+		const cssText = await cssResponse.text();
+
+		// Extract TTF/WOFF2 URL from CSS
+		const urlMatch = cssText.match(/url\((https:\/\/[^)]+\.(?:ttf|woff2))\)/);
+		if (!urlMatch) {
+			console.warn(
+				`Could not find font URL for ${fontName}, falling back to Helvetica`,
+			);
+			return await pdfDoc.embedFont(StandardFonts.Helvetica);
+		}
+
+		const fontFileUrl = urlMatch[1];
+
+		// Fetch font file
+		const fontResponse = await fetch(fontFileUrl);
+		const fontBytes = await fontResponse.arrayBuffer();
+
+		// Embed custom font
+		const customFont = await pdfDoc.embedFont(fontBytes);
+		return customFont;
+	} catch (error) {
+		console.warn(
+			`Failed to load font ${fontName}, falling back to Helvetica:`,
+			error,
+		);
+		return await pdfDoc.embedFont(StandardFonts.Helvetica);
+	}
+}
+
+/**
  * Insert today's date into a PDF
  * @param inputFile PDF file path
  * @param options Date insertion configuration
@@ -79,11 +173,18 @@ export async function insertDate(
 		const pdfBytes = await fs.readFile(inputFile);
 		const pdfDoc = await PDFDocument.load(pdfBytes);
 
-		// Get font
-		const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+		// Load font with style support
+		const font = await loadFont(
+			pdfDoc,
+			options.fontFamily || 'Helvetica',
+			options.bold || false,
+			options.italic || false,
+		);
 
 		// Get date text (use provided text or format today's date)
-		const dateText = options.dateText ?? formatDate(new Date(), options.format ?? 'MM/DD/YYYY');
+		const dateText =
+			options.dateText ??
+			formatDate(new Date(), options.format ?? 'MM/DD/YYYY');
 
 		// Determine which pages to apply date to
 		const pages = pdfDoc.getPages();
@@ -121,6 +222,24 @@ export async function insertDate(
 				});
 			}
 
+			// Draw text border if specified
+			if (options.borderColor && options.borderWidth) {
+				const borderPadding = 2;
+				page.drawRectangle({
+					x: x - borderPadding,
+					y: y - borderPadding,
+					width: textWidth + borderPadding * 2,
+					height: textHeight + borderPadding * 2,
+					borderColor: rgb(
+						options.borderColor.r,
+						options.borderColor.g,
+						options.borderColor.b,
+					),
+					borderWidth: options.borderWidth,
+					rotate: { angle: rotation, type: 'degrees' },
+				});
+			}
+
 			// Draw date text
 			page.drawText(dateText, {
 				x,
@@ -130,6 +249,20 @@ export async function insertDate(
 				color: rgb(color.r, color.g, color.b),
 				rotate: { angle: rotation, type: 'degrees' },
 			});
+
+			// Draw underline if specified
+			if (options.underline) {
+				const underlineY = y - 2;
+				const underlineThickness = Math.max(1, fontSize / 12);
+				page.drawRectangle({
+					x,
+					y: underlineY,
+					width: textWidth,
+					height: underlineThickness,
+					color: rgb(color.r, color.g, color.b),
+					rotate: { angle: rotation, type: 'degrees' },
+				});
+			}
 		}
 
 		// Determine output path

@@ -43,7 +43,7 @@
 	"bugs": {
 		"url": "https://github.com/muammar-yacoob/PDFile/issues"
 	},
-	"homepage": "https://piclet.co",
+	"homepage": "https://pdfile.co",
 	"engines": {
 		"node": ">=18"
 	},
@@ -69,7 +69,7 @@
 		"typescript": "^5.7.0"
 	},
 	"dependencies": {
-		"@simonwep/pickr": "^1.9.1",
+		"@pdf-lib/fontkit": "^1.1.1",
 		"chalk": "^5.6.2",
 		"commander": "^14.0.2",
 		"docx": "^9.0.1",

@@ -1,18 +1,22 @@
-import type { ToolConfig } from '../cli/tools.js';
-import { createServer } from 'node:http';
-import { dirname, join, basename } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { readFile, writeFile, unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { basename, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
-import { signalLoadingComplete, cleanupSignalFiles } from '../lib/edge-launcher.js';
-import { pdfToWord } from './pdf-to-word.js';
-import { mergePdfs } from './merge-pdfs.js';
+import type { ToolConfig } from '../cli/tools.js';
+import {
+	cleanupSignalFiles,
+	signalLoadingComplete,
+} from '../lib/edge-launcher.js';
+import { addImageOverlay } from './add-image-overlay.js';
 import { addSignature } from './add-signature.js';
 import { insertDate } from './insert-date.js';
-import { addImageOverlay } from './add-image-overlay.js';
+import { mergePdfs } from './merge-pdfs.js';
+import { pdfToWord } from './pdf-to-word.js';
 import { removePages } from './remove-pages.js';
 import { reorderPages } from './reorder-pages.js';
+import { rotatePages } from './rotate-pages.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -108,17 +112,27 @@ export async function runGUI(file: string): Promise<boolean> {
 		// API: Export PDF with merged pages and overlays
 		app.post('/api/export-pdf', async (req, res) => {
 			try {
-				const { hasMergedPages, hasReordering, pageOrder, overlays, mergedPagesData } = req.body;
+				const {
+					hasMergedPages,
+					hasReordering,
+					pageOrder,
+					overlays,
+					mergedPagesData,
+				} = req.body;
 
 				const tmpDir = join(__dirname, 'temp');
 				const { mkdir } = await import('node:fs/promises');
 				await mkdir(tmpDir, { recursive: true });
 
 				let currentFile = currentWorkingFile;
-				let tempFiles: string[] = [];
+				const tempFiles: string[] = [];
 
 				// Step 1: Handle merged pages or reordering if needed
-				if ((hasMergedPages || hasReordering) && pageOrder && pageOrder.length > 0) {
+				if (
+					(hasMergedPages || hasReordering) &&
+					pageOrder &&
+					pageOrder.length > 0
+				) {
 					const { PDFDocument } = await import('pdf-lib');
 					const pdfBytes = await readFile(currentWorkingFile);
 					const srcDoc = await PDFDocument.load(pdfBytes);
@@ -143,9 +157,9 @@ export async function runGUI(file: string): Promise<boolean> {
 				if (overlays && overlays.length > 0) {
 					const parseColor = (hex: string) => {
 						if (!hex) return undefined;
-						const r = parseInt(hex.slice(1, 3), 16) / 255;
-						const g = parseInt(hex.slice(3, 5), 16) / 255;
-						const b = parseInt(hex.slice(5, 7), 16) / 255;
+						const r = Number.parseInt(hex.slice(1, 3), 16) / 255;
+						const g = Number.parseInt(hex.slice(3, 5), 16) / 255;
+						const b = Number.parseInt(hex.slice(5, 7), 16) / 255;
 						return { r, g, b };
 					};
 
@@ -156,7 +170,9 @@ export async function runGUI(file: string): Promise<boolean> {
 							? file.replace(/\.pdf$/i, '_abused.pdf')
 							: join(tmpDir, `temp_overlay_${i}_${Date.now()}.pdf`);
 
-						console.log(`\n=== Processing overlay ${i + 1}/${overlays.length} (${overlay.type}) ===`);
+						console.log(
+							`\n=== Processing overlay ${i + 1}/${overlays.length} (${overlay.type}) ===`,
+						);
 						console.log(`Current input file: ${currentFile}`);
 						console.log(`Output file: ${outputPath}`);
 						console.log(`Is last: ${isLast}`);
@@ -164,52 +180,141 @@ export async function runGUI(file: string): Promise<boolean> {
 						let success = false;
 
 						if (overlay.type === 'date') {
-							success = await insertDate(currentFile, {
-								dateText: overlay.dateText,
-								format: overlay.format,
-								fontSize: overlay.fontSize,
-								color: parseColor(overlay.textColor),
-								bgColor: overlay.bgColor ? parseColor(overlay.bgColor) : undefined,
-								rotation: overlay.rotation || 0,
-								x: overlay.x,
-								y: overlay.y,
-								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
-							}, outputPath);
-
+							success = await insertDate(
+								currentFile,
+								{
+									dateText: overlay.dateText,
+									format: overlay.format,
+									fontSize: overlay.fontSize,
+									color: parseColor(overlay.textColor),
+									bgColor: overlay.bgColor
+										? parseColor(overlay.bgColor)
+										: undefined,
+									rotation: overlay.rotation || 0,
+									x: overlay.x,
+									y: overlay.y,
+									pages:
+										overlay.pageIndex !== undefined
+											? [overlay.pageIndex]
+											: undefined,
+							// Font styling
+							fontFamily: overlay.fontFamily,
+							bold: overlay.bold,
+							italic: overlay.italic,
+							underline: overlay.underline,
+							// Text border
+							borderColor: overlay.borderColor
+								? parseColor(overlay.borderColor)
+								: undefined,
+							borderWidth: overlay.borderWidth,
+								},
+								outputPath,
+							);
 						} else if (overlay.type === 'image') {
 							let imagePath: string;
 							try {
 								// Extract image data
 								const imageDataParts = overlay.imageData.split(',');
 								if (imageDataParts.length !== 2) {
-									throw new Error(`Invalid image data format (expected data:type;base64,data)`);
+									throw new Error(
+										`Invalid image data format (expected data:type;base64,data)`,
+									);
 								}
 
 								const imageBuffer = Buffer.from(imageDataParts[1], 'base64');
 								console.log(`Image buffer size: ${imageBuffer.length} bytes`);
 
 								// Determine image format from data URL
-								const mimeType = imageDataParts[0].match(/data:(.+);base64/)?.[1] || 'image/png';
+								const mimeType =
+									imageDataParts[0].match(/data:(.+);base64/)?.[1] ||
+									'image/png';
 								console.log(`Image MIME type: ${mimeType}`);
 
 								// Use correct file extension based on MIME type
-								const imageExt = mimeType === 'image/jpeg' ? 'jpg' :
-								                 mimeType === 'image/png' ? 'png' :
-								                 mimeType.split('/')[1] || 'png';
-								imagePath = join(tmpDir, `overlay_${i}_${Date.now()}.${imageExt}`);
+								const imageExt =
+									mimeType === 'image/jpeg'
+										? 'jpg'
+										: mimeType === 'image/png'
+											? 'png'
+											: mimeType.split('/')[1] || 'png';
+								imagePath = join(
+									tmpDir,
+									`overlay_${i}_${Date.now()}.${imageExt}`,
+								);
 								await writeFile(imagePath, imageBuffer);
 								tempFiles.push(imagePath);
 
 								// Log dimensions for debugging
-								console.log(`Image overlay dimensions: x=${overlay.x}, y=${overlay.y}, w=${overlay.width}, h=${overlay.height}`);
+								console.log(
+									`Image overlay dimensions: x=${overlay.x}, y=${overlay.y}, w=${overlay.width}, h=${overlay.height}`,
+								);
 							} catch (imageError) {
 								console.error(`Failed to process image data:`, imageError);
-								throw new Error(`Failed to process image data: ${(imageError as Error).message}`);
+								throw new Error(
+									`Failed to process image data: ${(imageError as Error).message}`,
+								);
 							}
 
 							// Use signature processing if removeBackground is true
 							if (overlay.removeBackground) {
-								success = await addSignature(currentFile, {
+								success = await addSignature(
+									currentFile,
+									{
+										signatureFile: imagePath,
+										x: overlay.x,
+										y: overlay.y,
+										width: overlay.width,
+										height: overlay.height,
+										opacity: overlay.opacity / 100,
+										rotation: overlay.rotation || 0,
+										removeBg: true,
+										pages:
+											overlay.pageIndex !== undefined
+												? [overlay.pageIndex]
+												: undefined,
+									},
+									outputPath,
+								);
+							} else {
+								success = await addImageOverlay(
+									currentFile,
+									{
+										imagePath,
+										x: overlay.x,
+										y: overlay.y,
+										width: overlay.width,
+										height: overlay.height,
+										opacity: overlay.opacity / 100,
+										rotation: overlay.rotation || 0,
+										pages:
+											overlay.pageIndex !== undefined
+												? [overlay.pageIndex]
+												: undefined,
+									},
+									outputPath,
+								);
+							}
+
+							if (!success) {
+								console.error(
+									`Failed to apply image overlay with dimensions: ${overlay.width}x${overlay.height}`,
+								);
+								throw new Error(
+									`Image overlay returned false - check logs above for details`,
+								);
+							}
+						} else if (overlay.type === 'signature') {
+							const imageBuffer = Buffer.from(
+								overlay.imageData.split(',')[1],
+								'base64',
+							);
+							const imagePath = join(tmpDir, `signature_${Date.now()}.png`);
+							await writeFile(imagePath, imageBuffer);
+							tempFiles.push(imagePath);
+
+							success = await addSignature(
+								currentFile,
+								{
 									signatureFile: imagePath,
 									x: overlay.x,
 									y: overlay.y,
@@ -217,44 +322,14 @@ export async function runGUI(file: string): Promise<boolean> {
 									height: overlay.height,
 									opacity: overlay.opacity / 100,
 									rotation: overlay.rotation || 0,
-									removeBg: true,
-									pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
-								}, outputPath);
-							} else {
-								success = await addImageOverlay(currentFile, {
-									imagePath,
-									x: overlay.x,
-									y: overlay.y,
-									width: overlay.width,
-									height: overlay.height,
-									opacity: overlay.opacity / 100,
-									rotation: overlay.rotation || 0,
-									pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
-								}, outputPath);
-							}
-
-							if (!success) {
-								console.error(`Failed to apply image overlay with dimensions: ${overlay.width}x${overlay.height}`);
-								throw new Error(`Image overlay returned false - check logs above for details`);
-							}
-
-						} else if (overlay.type === 'signature') {
-							const imageBuffer = Buffer.from(overlay.imageData.split(',')[1], 'base64');
-							const imagePath = join(tmpDir, `signature_${Date.now()}.png`);
-							await writeFile(imagePath, imageBuffer);
-							tempFiles.push(imagePath);
-
-							success = await addSignature(currentFile, {
-								signatureFile: imagePath,
-								x: overlay.x,
-								y: overlay.y,
-								width: overlay.width,
-								height: overlay.height,
-								opacity: overlay.opacity / 100,
-								rotation: overlay.rotation || 0,
-								removeBg: overlay.removeBackground !== false,
-								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
-							}, outputPath);
+									removeBg: overlay.removeBackground !== false,
+									pages:
+										overlay.pageIndex !== undefined
+											? [overlay.pageIndex]
+											: undefined,
+								},
+								outputPath,
+							);
 						}
 
 						if (!success) {
@@ -272,13 +347,19 @@ export async function runGUI(file: string): Promise<boolean> {
 
 						if (!isLast) {
 							if (currentFile !== file && existsSync(currentFile)) {
-								console.log(`Adding old currentFile to temp cleanup: ${currentFile}`);
+								console.log(
+									`Adding old currentFile to temp cleanup: ${currentFile}`,
+								);
 								tempFiles.push(currentFile);
 							}
-							console.log(`Updating currentFile from ${currentFile} to ${outputPath}`);
+							console.log(
+								`Updating currentFile from ${currentFile} to ${outputPath}`,
+							);
 							currentFile = outputPath;
 						} else {
-							console.log(`Final overlay - setting currentFile to ${outputPath}`);
+							console.log(
+								`Final overlay - setting currentFile to ${outputPath}`,
+							);
 							currentFile = outputPath;
 						}
 					}
@@ -287,9 +368,10 @@ export async function runGUI(file: string): Promise<boolean> {
 				}
 
 				// Return the final file
-				const finalOutput = currentFile === file
-					? file.replace(/\.pdf$/i, '_modified.pdf')
-					: currentFile;
+				const finalOutput =
+					currentFile === file
+						? file.replace(/\.pdf$/i, '_modified.pdf')
+						: currentFile;
 
 				// If currentFile is still the original, copy it
 				if (currentFile === file && hasMergedPages) {
@@ -300,7 +382,7 @@ export async function runGUI(file: string): Promise<boolean> {
 
 				if (existsSync(currentFile)) {
 					res.download(currentFile, basename(currentFile), (err) => {
-						tempFiles.forEach(f => unlink(f).catch(() => {}));
+						tempFiles.forEach((f) => unlink(f).catch(() => {}));
 						if (err) {
 							console.error('Download error:', err);
 						}
@@ -308,7 +390,6 @@ export async function runGUI(file: string): Promise<boolean> {
 				} else {
 					res.status(500).json({ error: 'Failed to create output file' });
 				}
-
 			} catch (error) {
 				console.error('Export PDF error:', error);
 				if (error instanceof Error) {
@@ -316,7 +397,7 @@ export async function runGUI(file: string): Promise<boolean> {
 				}
 				res.status(500).json({
 					error: 'Internal server error: ' + (error as Error).message,
-					stack: error instanceof Error ? error.stack : undefined
+					stack: error instanceof Error ? error.stack : undefined,
 				});
 			}
 		});
@@ -338,7 +419,7 @@ export async function runGUI(file: string): Promise<boolean> {
 				const finalOutput = file.replace(/\.pdf$/i, '_abused.pdf');
 
 				let currentFile = file;
-				let tempFiles: string[] = [];
+				const tempFiles: string[] = [];
 
 				// Process each overlay sequentially
 				for (let i = 0; i < overlays.length; i++) {
@@ -354,55 +435,90 @@ export async function runGUI(file: string): Promise<boolean> {
 						// Parse colors
 						const parseColor = (hex: string) => {
 							if (!hex) return undefined;
-							const r = parseInt(hex.slice(1, 3), 16) / 255;
-							const g = parseInt(hex.slice(3, 5), 16) / 255;
-							const b = parseInt(hex.slice(5, 7), 16) / 255;
+							const r = Number.parseInt(hex.slice(1, 3), 16) / 255;
+							const g = Number.parseInt(hex.slice(3, 5), 16) / 255;
+							const b = Number.parseInt(hex.slice(5, 7), 16) / 255;
 							return { r, g, b };
 						};
 
-						success = await insertDate(currentFile, {
-							dateText: overlay.dateText,
-							format: overlay.format,
-							fontSize: overlay.fontSize,
-							color: parseColor(overlay.textColor),
-							bgColor: overlay.bgColor ? parseColor(overlay.bgColor) : undefined,
-							rotation: overlay.rotation || 0,
-							x: overlay.x,
-							y: overlay.y,
-							pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
-						}, outputPath);
-
+						success = await insertDate(
+							currentFile,
+							{
+								dateText: overlay.dateText,
+								format: overlay.format,
+								fontSize: overlay.fontSize,
+								color: parseColor(overlay.textColor),
+								bgColor: overlay.bgColor
+									? parseColor(overlay.bgColor)
+									: undefined,
+								rotation: overlay.rotation || 0,
+								x: overlay.x,
+								y: overlay.y,
+								pages:
+									overlay.pageIndex !== undefined
+										? [overlay.pageIndex]
+										: undefined,
+								// Font styling
+								fontFamily: overlay.fontFamily,
+								bold: overlay.bold,
+								italic: overlay.italic,
+								underline: overlay.underline,
+								// Text border
+								borderColor: overlay.borderColor
+									? parseColor(overlay.borderColor)
+									: undefined,
+								borderWidth: overlay.borderWidth,
+							},
+							outputPath,
+						);
 					} else if (overlay.type === 'image' || overlay.type === 'signature') {
 						// Save base64 image to temp file
-						const imageBuffer = Buffer.from(overlay.imageData.split(',')[1], 'base64');
+						const imageBuffer = Buffer.from(
+							overlay.imageData.split(',')[1],
+							'base64',
+						);
 						const imagePath = join(tmpDir, `overlay_${Date.now()}.png`);
 						await writeFile(imagePath, imageBuffer);
 						tempFiles.push(imagePath);
 
 						// Use signature processing if removeBackground is true
 						if (overlay.removeBackground) {
-							success = await addSignature(currentFile, {
-								signatureFile: imagePath,
-								x: overlay.x,
-								y: overlay.y,
-								width: overlay.width,
-								height: overlay.height,
-								opacity: overlay.opacity / 100,
-								rotation: overlay.rotation || 0,
-								removeBg: true,
-								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
-							}, outputPath);
+							success = await addSignature(
+								currentFile,
+								{
+									signatureFile: imagePath,
+									x: overlay.x,
+									y: overlay.y,
+									width: overlay.width,
+									height: overlay.height,
+									opacity: overlay.opacity / 100,
+									rotation: overlay.rotation || 0,
+									removeBg: true,
+									pages:
+										overlay.pageIndex !== undefined
+											? [overlay.pageIndex]
+											: undefined,
+								},
+								outputPath,
+							);
 						} else {
-							success = await addImageOverlay(currentFile, {
-								imagePath,
-								x: overlay.x,
-								y: overlay.y,
-								width: overlay.width,
-								height: overlay.height,
-								opacity: overlay.opacity / 100,
-								rotation: overlay.rotation || 0,
-								pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
-							}, outputPath);
+							success = await addImageOverlay(
+								currentFile,
+								{
+									imagePath,
+									x: overlay.x,
+									y: overlay.y,
+									width: overlay.width,
+									height: overlay.height,
+									opacity: overlay.opacity / 100,
+									rotation: overlay.rotation || 0,
+									pages:
+										overlay.pageIndex !== undefined
+											? [overlay.pageIndex]
+											: undefined,
+								},
+								outputPath,
+							);
 						}
 					}
 
@@ -423,7 +539,7 @@ export async function runGUI(file: string): Promise<boolean> {
 				if (existsSync(finalOutput)) {
 					res.download(finalOutput, basename(finalOutput), (err) => {
 						// Clean up intermediate temp files only (keep finalOutput)
-						tempFiles.forEach(f => unlink(f).catch(() => {}));
+						tempFiles.forEach((f) => unlink(f).catch(() => {}));
 						if (err) {
 							console.error('Download error:', err);
 						}
@@ -431,10 +547,11 @@ export async function runGUI(file: string): Promise<boolean> {
 				} else {
 					res.status(500).json({ error: 'Failed to create output file' });
 				}
-
 			} catch (error) {
 				console.error('Apply overlays error:', error);
-				res.status(500).json({ error: 'Internal server error: ' + (error as Error).message });
+				res.status(500).json({
+					error: 'Internal server error: ' + (error as Error).message,
+				});
 			}
 		});
 
@@ -465,18 +582,18 @@ export async function runGUI(file: string): Promise<boolean> {
 				const tmpDir = join(__dirname, 'temp');
 				const outputPath = join(
 					tmpDir,
-					`${basename(file, '.pdf')}_removed_pages.pdf`,
+					`${basename(currentWorkingFile, '.pdf')}_removed_pages.pdf`,
 				);
 
 				const { mkdir } = await import('node:fs/promises');
 				await mkdir(tmpDir, { recursive: true });
 
-				const success = await removePages(file, pages, outputPath);
+				const success = await removePages(currentWorkingFile, pages, outputPath);
 
 				if (success && existsSync(outputPath)) {
 					res.download(
 						outputPath,
-						`${basename(file, '.pdf')}_removed_pages.pdf`,
+						`${basename(currentWorkingFile, '.pdf')}_removed_pages.pdf`,
 						(err) => {
 							unlink(outputPath).catch(() => {});
 							if (err) {
@@ -504,18 +621,18 @@ export async function runGUI(file: string): Promise<boolean> {
 				const tmpDir = join(__dirname, 'temp');
 				const outputPath = join(
 					tmpDir,
-					`${basename(file, '.pdf')}_reordered.pdf`,
+					`${basename(currentWorkingFile, '.pdf')}_reordered.pdf`,
 				);
 
 				const { mkdir } = await import('node:fs/promises');
 				await mkdir(tmpDir, { recursive: true });
 
-				const success = await reorderPages(file, order, outputPath);
+				const success = await reorderPages(currentWorkingFile, order, outputPath);
 
 				if (success && existsSync(outputPath)) {
 					res.download(
 						outputPath,
-						`${basename(file, '.pdf')}_reordered.pdf`,
+						`${basename(currentWorkingFile, '.pdf')}_reordered.pdf`,
 						(err) => {
 							unlink(outputPath).catch(() => {});
 							if (err) {
@@ -532,10 +649,67 @@ export async function runGUI(file: string): Promise<boolean> {
 			}
 		});
 
+		// API: Rotate pages
+		app.post('/api/rotate-pages', async (req, res) => {
+			try {
+				const { pages, rotation } = req.body;
+
+				// Validate rotation
+				const validRotations = [90, 180, 270, -90];
+				if (!validRotations.includes(rotation)) {
+					return res.status(400).json({ error: 'Invalid rotation angle' });
+				}
+
+				// If no pages specified, rotate all pages
+				const pagesToRotate = pages && Array.isArray(pages) && pages.length > 0
+					? pages
+					: [];
+
+				const tmpDir = join(__dirname, 'temp');
+				const outputPath = join(
+					tmpDir,
+					`${basename(currentWorkingFile, '.pdf')}_rotated.pdf`,
+				);
+
+				const { mkdir } = await import('node:fs/promises');
+				await mkdir(tmpDir, { recursive: true });
+
+				const success = await rotatePages(currentWorkingFile, pagesToRotate, rotation, outputPath);
+
+				if (success && existsSync(outputPath)) {
+					res.download(
+						outputPath,
+						`${basename(currentWorkingFile, '.pdf')}_rotated.pdf`,
+						(err) => {
+							unlink(outputPath).catch(() => {});
+							if (err) {
+								console.error('Download error:', err);
+							}
+						},
+					);
+				} else {
+					res.status(500).json({ error: 'Page rotation failed' });
+				}
+			} catch (error) {
+				console.error('Rotate pages error:', error);
+				res.status(500).json({ error: 'Internal server error' });
+			}
+		});
+
 		// API: Insert date into PDF
 		app.post('/api/insert-date', async (req, res) => {
 			try {
-				const { dateText, format, x, y, fontSize, textColor, bgColor, rotation, pageIndex } = req.body;
+				const {
+					dateText,
+					format,
+					x,
+					y,
+					fontSize,
+					textColor,
+					bgColor,
+					rotation,
+					pageIndex,
+				} = req.body;
 
 				const tmpDir = join(__dirname, 'temp');
 				const outputPath = join(
@@ -548,9 +722,9 @@ export async function runGUI(file: string): Promise<boolean> {
 
 				// Parse colors
 				const parseColor = (hex: string) => {
-					const r = parseInt(hex.slice(1, 3), 16) / 255;
-					const g = parseInt(hex.slice(3, 5), 16) / 255;
-					const b = parseInt(hex.slice(5, 7), 16) / 255;
+					const r = Number.parseInt(hex.slice(1, 3), 16) / 255;
+					const g = Number.parseInt(hex.slice(3, 5), 16) / 255;
+					const b = Number.parseInt(hex.slice(5, 7), 16) / 255;
 					return { r, g, b };
 				};
 
@@ -599,30 +773,43 @@ export async function runGUI(file: string): Promise<boolean> {
 				}
 
 				const tmpDir = join(__dirname, 'temp');
-				await (await import('node:fs/promises')).mkdir(tmpDir, { recursive: true });
+				await (await import('node:fs/promises')).mkdir(tmpDir, {
+					recursive: true,
+				});
 
 				// Save base64 image to temp file
 				const imageBuffer = Buffer.from(imageData.split(',')[1], 'base64');
 				const imagePath = join(tmpDir, `overlay_${Date.now()}.png`);
 				await writeFile(imagePath, imageBuffer);
 
-				const outputPath = join(tmpDir, `${basename(file, '.pdf')}_with_overlay.pdf`);
+				const outputPath = join(
+					tmpDir,
+					`${basename(file, '.pdf')}_with_overlay.pdf`,
+				);
 
-				const success = await addImageOverlay(file, {
-					imagePath,
-					x: x || 50,
-					y: y || 50,
-					width: width || 100,
-					height: height || 100,
-					opacity: (opacity || 100) / 100,
-				}, outputPath);
+				const success = await addImageOverlay(
+					file,
+					{
+						imagePath,
+						x: x || 50,
+						y: y || 50,
+						width: width || 100,
+						height: height || 100,
+						opacity: (opacity || 100) / 100,
+					},
+					outputPath,
+				);
 
 				if (success && existsSync(outputPath)) {
-					res.download(outputPath, `${basename(file, '.pdf')}_with_overlay.pdf`, (err) => {
-						unlink(outputPath).catch(() => {});
-						unlink(imagePath).catch(() => {});
-						if (err) console.error('Download error:', err);
-					});
+					res.download(
+						outputPath,
+						`${basename(file, '.pdf')}_with_overlay.pdf`,
+						(err) => {
+							unlink(outputPath).catch(() => {});
+							unlink(imagePath).catch(() => {});
+							if (err) console.error('Download error:', err);
+						},
+					);
 				} else {
 					res.status(500).json({ error: 'Image overlay failed' });
 				}
@@ -641,7 +828,9 @@ export async function runGUI(file: string): Promise<boolean> {
 				}
 
 				const tmpDir = join(__dirname, 'temp');
-				await (await import('node:fs/promises')).mkdir(tmpDir, { recursive: true });
+				await (await import('node:fs/promises')).mkdir(tmpDir, {
+					recursive: true,
+				});
 
 				// Save base64 image to temp file
 				const imageBuffer = Buffer.from(imageData.split(',')[1], 'base64');
@@ -650,21 +839,29 @@ export async function runGUI(file: string): Promise<boolean> {
 
 				const outputPath = join(tmpDir, `${basename(file, '.pdf')}_signed.pdf`);
 
-				const success = await addSignature(file, {
-					signatureFile: imagePath,
-					x: x || 50,
-					y: y || 50,
-					width: width || 150,
-					height: height || 50,
-					removeBg: removeBackground !== false,
-				}, outputPath);
+				const success = await addSignature(
+					file,
+					{
+						signatureFile: imagePath,
+						x: x || 50,
+						y: y || 50,
+						width: width || 150,
+						height: height || 50,
+						removeBg: removeBackground !== false,
+					},
+					outputPath,
+				);
 
 				if (success && existsSync(outputPath)) {
-					res.download(outputPath, `${basename(file, '.pdf')}_signed.pdf`, (err) => {
-						unlink(outputPath).catch(() => {});
-						unlink(imagePath).catch(() => {});
-						if (err) console.error('Download error:', err);
-					});
+					res.download(
+						outputPath,
+						`${basename(file, '.pdf')}_signed.pdf`,
+						(err) => {
+							unlink(outputPath).catch(() => {});
+							unlink(imagePath).catch(() => {});
+							if (err) console.error('Download error:', err);
+						},
+					);
 				} else {
 					res.status(500).json({ error: 'Signature addition failed' });
 				}
@@ -683,7 +880,9 @@ export async function runGUI(file: string): Promise<boolean> {
 				}
 
 				const tmpDir = join(__dirname, 'temp');
-				await (await import('node:fs/promises')).mkdir(tmpDir, { recursive: true });
+				await (await import('node:fs/promises')).mkdir(tmpDir, {
+					recursive: true,
+				});
 
 				let uploadedPdfPath: string;
 
@@ -710,12 +909,15 @@ export async function runGUI(file: string): Promise<boolean> {
 
 						if (!hasImageMagick) {
 							return res.status(400).json({
-								error: `Image type '${imageType}' requires ImageMagick. Install it with: sudo apt install imagemagick`
+								error: `Image type '${imageType}' requires ImageMagick. Install it with: sudo apt install imagemagick`,
 							});
 						}
 
 						// Save original image to temp file
-						const tempImagePath = join(tmpDir, `temp_${Date.now()}.${imageType}`);
+						const tempImagePath = join(
+							tmpDir,
+							`temp_${Date.now()}.${imageType}`,
+						);
 						await writeFile(tempImagePath, imageBuffer);
 
 						// Convert to PNG using ImageMagick
@@ -725,10 +927,14 @@ export async function runGUI(file: string): Promise<boolean> {
 						const execAsync = promisify(exec);
 
 						try {
-							await execAsync(`convert "${tempImagePath}" "PNG32:${tempPngPath}"`);
+							await execAsync(
+								`convert "${tempImagePath}" "PNG32:${tempPngPath}"`,
+							);
 
 							// Read the converted PNG
-							const pngBuffer = await (await import('node:fs/promises')).readFile(tempPngPath);
+							const pngBuffer = await (
+								await import('node:fs/promises')
+							).readFile(tempPngPath);
 							image = await pdfDoc.embedPng(pngBuffer);
 
 							// Clean up temp files
@@ -736,7 +942,7 @@ export async function runGUI(file: string): Promise<boolean> {
 							await (await import('node:fs/promises')).unlink(tempPngPath);
 						} catch (error) {
 							return res.status(500).json({
-								error: `Failed to convert ${imageType} to PNG: ${(error as Error).message}`
+								error: `Failed to convert ${imageType} to PNG: ${(error as Error).message}`,
 							});
 						}
 					}
@@ -769,24 +975,31 @@ export async function runGUI(file: string): Promise<boolean> {
 					filesToMerge = [uploadedPdfPath, file];
 				} else if (position === 'replace') {
 					filesToMerge = [uploadedPdfPath];
-				} else { // 'end' or default
+				} else {
+					// 'end' or default
 					filesToMerge = [file, uploadedPdfPath];
 				}
 
 				const success = await mergePdfs(filesToMerge, outputPath);
 
 				if (success && existsSync(outputPath)) {
-					res.download(outputPath, `${basename(file, '.pdf')}_merged.pdf`, (err) => {
-						unlink(outputPath).catch(() => {});
-						unlink(uploadedPdfPath).catch(() => {});
-						if (err) console.error('Download error:', err);
-					});
+					res.download(
+						outputPath,
+						`${basename(file, '.pdf')}_merged.pdf`,
+						(err) => {
+							unlink(outputPath).catch(() => {});
+							unlink(uploadedPdfPath).catch(() => {});
+							if (err) console.error('Download error:', err);
+						},
+					);
 				} else {
 					res.status(500).json({ error: 'Merge failed' });
 				}
 			} catch (error) {
 				console.error('Merge error:', error);
-				res.status(500).json({ error: 'Internal server error: ' + (error as Error).message });
+				res.status(500).json({
+					error: 'Internal server error: ' + (error as Error).message,
+				});
 			}
 		});
 

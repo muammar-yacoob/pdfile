@@ -1,17 +1,18 @@
 import chalk from 'chalk';
 import { Command } from 'commander';
 import { showBanner } from '../lib/banner.js';
+import { registerAddSignatureCommand } from './commands/add-signature.js';
 import { registerConfigCommand } from './commands/config.js';
 import { registerHelpCommand } from './commands/help.js';
+import { registerInsertDateCommand } from './commands/insert-date.js';
 import { registerInstallCommand } from './commands/install.js';
-import { registerUninstallCommand } from './commands/uninstall.js';
 import { registerMergePdfsCommand } from './commands/merge-pdfs.js';
 import { registerPdfToWordCommand } from './commands/pdf-to-word.js';
+import { registerPdfileCommand } from './commands/pdfile.js';
 import { registerRemovePagesCommand } from './commands/remove-pages.js';
 import { registerReorderPagesCommand } from './commands/reorder-pages.js';
-import { registerInsertDateCommand } from './commands/insert-date.js';
-import { registerAddSignatureCommand } from './commands/add-signature.js';
-import { registerPdfileCommand } from './commands/pdfile.js';
+import { registerRotatePagesCommand } from './commands/rotate-pages.js';
+import { registerUninstallCommand } from './commands/uninstall.js';
 
 export function showHelp(): void {
 	showBanner();
@@ -46,6 +47,9 @@ export function showHelp(): void {
 		`    ${cmd('reorder')} ${arg('<file>')}            Reorder pages in PDF`,
 	);
 	console.log(
+		`    ${cmd('rotate')} ${arg('<file>')}             Rotate pages in PDF`,
+	);
+	console.log(
 		`    ${cmd('move-page')} ${arg('<file> <page> <dir>')} Move page up or down`,
 	);
 	console.log();
@@ -53,19 +57,38 @@ export function showHelp(): void {
 	console.log(
 		`    ${cmd('install')}                     Add Windows right-click menu`,
 	);
-	console.log(`    ${cmd('uninstall')}                   Remove right-click menu`);
+	console.log(
+		`    ${cmd('uninstall')}                   Remove right-click menu`,
+	);
 	console.log();
 	console.log(head('  Config'));
-	console.log(`    ${cmd('config')}                      Display current settings`);
+	console.log(
+		`    ${cmd('config')}                      Display current settings`,
+	);
 	console.log(`    ${cmd('config reset')}                Restore defaults`);
 	console.log();
 	console.log(head('  Examples'));
-	console.log(`    ${dim('$')} pdfile ${cmd('merge')} ${arg('file1.pdf file2.pdf')}              ${dim('# Merge PDFs')}`);
-	console.log(`    ${dim('$')} pdfile ${cmd('to-word')} ${arg('doc.pdf')}                        ${dim('# Convert to Word')}`);
-	console.log(`    ${dim('$')} pdfile ${cmd('sign')} ${arg('doc.pdf signature.png')}           ${dim('# Add signature')}`);
-	console.log(`    ${dim('$')} pdfile ${cmd('insert-date')} ${arg('doc.pdf')}                    ${dim("# Insert today's date")}`);
-	console.log(`    ${dim('$')} pdfile ${cmd('remove-pages')} ${arg('doc.pdf')} ${opt('-p 1,3,5')}         ${dim('# Remove pages')}`);
-	console.log(`    ${dim('$')} pdfile ${cmd('reorder')} ${arg('doc.pdf')} ${opt('-n 3,1,2')}               ${dim('# Reorder pages')}`);
+	console.log(
+		`    ${dim('$')} pdfile ${cmd('merge')} ${arg('file1.pdf file2.pdf')}              ${dim('# Merge PDFs')}`,
+	);
+	console.log(
+		`    ${dim('$')} pdfile ${cmd('to-word')} ${arg('doc.pdf')}                        ${dim('# Convert to Word')}`,
+	);
+	console.log(
+		`    ${dim('$')} pdfile ${cmd('sign')} ${arg('doc.pdf signature.png')}           ${dim('# Add signature')}`,
+	);
+	console.log(
+		`    ${dim('$')} pdfile ${cmd('insert-date')} ${arg('doc.pdf')}                    ${dim("# Insert today's date")}`,
+	);
+	console.log(
+		`    ${dim('$')} pdfile ${cmd('remove-pages')} ${arg('doc.pdf')} ${opt('-p 1,3,5')}         ${dim('# Remove pages')}`,
+	);
+	console.log(
+		`    ${dim('$')} pdfile ${cmd('reorder')} ${arg('doc.pdf')} ${opt('-n 3,1,2')}               ${dim('# Reorder pages')}`,
+	);
+	console.log(
+		`    ${dim('$')} pdfile ${cmd('rotate')} ${arg('doc.pdf')} ${opt('-r 90')}                  ${dim('# Rotate pages')}`,
+	);
 	console.log();
 	console.log(head('  Features'));
 	console.log('    - All exports are compressed for optimal file size');
@@ -100,6 +123,7 @@ export function createProgram(): Command {
 	registerInsertDateCommand(program);
 	registerRemovePagesCommand(program);
 	registerReorderPagesCommand(program);
+	registerRotatePagesCommand(program);
 	registerConfigCommand(program);
 	registerPdfileCommand(program);
 

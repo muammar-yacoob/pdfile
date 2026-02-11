@@ -1,9 +1,10 @@
-import * as pdfileMain from '../tools/pdfile-main.js';
+import * as addImageOverlay from '../tools/add-image-overlay.js';
 import * as mergePdfs from '../tools/merge-pdfs.js';
 import * as pdfToWord from '../tools/pdf-to-word.js';
-import * as addImageOverlay from '../tools/add-image-overlay.js';
+import * as pdfileMain from '../tools/pdfile-main.js';
 import * as removePages from '../tools/remove-pages.js';
 import * as reorderPages from '../tools/reorder-pages.js';
+import * as rotatePages from '../tools/rotate-pages.js';
 
 /** Tool configuration */
 export interface ToolConfig {

@@ -1,6 +1,6 @@
-import { PDFDocument } from 'pdf-lib';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { PDFDocument } from 'pdf-lib';
 
 export interface MergePdfsConfig {
 	extensions: string[];

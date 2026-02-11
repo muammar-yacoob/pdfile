@@ -1,7 +1,7 @@
+import * as path from 'node:path';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import prompts from 'prompts';
-import * as path from 'node:path';
 import * as addSignature from '../../tools/add-signature.js';
 
 export function registerAddSignatureCommand(program: Command): void {
@@ -13,11 +13,26 @@ export function registerAddSignatureCommand(program: Command): void {
 		.option('--y <number>', 'Y position', Number.parseFloat)
 		.option('-w, --width <number>', 'Signature width', Number.parseFloat)
 		.option('-h, --height <number>', 'Signature height', Number.parseFloat)
-		.option('--opacity <number>', 'Signature opacity (0.0 to 1.0)', Number.parseFloat)
-		.option('-p, --pages <pages>', 'Comma-separated page numbers (default: last page)')
+		.option(
+			'--opacity <number>',
+			'Signature opacity (0.0 to 1.0)',
+			Number.parseFloat,
+		)
+		.option(
+			'-p, --pages <pages>',
+			'Comma-separated page numbers (default: last page)',
+		)
 		.option('--no-remove-bg', 'Skip background removal')
-		.option('--fuzz <number>', 'Background removal tolerance (0-100, default: 15)', Number.parseFloat)
-		.option('--feather <number>', 'Feathering radius (default: 2)', Number.parseFloat)
+		.option(
+			'--fuzz <number>',
+			'Background removal tolerance (0-100, default: 15)',
+			Number.parseFloat,
+		)
+		.option(
+			'--feather <number>',
+			'Feathering radius (default: 2)',
+			Number.parseFloat,
+		)
 		.option('--yes', 'Use defaults, skip prompts')
 		.action(
 			async (
@@ -39,7 +54,9 @@ export function registerAddSignatureCommand(program: Command): void {
 			) => {
 				try {
 					if (!pdfFile.toLowerCase().endsWith('.pdf')) {
-						console.error(chalk.red('Error: First argument must be a PDF file'));
+						console.error(
+							chalk.red('Error: First argument must be a PDF file'),
+						);
 						process.exit(1);
 					}
 
@@ -125,7 +142,9 @@ export function registerAddSignatureCommand(program: Command): void {
 					process.exit(success ? 0 : 1);
 				} catch (error) {
 					console.error(
-						chalk.red(`Error: ${error instanceof Error ? error.message : error}`),
+						chalk.red(
+							`Error: ${error instanceof Error ? error.message : error}`,
+						),
 					);
 					process.exit(1);
 				}

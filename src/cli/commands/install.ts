@@ -3,7 +3,11 @@ import type { Command } from 'commander';
 import { showBanner } from '../../lib/banner.js';
 import { wslToWindows } from '../../lib/paths.js';
 import { isWSL, isWSLInteropEnabled } from '../../lib/registry.js';
-import { generateRegFile, registerAllTools, unregisterAllTools } from '../registry.js';
+import {
+	generateRegFile,
+	registerAllTools,
+	unregisterAllTools,
+} from '../registry.js';
 
 export function registerInstallCommand(program: Command): void {
 	program
@@ -24,7 +28,11 @@ export function registerInstallCommand(program: Command): void {
 			}
 
 			if (!isWSLInteropEnabled()) {
-				console.log(chalk.yellow('WSL Interop not available. Generating registry file...\n'));
+				console.log(
+					chalk.yellow(
+						'WSL Interop not available. Generating registry file...\n',
+					),
+				);
 
 				const regPath = await generateRegFile();
 				const winPath = wslToWindows(regPath);
@@ -32,8 +40,12 @@ export function registerInstallCommand(program: Command): void {
 				console.log(chalk.green('✓ Generated registry file:'));
 				console.log(chalk.cyan(`  ${winPath}\n`));
 				console.log(chalk.bold('To install, either:'));
-				console.log(chalk.dim('  1. Double-click the .reg file in Windows Explorer'));
-				console.log(chalk.dim(`  2. Run in elevated PowerShell: reg import "${winPath}"`));
+				console.log(
+					chalk.dim('  1. Double-click the .reg file in Windows Explorer'),
+				);
+				console.log(
+					chalk.dim(`  2. Run in elevated PowerShell: reg import "${winPath}"`),
+				);
 				return;
 			}
 
@@ -52,9 +64,7 @@ export function registerInstallCommand(program: Command): void {
 			console.log('  Right-click any PDF file in Windows Explorer.');
 			console.log('  Select "PDFile" to open the PDF toolkit.');
 			console.log('  Multi-select supported for batch processing.');
-			console.log(
-				`  Supported format: ${arg('[.pdf]')}`,
-			);
+			console.log(`  Supported format: ${arg('[.pdf]')}`);
 
 			console.log(head('\nCLI Usage:'));
 			console.log(
@@ -70,11 +80,15 @@ export function registerInstallCommand(program: Command): void {
 			);
 			console.log();
 			console.log(head('  Setup'));
-			console.log(`    ${cmd('install')}              Add Windows right-click menu`);
+			console.log(
+				`    ${cmd('install')}              Add Windows right-click menu`,
+			);
 			console.log(`    ${cmd('uninstall')}            Remove right-click menu`);
 			console.log();
 			console.log(head('  Config'));
-			console.log(`    ${cmd('config')}               Display current settings`);
+			console.log(
+				`    ${cmd('config')}               Display current settings`,
+			);
 			console.log(`    ${cmd('config reset')}         Restore defaults`);
 			console.log();
 			console.log(head('  Prerequisites'));
@@ -82,13 +96,19 @@ export function registerInstallCommand(program: Command): void {
 			console.log('    - Node.js >= 18');
 			console.log();
 			console.log(head('  Examples'));
-			console.log(`    ${dim('$')} pdfile ${cmd('merge')} ${arg('file1.pdf file2.pdf')}   ${dim('# Merge PDFs')}`);
-			console.log(`    ${dim('$')} pdfile ${cmd('to-word')} ${arg('doc.pdf')}             ${dim('# Convert to Word')}`);
-			console.log(`    ${dim('$')} pdfile ${cmd('remove-pages')} ${arg('doc.pdf')} ${opt('-p 1,3')} ${dim('# Remove pages')}`);
-			console.log(`    ${dim('$')} pdfile ${cmd('reorder')} ${arg('doc.pdf')} ${opt('-n 3,1,2')}    ${dim('# Reorder pages')}`);
 			console.log(
-				`\n  Run "pdfile ${opt('--help')}" for full documentation.`,
+				`    ${dim('$')} pdfile ${cmd('merge')} ${arg('file1.pdf file2.pdf')}   ${dim('# Merge PDFs')}`,
 			);
+			console.log(
+				`    ${dim('$')} pdfile ${cmd('to-word')} ${arg('doc.pdf')}             ${dim('# Convert to Word')}`,
+			);
+			console.log(
+				`    ${dim('$')} pdfile ${cmd('remove-pages')} ${arg('doc.pdf')} ${opt('-p 1,3')} ${dim('# Remove pages')}`,
+			);
+			console.log(
+				`    ${dim('$')} pdfile ${cmd('reorder')} ${arg('doc.pdf')} ${opt('-n 3,1,2')}    ${dim('# Reorder pages')}`,
+			);
+			console.log(`\n  Run "pdfile ${opt('--help')}" for full documentation.`);
 			console.log();
 		});
 }

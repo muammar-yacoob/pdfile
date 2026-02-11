@@ -1,7 +1,7 @@
+import * as path from 'node:path';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import prompts from 'prompts';
-import * as path from 'node:path';
 import * as mergePdfs from '../../tools/merge-pdfs.js';
 
 export function registerMergePdfsCommand(program: Command): void {
@@ -11,10 +11,7 @@ export function registerMergePdfsCommand(program: Command): void {
 		.option('-o, --output <path>', 'Output file path')
 		.option('-y, --yes', 'Use defaults, skip prompts')
 		.action(
-			async (
-				files: string[],
-				options: { output?: string; yes?: boolean },
-			) => {
+			async (files: string[], options: { output?: string; yes?: boolean }) => {
 				try {
 					if (files.length < 2) {
 						console.error(
@@ -66,7 +63,9 @@ export function registerMergePdfsCommand(program: Command): void {
 					process.exit(success ? 0 : 1);
 				} catch (error) {
 					console.error(
-						chalk.red(`Error: ${error instanceof Error ? error.message : error}`),
+						chalk.red(
+							`Error: ${error instanceof Error ? error.message : error}`,
+						),
 					);
 					process.exit(1);
 				}

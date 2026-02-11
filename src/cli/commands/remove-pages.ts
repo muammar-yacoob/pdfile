@@ -1,14 +1,17 @@
+import * as path from 'node:path';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import prompts from 'prompts';
-import * as path from 'node:path';
 import * as removePages from '../../tools/remove-pages.js';
 
 export function registerRemovePagesCommand(program: Command): void {
 	program
 		.command('remove-pages <file>')
 		.description('Remove specific pages from a PDF')
-		.option('-p, --pages <pages>', 'Comma-separated page numbers to remove (e.g., "1,3,5")')
+		.option(
+			'-p, --pages <pages>',
+			'Comma-separated page numbers to remove (e.g., "1,3,5")',
+		)
 		.option('-o, --output <path>', 'Output file path')
 		.option('-y, --yes', 'Use defaults, skip prompts')
 		.action(
@@ -32,7 +35,8 @@ export function registerRemovePagesCommand(program: Command): void {
 						const response = await prompts({
 							type: 'text',
 							name: 'pages',
-							message: 'Enter page numbers to remove (comma-separated, e.g., 1,3,5):',
+							message:
+								'Enter page numbers to remove (comma-separated, e.g., 1,3,5):',
 							validate: (value) =>
 								value.trim().length > 0
 									? true
@@ -89,7 +93,9 @@ export function registerRemovePagesCommand(program: Command): void {
 					process.exit(success ? 0 : 1);
 				} catch (error) {
 					console.error(
-						chalk.red(`Error: ${error instanceof Error ? error.message : error}`),
+						chalk.red(
+							`Error: ${error instanceof Error ? error.message : error}`,
+						),
 					);
 					process.exit(1);
 				}

@@ -1,7 +1,7 @@
+import * as path from 'node:path';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import prompts from 'prompts';
-import * as path from 'node:path';
 import * as pdfToWord from '../../tools/pdf-to-word.js';
 
 export function registerPdfToWordCommand(program: Command): void {
@@ -47,7 +47,9 @@ export function registerPdfToWordCommand(program: Command): void {
 					process.exit(success ? 0 : 1);
 				} catch (error) {
 					console.error(
-						chalk.red(`Error: ${error instanceof Error ? error.message : error}`),
+						chalk.red(
+							`Error: ${error instanceof Error ? error.message : error}`,
+						),
 					);
 					process.exit(1);
 				}

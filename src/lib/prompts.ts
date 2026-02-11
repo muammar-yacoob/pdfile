@@ -23,7 +23,9 @@ export function isUsingDefaults(): boolean {
 /**
  * Set override values from CLI arguments
  */
-export function setOverrides(values: Record<string, string | number | boolean | string[]>): void {
+export function setOverrides(
+	values: Record<string, string | number | boolean | string[]>,
+): void {
 	Object.assign(overrides, values);
 }
 
@@ -39,7 +41,9 @@ export function clearOverrides(): void {
 /**
  * Get override value for a prompt message (matches substring)
  */
-function getOverride(message: string): string | number | boolean | string[] | undefined {
+function getOverride(
+	message: string,
+): string | number | boolean | string[] | undefined {
 	const msgLower = message.toLowerCase();
 	for (const [key, value] of Object.entries(overrides)) {
 		if (msgLower.includes(key.toLowerCase())) {
@@ -179,7 +183,9 @@ prompts.override({});
  * Pause and wait for user to press Enter (useful for errors in batch mode)
  * Only pauses when running with -y flag so user can see error messages
  */
-export async function pauseOnError(message = 'Press Enter to close...'): Promise<void> {
+export async function pauseOnError(
+	message = 'Press Enter to close...',
+): Promise<void> {
 	if (!useDefaults) return; // Interactive mode - no need to pause
 
 	console.log();

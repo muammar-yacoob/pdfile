@@ -1,7 +1,7 @@
+import * as path from 'node:path';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import prompts from 'prompts';
-import * as path from 'node:path';
 import * as addImageOverlay from '../../tools/add-image-overlay.js';
 
 export function registerAddImageOverlayCommand(program: Command): void {
@@ -9,8 +9,16 @@ export function registerAddImageOverlayCommand(program: Command): void {
 		.command('add-image <pdf> <image>')
 		.description('Add an image overlay to a PDF')
 		.option('-o, --output <path>', 'Output file path')
-		.option('-x, --x <number>', 'X position (default: center)', Number.parseFloat)
-		.option('-y, --y <number>', 'Y position (default: center)', Number.parseFloat)
+		.option(
+			'-x, --x <number>',
+			'X position (default: center)',
+			Number.parseFloat,
+		)
+		.option(
+			'-y, --y <number>',
+			'Y position (default: center)',
+			Number.parseFloat,
+		)
 		.option('-w, --width <number>', 'Image width', Number.parseFloat)
 		.option('-h, --height <number>', 'Image height', Number.parseFloat)
 		.option(
@@ -18,7 +26,10 @@ export function registerAddImageOverlayCommand(program: Command): void {
 			'Image opacity (0.0 to 1.0)',
 			Number.parseFloat,
 		)
-		.option('-p, --pages <pages>', 'Comma-separated page numbers (e.g., "1,3,5")')
+		.option(
+			'-p, --pages <pages>',
+			'Comma-separated page numbers (e.g., "1,3,5")',
+		)
 		.option('--yes', 'Use defaults, skip prompts')
 		.action(
 			async (
@@ -37,7 +48,9 @@ export function registerAddImageOverlayCommand(program: Command): void {
 			) => {
 				try {
 					if (!pdfFile.toLowerCase().endsWith('.pdf')) {
-						console.error(chalk.red('Error: First argument must be a PDF file'));
+						console.error(
+							chalk.red('Error: First argument must be a PDF file'),
+						);
 						process.exit(1);
 					}
 
@@ -113,7 +126,9 @@ export function registerAddImageOverlayCommand(program: Command): void {
 					process.exit(success ? 0 : 1);
 				} catch (error) {
 					console.error(
-						chalk.red(`Error: ${error instanceof Error ? error.message : error}`),
+						chalk.red(
+							`Error: ${error instanceof Error ? error.message : error}`,
+						),
 					);
 					process.exit(1);
 				}

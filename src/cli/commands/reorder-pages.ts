@@ -1,7 +1,7 @@
+import * as path from 'node:path';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import prompts from 'prompts';
-import * as path from 'node:path';
 import * as reorderPages from '../../tools/reorder-pages.js';
 
 export function registerReorderPagesCommand(program: Command): void {
@@ -51,7 +51,9 @@ export function registerReorderPagesCommand(program: Command): void {
 							.map((p: string) => Number.parseInt(p.trim(), 10));
 					} else {
 						console.error(
-							chalk.red('Error: --new-order option is required with --yes flag'),
+							chalk.red(
+								'Error: --new-order option is required with --yes flag',
+							),
 						);
 						process.exit(1);
 					}
@@ -89,7 +91,9 @@ export function registerReorderPagesCommand(program: Command): void {
 					process.exit(success ? 0 : 1);
 				} catch (error) {
 					console.error(
-						chalk.red(`Error: ${error instanceof Error ? error.message : error}`),
+						chalk.red(
+							`Error: ${error instanceof Error ? error.message : error}`,
+						),
 					);
 					process.exit(1);
 				}
@@ -125,9 +129,7 @@ export function registerReorderPagesCommand(program: Command): void {
 						process.exit(1);
 					}
 
-					console.log(
-						chalk.blue(`Moving page ${pageNumber} ${direction}...`),
-					);
+					console.log(chalk.blue(`Moving page ${pageNumber} ${direction}...`));
 
 					const success = await reorderPages.movePage(
 						file,
@@ -138,7 +140,9 @@ export function registerReorderPagesCommand(program: Command): void {
 					process.exit(success ? 0 : 1);
 				} catch (error) {
 					console.error(
-						chalk.red(`Error: ${error instanceof Error ? error.message : error}`),
+						chalk.red(
+							`Error: ${error instanceof Error ? error.message : error}`,
+						),
 					);
 					process.exit(1);
 				}

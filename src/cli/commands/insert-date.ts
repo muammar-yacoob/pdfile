@@ -1,7 +1,7 @@
+import * as path from 'node:path';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import prompts from 'prompts';
-import * as path from 'node:path';
 import * as insertDate from '../../tools/insert-date.js';
 
 export function registerInsertDateCommand(program: Command): void {
@@ -16,7 +16,10 @@ export function registerInsertDateCommand(program: Command): void {
 			'-f, --format <format>',
 			'Date format: MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, or "Month DD, YYYY"',
 		)
-		.option('-p, --pages <pages>', 'Comma-separated page numbers (e.g., "1,3,5")')
+		.option(
+			'-p, --pages <pages>',
+			'Comma-separated page numbers (e.g., "1,3,5")',
+		)
 		.option('--yes', 'Use defaults, skip prompts')
 		.action(
 			async (
@@ -38,8 +41,7 @@ export function registerInsertDateCommand(program: Command): void {
 					}
 
 					let outputPath = options.output;
-					let dateFormat: insertDate.DateInsertOptions['format'] =
-						'MM/DD/YYYY';
+					let dateFormat: insertDate.DateInsertOptions['format'] = 'MM/DD/YYYY';
 					let pageNumbers: number[] | undefined;
 
 					if (options.format) {
@@ -50,12 +52,11 @@ export function registerInsertDateCommand(program: Command): void {
 							'Month DD, YYYY',
 						];
 						if (validFormats.includes(options.format)) {
-							dateFormat = options.format as insertDate.DateInsertOptions['format'];
+							dateFormat =
+								options.format as insertDate.DateInsertOptions['format'];
 						} else {
 							console.error(
-								chalk.red(
-									`Invalid format. Use: ${validFormats.join(', ')}`,
-								),
+								chalk.red(`Invalid format. Use: ${validFormats.join(', ')}`),
 							);
 							process.exit(1);
 						}
@@ -85,9 +86,18 @@ export function registerInsertDateCommand(program: Command): void {
 								name: 'format',
 								message: 'Date format:',
 								choices: [
-									{ title: 'MM/DD/YYYY (e.g., 02/02/2026)', value: 'MM/DD/YYYY' },
-									{ title: 'DD/MM/YYYY (e.g., 02/02/2026)', value: 'DD/MM/YYYY' },
-									{ title: 'YYYY-MM-DD (e.g., 2026-02-02)', value: 'YYYY-MM-DD' },
+									{
+										title: 'MM/DD/YYYY (e.g., 02/02/2026)',
+										value: 'MM/DD/YYYY',
+									},
+									{
+										title: 'DD/MM/YYYY (e.g., 02/02/2026)',
+										value: 'DD/MM/YYYY',
+									},
+									{
+										title: 'YYYY-MM-DD (e.g., 2026-02-02)',
+										value: 'YYYY-MM-DD',
+									},
 									{
 										title: 'Month DD, YYYY (e.g., February 02, 2026)',
 										value: 'Month DD, YYYY',
@@ -132,7 +142,9 @@ export function registerInsertDateCommand(program: Command): void {
 					process.exit(success ? 0 : 1);
 				} catch (error) {
 					console.error(
-						chalk.red(`Error: ${error instanceof Error ? error.message : error}`),
+						chalk.red(
+							`Error: ${error instanceof Error ? error.message : error}`,
+						),
 					);
 					process.exit(1);
 				}

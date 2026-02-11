@@ -1,15 +1,15 @@
-import { PDFDocument } from 'pdf-lib';
-import pdfParse from 'pdf-parse';
-import {
-	Document,
-	Packer,
-	Paragraph,
-	TextRun,
-	HeadingLevel,
-	PageBreak,
-} from 'docx';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import {
+	Document,
+	HeadingLevel,
+	Packer,
+	PageBreak,
+	Paragraph,
+	TextRun,
+} from 'docx';
+import { PDFDocument } from 'pdf-lib';
+import pdfParse from 'pdf-parse';
 
 export interface PdfToWordConfig {
 	extensions: string[];

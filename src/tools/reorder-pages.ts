@@ -1,6 +1,6 @@
-import { PDFDocument } from 'pdf-lib';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { PDFDocument } from 'pdf-lib';
 
 export interface ReorderPagesConfig {
 	extensions: string[];
@@ -126,10 +126,7 @@ export async function movePage(
 		}
 
 		// Create new order
-		const currentOrder = Array.from(
-			{ length: totalPages },
-			(_, i) => i + 1,
-		);
+		const currentOrder = Array.from({ length: totalPages }, (_, i) => i + 1);
 
 		// Swap pages
 		[currentOrder[pageIndex], currentOrder[newIndex]] = [
