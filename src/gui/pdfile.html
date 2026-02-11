@@ -7,9 +7,11 @@
     <link rel="icon" href="img/logo.ico">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/flatpickr.min.css">
+    <link rel="stylesheet" href="/css/pickr-nano.min.css">
     <script src="/js/lucide.min.js"></script>
     <script src="/js/pdf.min.js"></script>
     <script src="/js/flatpickr.min.js"></script>
+    <script src="/js/pickr.min.js"></script>
     <script src="/js/color-picker.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -277,14 +279,14 @@
 
         .thumbnail-item {
             background: var(--bg);
-            border: 2px solid var(--brd);
-            border-radius: 4px;
+            border: 3px solid var(--brd);
+            border-radius: 6px;
             cursor: grab;
             position: relative;
             transition: all 0.2s;
             user-select: none;
+            overflow: hidden;
         }
-
 
         .thumbnail-item:hover {
             border-color: #7fa5df;
@@ -321,27 +323,10 @@
         }
 
         .thumbnail-item.selected {
-            border: 3px solid #7fa5df !important;
-            background: rgba(127, 165, 223, 0.15);
-            box-shadow: 0 0 12px rgba(127, 165, 223, 0.5);
+            border: 4px solid #ffffff !important;
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 0 0 1px rgba(127, 165, 223, 0.3), 0 0 16px rgba(127, 165, 223, 0.4);
             position: relative;
-        }
-
-        .thumbnail-item.selected::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 32px;
-            height: 32px;
-            background: #7fa5df;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-            z-index: 10;
         }
 
         .thumbnail-item.selected .thumbnail-checkmark {
@@ -349,16 +334,34 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 32px;
-            height: 32px;
+            width: 44px;
+            height: 44px;
             background: #7fa5df;
+            border: 3px solid #ffffff;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             pointer-events: none;
             z-index: 10;
-            color: white;
+            color: #ffffff;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        .thumbnail-item.selected .thumbnail-checkmark i {
+            width: 24px !important;
+            height: 24px !important;
+            stroke-width: 3.5px;
+        }
+
+        /* Dim unselected thumbnails when any page is selected */
+        .thumbnails-list:has(.thumbnail-item.selected) .thumbnail-item:not(.selected) {
+            opacity: 0.4;
+            filter: grayscale(0.3);
+        }
+
+        .thumbnails-list:has(.thumbnail-item.selected) .thumbnail-item:not(.selected):hover {
+            opacity: 0.7;
         }
 
         /* Center: PDF Preview */
@@ -452,52 +455,61 @@
 
         /* Hotkeys Display */
         .preview-hotkeys {
-            position: absolute;
-            bottom: 12px;
-            left: 12px;
+            position: fixed;
+            bottom: 20px;
+            left: 220px;
             background: rgba(26, 26, 29, 0.95);
             border: 1px solid var(--brd);
-            border-radius: 6px;
+            border-radius: 50%;
             z-index: 100;
             display: flex;
             flex-direction: column;
             backdrop-filter: blur(8px);
-            font-size: 10px;
+            font-size: 8px;
             color: var(--txt3);
             pointer-events: auto;
             cursor: pointer;
             transition: all 0.3s ease;
             overflow: hidden;
+            width: 24px;
+            height: 24px;
+        }
+
+        .preview-hotkeys.expanded {
+            border-radius: 6px;
+            width: auto;
+            height: auto;
         }
 
         .hotkey-icon {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 8px;
+            padding: 10px;
             color: var(--txt2);
             transition: color 0.2s;
+            flex-shrink: 0;
         }
 
         .preview-hotkeys:hover .hotkey-icon {
-            color: var(--blue);
+            color: #7fa5df;
         }
 
         .hotkey-content {
             display: flex;
             flex-direction: column;
             gap: 4px;
-            padding: 0 12px;
+            padding: 0;
             max-height: 0;
             opacity: 0;
             overflow: hidden;
             transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
         }
 
-        .preview-hotkeys:hover .hotkey-content {
+        .preview-hotkeys.expanded .hotkey-content {
             max-height: 200px;
             opacity: 1;
-            padding: 8px 12px;
+            padding: 0 12px 12px 12px;
         }
 
         .hotkey-item {
@@ -524,26 +536,26 @@
 
         /* Zoom Controls */
         .zoom-controls {
-            position: absolute;
-            bottom: 12px;
-            right: 12px;
+            position: fixed;
+            bottom: 20px;
+            right: 420px;
             background: rgba(26, 26, 29, 0.95);
             border: 1px solid var(--brd);
-            border-radius: 6px;
-            padding: 6px;
+            border-radius: 4px;
+            padding: 3px;
             z-index: 100;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 2px;
             backdrop-filter: blur(8px);
         }
 
         .zoom-btn {
             background: var(--bg2);
             border: 1px solid var(--brd);
-            border-radius: 4px;
-            width: 28px;
-            height: 28px;
+            border-radius: 3px;
+            width: 22px;
+            height: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -563,12 +575,12 @@
         }
 
         .zoom-display {
-            min-width: 50px;
+            min-width: 35px;
             text-align: center;
-            font-size: 11px;
+            font-size: 9px;
             font-weight: 600;
             color: var(--txt);
-            padding: 0 8px;
+            padding: 0 4px;
             font-variant-numeric: tabular-nums;
         }
 
@@ -1227,128 +1239,99 @@
         .color-input-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: space-between;
+            width: 100%;
         }
 
         .color-input-group label {
-            font-size: 10px;
+            font-size: 11px;
             color: var(--txt2);
             font-weight: 500;
+            flex-shrink: 0;
         }
 
-        /* Color Picker Component - Compact with Popover */
-        .color-picker-compact {
-            display: inline-block;
+        /* Pickr Color Picker Customization */
+        .pcr-button {
+            width: 32px !important;
+            height: 28px !important;
+            border-radius: 4px !important;
+            border: 1px solid var(--brd) !important;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease !important;
         }
 
-        .color-picker-box {
-            width: 32px;
-            height: 32px;
-            border-radius: 4px;
-            border: 2px solid var(--brd);
-            cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        .pcr-button:hover {
+            border-color: #7fa5df !important;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(127, 165, 223, 0.15) !important;
         }
 
-        .color-picker-box:hover {
-            border-color: #7fa5df;
-            box-shadow: 0 2px 8px rgba(127, 165, 223, 0.4);
+        .pcr-button:focus {
+            outline: none !important;
+            border-color: #7fa5df !important;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(127, 165, 223, 0.25) !important;
         }
 
-        .color-picker-popover {
-            position: fixed;
-            z-index: 10000;
-            background: var(--bg2);
-            border: 1px solid var(--brd);
-            border-radius: 8px;
-            padding: 12px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-            animation: fadeIn 0.15s ease-out;
+        .pcr-app {
+            background: var(--bg2) !important;
+            border: 1px solid var(--brd) !important;
+            border-radius: 6px !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+            padding: 12px !important;
         }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-8px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .pcr-app .pcr-selection {
+            margin-bottom: 10px !important;
         }
 
-        .color-picker-popover-content {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            width: 200px;
+        .pcr-app .pcr-selection .pcr-picker {
+            border-radius: 4px !important;
+            border: 1px solid var(--brd) !important;
         }
 
-        .color-picker-preview {
-            width: 100%;
-            height: 48px;
-            border-radius: 6px;
-            border: 2px solid var(--brd);
-            cursor: pointer;
-            transition: border-color 0.2s;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        .pcr-app .pcr-interaction {
+            padding: 8px 0 0 0 !important;
         }
 
-        .color-picker-preview:hover {
-            border-color: #7fa5df;
+        .pcr-app .pcr-interaction input {
+            background: var(--bg) !important;
+            color: var(--txt) !important;
+            border-color: var(--brd) !important;
+            border-radius: 4px !important;
+            font-size: 11px !important;
+            padding: 4px 6px !important;
         }
 
-        .color-picker-input {
-            width: 0;
-            height: 0;
-            opacity: 0;
-            position: absolute;
-            pointer-events: none;
+        .pcr-app .pcr-interaction .pcr-result {
+            background: var(--bg) !important;
+            color: var(--txt) !important;
+            border-color: var(--brd) !important;
+            border-radius: 4px !important;
+            font-size: 11px !important;
         }
 
-        .color-picker-eyedropper {
-            width: 100%;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            background: var(--bg3);
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            color: var(--txt2);
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 11px;
+        .pcr-app .pcr-interaction input:focus {
+            border-color: #7fa5df !important;
+            outline: none !important;
         }
 
-        .color-picker-eyedropper:hover {
-            background: var(--bg2);
-            border-color: #7fa5df;
-            color: #7fa5df;
+        .pcr-app .pcr-swatches {
+            margin-top: 8px !important;
         }
 
-        .color-picker-swatches {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
+        .pcr-app .pcr-swatches > button {
+            border-radius: 3px !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
         }
 
-        .color-swatch {
-            width: 100%;
-            aspect-ratio: 1;
-            border-radius: 4px;
-            border: 2px solid var(--brd);
-            cursor: pointer;
-            transition: all 0.2s;
-            padding: 0;
+        .pcr-eyedropper-btn {
+            font-size: 11px !important;
         }
 
-        .color-swatch:hover {
-            transform: scale(1.1);
-            border-color: #7fa5df;
-            box-shadow: 0 0 12px rgba(127, 165, 223, 0.5);
+        .pcr-eyedropper-btn:hover {
+            background: var(--bg3) !important;
+            border-color: #7fa5df !important;
+            color: #7fa5df !important;
         }
 
         /* Tabs */
@@ -1461,6 +1444,15 @@
 
         .modal-btn-primary:hover {
             background: #a3b8d9;
+        }
+
+        .modal-btn-danger {
+            background: #dc3545;
+            color: #fff;
+        }
+
+        .modal-btn-danger:hover {
+            background: #c82333;
         }
 
         .modal-btn-secondary {
@@ -1681,7 +1673,7 @@
                     </div>
 
                     <!-- Hotkeys Display (Bottom Left) -->
-                    <div class="preview-hotkeys">
+                    <div class="preview-hotkeys" id="previewHotkeys" onclick="toggleHotkeys()">
                         <div class="hotkey-icon">
                             <i data-lucide="info" style="width: 16px; height: 16px;"></i>
                         </div>
@@ -1712,6 +1704,10 @@
                         </button>
                         <button class="zoom-btn" onclick="PreviewController.zoomFit()" title="Fit to Width">
                             <i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <div style="width: 1px; height: 20px; background: var(--brd); margin: 0 4px;"></div>
+                        <button class="zoom-btn" id="darkModeBtn" onclick="PreviewController.toggleDarkMode()" title="Toggle Dark Background">
+                            <i data-lucide="moon" style="width: 14px; height: 14px;"></i>
                         </button>
                     </div>
 
@@ -1746,6 +1742,9 @@
                                 <button class="tool-btn" style="flex: 1; font-size: 10px;" onclick="browseImage()">
                                     <i data-lucide="image" style="width: 12px; height: 12px;"></i> Image
                                 </button>
+                                <button class="tool-btn" style="flex: 1; font-size: 10px;" onclick="UIControls.showRectangleEditor()">
+                                    <i data-lucide="square" style="width: 12px; height: 12px;"></i> Shape
+                                </button>
                             </div>
                             <input type="file" id="imageFile" accept="image/*" style="display: none;">
                         </div>
@@ -1772,6 +1771,30 @@
                                 </button>
                             </div>
                             <button class="tool-btn" id="addTextBtn" onclick="addTextOverlay()" disabled style="width: 100%;">Add Text</button>
+                        </div>
+
+                        <!-- Rectangle Editor Modal (hidden by default) -->
+                        <div id="rectangleEditorSection" style="display: none; padding: 12px; background: var(--bg); border: 1px solid var(--brd); border-radius: 4px; margin-bottom: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label class="form-label" style="margin: 0;">Shape Editor</label>
+                                <button onclick="UIControls.closeRectangleEditor()" style="background: none; border: none; color: var(--txt3); cursor: pointer; padding: 4px;">
+                                    <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                                </button>
+                            </div>
+                            <div class="form-group">
+                                <div class="color-input-group">
+                                    <label>Fill Color</label>
+                                    <div id="rectangleColorPicker"></div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Border Fade: <span id="rectangleBorderFadeValue">0</span>px</label>
+                                <input type="range" min="0" max="30" value="0" id="rectangleBorderFadeSlider" style="width: 100%;" oninput="UIControls.updateRectangleBorderFade(this.value)">
+                                <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">
+                                    Gradient fade at borders
+                                </div>
+                            </div>
+                            <button class="tool-btn" id="addRectangleBtn" onclick="addRectangleOverlay()" style="width: 100%;">Add Shape</button>
                         </div>
 
                         <!-- Selected Layer Editor (context-sensitive) -->
@@ -1820,55 +1843,40 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Text Style</label>
-                                    <div style="display: flex; gap: 8px;">
-                                        <label class="checkbox-label" style="flex: 1;">
-                                            <input type="checkbox" id="editBoldCheckbox" onchange="UIControls.updateLayerBold(this.checked)">
-                                            <span>Bold</span>
-                                        </label>
-                                        <label class="checkbox-label" style="flex: 1;">
-                                            <input type="checkbox" id="editItalicCheckbox" onchange="UIControls.updateLayerItalic(this.checked)">
-                                            <span>Italic</span>
-                                        </label>
-                                        <label class="checkbox-label" style="flex: 1;">
-                                            <input type="checkbox" id="editUnderlineCheckbox" onchange="UIControls.updateLayerUnderline(this.checked)">
-                                            <span>Underline</span>
-                                        </label>
+                                    <div style="display: flex; gap: 4px;">
+                                        <button class="tool-btn" id="boldBtn" onclick="UIControls.toggleBold()" title="Bold" style="flex: 1;">
+                                            <i data-lucide="bold" style="width: 14px; height: 14px;"></i>
+                                        </button>
+                                        <button class="tool-btn" id="italicBtn" onclick="UIControls.toggleItalic()" title="Italic" style="flex: 1;">
+                                            <i data-lucide="italic" style="width: 14px; height: 14px;"></i>
+                                        </button>
+                                        <button class="tool-btn" id="underlineBtn" onclick="UIControls.toggleUnderline()" title="Underline" style="flex: 1;">
+                                            <i data-lucide="underline" style="width: 14px; height: 14px;"></i>
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="form-group">
                                     <div class="color-input-group">
-                                        <div id="textColorPicker"></div>
                                         <label>Text Color</label>
+                                        <div id="textColorPicker"></div>
                                     </div>
                                 </div>
                                 <div class="form-group">
                                     <div class="color-input-group">
-                                        <div id="highlightColorPicker"></div>
                                         <label>Text Highlight</label>
+                                        <div id="highlightColorPicker"></div>
                                     </div>
                                 </div>
-                                <div class="form-group">
-                                    <div class="color-input-group">
-                                        <div id="bgColorPicker"></div>
-                                        <label>Background Box</label>
+                                <div class="form-group" id="highlightBlurGroup" style="display: none;">
+                                    <label class="form-label">Highlight Fade: <span id="highlightBlurValue">0</span>px</label>
+                                    <input type="range" min="0" max="20" value="0" id="highlightBlurSlider" style="width: 100%;" oninput="UIControls.updateHighlightBlur(this.value)">
+                                    <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">
+                                        Gradient fade at highlight edges
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Common controls (background, opacity) -->
-                            <div class="form-group">
-                                <label class="form-label" style="display: flex; align-items: center; justify-content: space-between;">
-                                    <span id="transparentBtnText">Background Box</span>
-                                    <label class="switch" style="margin: 0;">
-                                        <input type="checkbox" id="layerTransparentCheckbox" onchange="UIControls.toggleLayerTransparency()">
-                                        <span class="slider"></span>
-                                    </label>
-                                </label>
-                                <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;" id="transparentHelpText">
-                                    Show colored background box
-                                </div>
-                            </div>
-
+                            <!-- Common controls (opacity) -->
                             <div class="form-group">
                                 <label class="form-label">Layer Opacity: <span id="opacityValue">100</span>%</label>
                                 <input type="range" min="10" max="100" value="100" id="opacitySlider" style="width: 100%;" oninput="UIControls.updateLayerOpacity(this.value)">

@@ -72,10 +72,70 @@ async function loadInitialPDF() {
 
 			// Load PDF preview
 			const previewArea = document.getElementById('previewArea');
-			previewArea.innerHTML = `<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>`;
+			previewArea.innerHTML = `
+				<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>
+
+				<!-- Hotkeys Display (Bottom Left) -->
+				<div class="preview-hotkeys" id="previewHotkeys" onclick="toggleHotkeys()">
+					<div class="hotkey-icon">
+						<i data-lucide="keyboard" style="width: 16px; height: 16px;"></i>
+					</div>
+					<div class="hotkey-content">
+						<div class="hotkey-item">
+							<kbd>Ctrl</kbd><span>+</span><kbd>0</kbd><span>Toggle fit/100%</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>Ctrl</kbd><span>+</span><kbd>+/-</kbd><span>Zoom in/out</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>Ctrl</kbd><span>+</span><kbd>Scroll</kbd><span>Zoom</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>←↑↓→</kbd><span>Move overlay</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>Del</kbd><span>Delete</span>
+						</div>
+					</div>
+				</div>
+
+				<!-- Zoom Controls (Bottom Right) -->
+				<div class="zoom-controls">
+					<button class="zoom-btn" onclick="PreviewController.zoomOut()" title="Zoom Out (Ctrl+-)">
+						<i data-lucide="minus" style="width: 11px; height: 11px;"></i>
+					</button>
+					<div class="zoom-display" id="zoomDisplay">100%</div>
+					<button class="zoom-btn" onclick="PreviewController.zoomIn()" title="Zoom In (Ctrl++)">
+						<i data-lucide="plus" style="width: 11px; height: 11px;"></i>
+					</button>
+					<button class="zoom-btn" onclick="PreviewController.zoomFit()" title="Fit to Width (Ctrl+0)">
+						<i data-lucide="maximize-2" style="width: 11px; height: 11px;"></i>
+					</button>
+					<div style="width: 1px; height: 20px; background: var(--brd); margin: 0 4px;"></div>
+					<button class="zoom-btn" id="darkModeBtn" onclick="PreviewController.toggleDarkMode()" title="Toggle Dark Background">
+						<i data-lucide="moon" style="width: 11px; height: 11px;"></i>
+					</button>
+				</div>
+
+				<!-- Processing Overlay -->
+				<div class="processing-overlay" id="processingOverlay" style="display: none;">
+					<div class="processing-content">
+						<div class="processing-spinner"></div>
+						<div class="processing-text" id="processingText">Processing...</div>
+					</div>
+				</div>
+			`;
+
+			// Initialize Lucide icons for toolbar
+			if (window.lucide) {
+				window.lucide.createIcons();
+			}
 
 			// Setup zoom and pan interactions
 			PreviewController.setupInteraction();
+
+			// Initialize dark mode preference
+			PreviewController.initDarkMode();
 
 			// Auto-fit to width on initial load
 			zoomLevel = window.zoomLevel = 'fit';
@@ -140,14 +200,14 @@ async function loadPDFFile(file) {
 			<!-- Zoom Controls (Bottom Right) -->
 			<div class="zoom-controls">
 				<button class="zoom-btn" onclick="PreviewController.zoomOut()" title="Zoom Out (Scroll Down)">
-					<i data-lucide="minus" style="width: 14px; height: 14px;"></i>
+					<i data-lucide="minus" style="width: 11px; height: 11px;"></i>
 				</button>
 				<div class="zoom-display" id="zoomDisplay">100%</div>
 				<button class="zoom-btn" onclick="PreviewController.zoomIn()" title="Zoom In (Scroll Up)">
-					<i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+					<i data-lucide="plus" style="width: 11px; height: 11px;"></i>
 				</button>
 				<button class="zoom-btn" onclick="PreviewController.zoomFit()" title="Fit to Width">
-					<i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i>
+					<i data-lucide="maximize-2" style="width: 11px; height: 11px;"></i>
 				</button>
 			</div>
 		`;
@@ -758,30 +818,60 @@ function insertRecentImage(index) {
 	const img = recentImages[index];
 	if (!img) return;
 
-	const overlayIndex = AppState.getOverlays().length;
+	// Load image to get actual dimensions and aspect ratio
+	const imgElement = new Image();
+	imgElement.onload = () => {
+		const overlayIndex = AppState.getOverlays().length;
 
-	const canvas = document.getElementById('pdfCanvas');
-	const canvasWidth = canvas ? canvas.width : 1;
-	const canvasHeight = canvas ? canvas.height : 1;
+		const canvas = document.getElementById('pdfCanvas');
+		const canvasWidth = canvas ? canvas.width : 1;
+		const canvasHeight = canvas ? canvas.height : 1;
 
-	AppState.addOverlay({
-		type: 'image',
-		imageData: img.data,
-		x: 100,
-		y: 100,
-		width: 150,
-		height: 150,
-		opacity: 100,
-		removeBackground: false,
-		pageIndex: currentPreviewPage - 1,
-		canvasWidth,
-		canvasHeight,
-	});
+		// Calculate size maintaining aspect ratio
+		const aspectRatio = imgElement.width / imgElement.height;
+		let width, height;
 
-	AppState.markAsChanged(); // Track unsaved changes
+		if (aspectRatio > 1) {
+			// Wider than tall
+			width = 150;
+			height = width / aspectRatio;
+		} else {
+			// Taller than wide
+			height = 150;
+			width = height * aspectRatio;
+		}
 
-	addOverlayGizmo('image', 'Image', 100, 100, overlayIndex);
-	LayerManager.updateLayersList();
+		// Calculate center position for initial placement
+		const centerX = Math.max(0, (canvasWidth - width) / 2);
+		const centerY = Math.max(0, (canvasHeight - height) / 2);
+
+		AppState.addOverlay({
+			type: 'image',
+			imageData: img.data,
+			x: centerX,
+			y: centerY,
+			width: width,
+			height: height,
+			aspectRatio: aspectRatio,
+			opacity: 100,
+			removeBackground: false,
+			pageIndex: window.currentPreviewPage - 1,
+			canvasWidth,
+			canvasHeight,
+		});
+
+		AppState.markAsChanged(); // Track unsaved changes
+
+		window.GizmoManager.createGizmo('image', 'Image', centerX, centerY, overlayIndex);
+		LayerManager.updateLayersList();
+
+		// Auto-select the newly added overlay
+		if (window.SelectionManager) {
+			window.SelectionManager.selectOverlay(overlayIndex);
+		}
+	};
+
+	imgElement.src = img.data;
 }
 
 function openDatePicker() {
@@ -804,12 +894,19 @@ function addTextOverlay() {
 	const canvasWidth = canvas ? canvas.width : 1;
 	const canvasHeight = canvas ? canvas.height : 1;
 
+	// Calculate center position for initial placement
+	const baseFontSize = 12;
+	const estimatedWidth = baseFontSize * text.length * 0.6; // Rough estimate
+	const estimatedHeight = baseFontSize * 1.5;
+	const centerX = Math.max(0, (canvasWidth - estimatedWidth) / 2);
+	const centerY = Math.max(0, (canvasHeight - estimatedHeight) / 2);
+
 	AppState.addOverlay({
 		type: 'date', // Using date type since it handles text rendering
 		dateText: text,
 		dateFormat: textContentIsDate ? currentDateFormat : undefined, // Store format if it's a date
-		x: 100,
-		y: 100,
+		x: centerX,
+		y: centerY,
 		fontSize: 12, // Base font size, will be scaled by gizmo
 		baseFontSize: 12, // Store base font size for scaling
 		textColor: textColor,
@@ -817,7 +914,7 @@ function addTextOverlay() {
 		transparentBg: true, // Default to transparent
 		opacity: 100,
 		scale: 1,
-		pageIndex: currentPreviewPage - 1,
+		pageIndex: window.currentPreviewPage - 1,
 		// Font styling
 		fontFamily: 'Helvetica',
 		bold: false,
@@ -825,6 +922,7 @@ function addTextOverlay() {
 		underline: false,
 		// Text highlight
 		highlightColor: null,
+		highlightBlur: 0,
 		canvasWidth,
 		canvasHeight,
 	});
@@ -833,13 +931,62 @@ function addTextOverlay() {
 
 	// Add visual gizmo to preview
 	const label = text.length > 20 ? `${text.substring(0, 20)}...` : text;
-	addOverlayGizmo('text', label, 100, 100, overlayIndex);
+	window.GizmoManager.createGizmo('text', label, centerX, centerY, overlayIndex);
 
 	LayerManager.updateLayersList();
 	UIControls.closeTextEditor();
 
 	// Reset date flags
 	textContentIsDate = false;
+
+	// Auto-select the newly added overlay
+	if (window.SelectionManager) {
+		window.SelectionManager.selectOverlay(overlayIndex);
+	}
+}
+
+function addRectangleOverlay() {
+	if (!currentPdfFile) return;
+
+	const overlayIndex = AppState.getOverlays().length;
+
+	const canvas = document.getElementById('pdfCanvas');
+	const canvasWidth = canvas ? canvas.width : 1;
+	const canvasHeight = canvas ? canvas.height : 1;
+
+	// Calculate center position for initial placement
+	const rectWidth = 200;
+	const rectHeight = 150;
+	const centerX = Math.max(0, (canvasWidth - rectWidth) / 2);
+	const centerY = Math.max(0, (canvasHeight - rectHeight) / 2);
+
+	AppState.addOverlay({
+		type: 'rectangle',
+		x: centerX,
+		y: centerY,
+		width: rectWidth,
+		height: rectHeight,
+		fillColor: window.selectedRectangleColor || '#000000',
+		fillAlpha: window.selectedRectangleAlpha || 0.5,
+		borderFade: window.selectedRectangleBorderFade || 0,
+		opacity: 100,
+		pageIndex: window.currentPreviewPage - 1,
+		canvasWidth,
+		canvasHeight,
+	});
+
+	AppState.markAsChanged();
+
+	// Add visual gizmo to preview
+	window.GizmoManager.createGizmo('rectangle', 'Shape', centerX, centerY, overlayIndex);
+
+	LayerManager.updateLayersList();
+	UIControls.closeRectangleEditor();
+
+	// Auto-select the newly added overlay
+	if (window.SelectionManager) {
+		window.SelectionManager.selectOverlay(overlayIndex);
+	}
 }
 
 async function convertToWord() {
@@ -941,6 +1088,8 @@ async function removeSelectedPages() {
 				showModal('Error', `Failed to remove pages: ${err.message}`);
 			}
 		},
+		null,
+		true,
 	);
 }
 
@@ -962,7 +1111,7 @@ function handleEmailShare() {
 }
 
 // ===== GIZMO & MERGE FUNCTIONS ===== (moved to gizmo-manager.js and merge-handler.js)
-// Functions are available via window.addOverlayGizmo, window.removeOverlay, window.mergeFiles, etc.
+// Functions are available via window.GizmoManager.createGizmo, window.GizmoManager.removeOverlay, window.mergeFiles, etc.
 
 // ===== LAYERS MANAGEMENT =====
 // Old functions removed - now using LayerManager and SelectionManager modules
@@ -1046,7 +1195,7 @@ async function handleImageDrop(file) {
 					aspectRatio: aspectRatio, // Store for resize operations
 					opacity: 100,
 					removeBackground: false,
-					pageIndex: currentPreviewPage - 1,
+					pageIndex: window.currentPreviewPage - 1,
 					canvasWidth,
 					canvasHeight,
 				});
@@ -1055,14 +1204,14 @@ async function handleImageDrop(file) {
 
 				// Add visual gizmo to preview
 				const label = isLargeImage ? 'Image (Full Page)' : 'Image';
-				addOverlayGizmo(
+				window.GizmoManager.createGizmo(
 					'image',
 					label,
 					Math.max(0, x),
 					Math.max(0, y),
 					overlayIndex,
 				);
-				updateLayersList();
+				window.LayerManager.updateLayersList();
 
 				console.log(
 					`Image dropped: ${file.name} (${img.width}x${img.height}) - ${isLargeImage ? 'large' : 'small'} - centered at (${x}, ${y})`,
@@ -1225,16 +1374,22 @@ document.addEventListener('DOMContentLoaded', () => {
 			const canvasWidth = canvas ? canvas.width : 1;
 			const canvasHeight = canvas ? canvas.height : 1;
 
+			// Calculate center position for initial placement
+			const imgWidth = 150;
+			const imgHeight = 150;
+			const centerX = Math.max(0, (canvasWidth - imgWidth) / 2);
+			const centerY = Math.max(0, (canvasHeight - imgHeight) / 2);
+
 			const overlayData = {
 				type: 'image',
 				imageData: imageData,
-				x: 100,
-				y: 100,
-				width: 150,
-				height: 150,
+				x: centerX,
+				y: centerY,
+				width: imgWidth,
+				height: imgHeight,
 				opacity: 100,
 				removeBackground: false,
-				pageIndex: currentPreviewPage - 1,
+				pageIndex: window.currentPreviewPage - 1,
 				canvasWidth,
 				canvasHeight,
 			};
@@ -1243,7 +1398,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			AppState.markAsChanged(); // Track unsaved changes
 
 			// Add visual gizmo to preview
-			addOverlayGizmo('image', 'Image', 100, 100, overlayIndex);
+			window.GizmoManager.createGizmo('image', 'Image', centerX, centerY, overlayIndex);
 			LayerManager.updateLayersList();
 
 			// Clear file input
@@ -1316,10 +1471,10 @@ document.addEventListener('DOMContentLoaded', () => {
 			'#ff00ff',
 			'#00ffff',
 		],
-		onChange: (color) => {
+		onChange: (color, alpha) => {
 			selectedTextColor = color;
 			window.selectedTextColor = color;
-			UIControls.updateLayerColor(color, false);
+			UIControls.updateLayerColor(color, false, alpha);
 		},
 	});
 
@@ -1327,31 +1482,6 @@ document.addEventListener('DOMContentLoaded', () => {
 	selectedTextColor = textColorPicker.getColor();
 	window.selectedTextColor = selectedTextColor;
 	window.textColorPicker = textColorPicker;
-
-	bgColorPicker = new ColorPicker({
-		container: '#bgColorPicker',
-		default: '#ffffff',
-		label: 'Background Color',
-		swatches: [
-			'#ffffff',
-			'#000000',
-			'#ffff00',
-			'#00ffff',
-			'#ff00ff',
-			'#c0c0c0',
-			'#808080',
-		],
-		onChange: (color) => {
-			selectedBgColor = color;
-			window.selectedBgColor = color;
-			UIControls.updateLayerColor(color, true);
-		},
-	});
-
-	// Initialize selected color
-	selectedBgColor = bgColorPicker.getColor();
-	window.selectedBgColor = selectedBgColor;
-	window.bgColorPicker = bgColorPicker;
 
 	// Highlight Color Picker
 	highlightColorPicker = new ColorPicker({
@@ -1368,7 +1498,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			'#add8e6',
 			'#90ee90',
 		],
-		onChange: (color) => {
+		onChange: (color, alpha) => {
 			selectedHighlightColor = color;
 			window.selectedHighlightColor = color;
 			// Update current layer's highlight color
@@ -1376,8 +1506,12 @@ document.addEventListener('DOMContentLoaded', () => {
 			if (index !== null) {
 				AppState.updateOverlay(index, {
 					highlightColor: color,
+					highlightAlpha: alpha,
 				});
-				window.PreviewController?.renderPage(window.currentPreviewPage);
+				// Update gizmo visual to show highlight
+				if (window.GizmoManager) {
+					window.GizmoManager.updateGizmoFromOverlay(index);
+				}
 			}
 		},
 	});
@@ -1386,6 +1520,33 @@ document.addEventListener('DOMContentLoaded', () => {
 	selectedHighlightColor = null; // Default: no highlight
 	window.selectedHighlightColor = selectedHighlightColor;
 	window.highlightColorPicker = highlightColorPicker;
+
+	// Rectangle Color Picker
+	rectangleColorPicker = new ColorPicker({
+		container: '#rectangleColorPicker',
+		default: '#000000',
+		alpha: 0.5,
+		label: 'Rectangle Color',
+		swatches: [
+			'#000000',
+			'#ffffff',
+			'#ff0000',
+			'#00ff00',
+			'#0000ff',
+			'#ffff00',
+			'#ff00ff',
+			'#00ffff',
+		],
+		onChange: (color, alpha) => {
+			window.selectedRectangleColor = color;
+			window.selectedRectangleAlpha = alpha;
+		},
+	});
+
+	window.selectedRectangleColor = '#000000';
+	window.selectedRectangleAlpha = 0.5;
+	window.selectedRectangleBorderFade = 0;
+	window.rectangleColorPicker = rectangleColorPicker;
 
 	// Set up drag & drop for PDF, image, and document files
 	const thumbnailsPanel = document.getElementById('thumbnailsPanel');
@@ -1486,4 +1647,21 @@ document.addEventListener('DOMContentLoaded', () => {
 			return '';
 		}
 	});
+});
+
+// ===== HOTKEYS TOGGLE =====
+function toggleHotkeys(e) {
+	if (e) e.stopPropagation();
+	const hotkeysElement = document.getElementById('previewHotkeys');
+	if (hotkeysElement) {
+		hotkeysElement.classList.toggle('expanded');
+	}
+}
+
+// Close hotkeys when clicking outside
+document.addEventListener('click', (e) => {
+	const hotkeysElement = document.getElementById('previewHotkeys');
+	if (hotkeysElement && !hotkeysElement.contains(e.target)) {
+		hotkeysElement.classList.remove('expanded');
+	}
 });

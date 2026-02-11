@@ -21,6 +21,28 @@ const KeyboardHandler = (() => {
 			return;
 		}
 
+		// Zoom shortcuts (work globally)
+		if (e.ctrlKey || e.metaKey) {
+			// Ctrl+0 or Ctrl+F: Fit to width
+			if (e.key === '0' || e.key.toLowerCase() === 'f') {
+				e.preventDefault();
+				window.PreviewController?.zoomFit();
+				return;
+			}
+			// Ctrl++ or Ctrl+=: Zoom in
+			if (e.key === '+' || e.key === '=') {
+				e.preventDefault();
+				window.PreviewController?.zoomIn();
+				return;
+			}
+			// Ctrl+-: Zoom out
+			if (e.key === '-' || e.key === '_') {
+				e.preventDefault();
+				window.PreviewController?.zoomOut();
+				return;
+			}
+		}
+
 		// Only handle arrow keys when an overlay is selected
 		const selectedIndex = window.AppState?.getSelectedIndex();
 		if (selectedIndex === null || selectedIndex === undefined) return;

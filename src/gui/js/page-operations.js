@@ -4,25 +4,53 @@ const PageOperations = {
 	draggedElement: null,
 
 	selectPage(pageNum, isSelected) {
+		console.log(`[selectPage] Called with pageNum=${pageNum}, isSelected=${isSelected}`);
+		console.log(`[selectPage] BEFORE - lastSelectedPage=${window.lastSelectedPage}, selectedPages=`, Array.from(window.selectedPages || []));
+
 		if (isSelected) {
 			window.selectedPages.add(pageNum);
 			window.lastSelectedPage = pageNum;
-			// Show the selected page in preview (always show the last selected one)
-			window.PreviewController?.renderPage(pageNum);
+			window.AppState?.setLastSelectedPage(pageNum);
+			console.log(`[selectPage] SELECTED - Set lastSelectedPage to ${pageNum}`);
 		} else {
 			window.selectedPages.delete(pageNum);
-			window.lastSelectedPage =
+			const newLast =
 				window.selectedPages.size > 0
 					? Array.from(window.selectedPages)[0]
 					: null;
+			window.lastSelectedPage = newLast;
+			window.AppState?.setLastSelectedPage(newLast);
+			console.log(`[selectPage] DESELECTED - Set lastSelectedPage to ${newLast}`);
 		}
 
-		// If we have a selection, preview the last selected page
-		if (window.selectedPages.size > 0 && window.lastSelectedPage) {
-			window.PreviewController?.renderPage(window.lastSelectedPage);
+		// Always preview the last selected page using original page number
+		if (window.lastSelectedPage) {
+			const originalPageNum = this.getOriginalPageNumber(window.lastSelectedPage);
+			console.log(`[selectPage] About to render original page ${originalPageNum}`);
+			window.PreviewController?.renderPage(originalPageNum);
+		} else {
+			console.log(`[selectPage] No lastSelectedPage to render`);
 		}
 
 		this.updateSelectionUI();
+	},
+
+	// Get the original page number (before reordering) for a display page number
+	getOriginalPageNumber(displayPageNum) {
+		const items = document.querySelectorAll('.thumbnail-item');
+		for (const item of items) {
+			if (Number.parseInt(item.dataset.pageNum) === displayPageNum) {
+				// Use originalPage if it exists (pages were reordered), otherwise use pageNum
+				const originalPageNum = Number.parseInt(item.dataset.originalPage || item.dataset.pageNum);
+				console.log(`[getOriginalPageNumber] display=${displayPageNum} -> original=${originalPageNum}, dataset:`, {
+					pageNum: item.dataset.pageNum,
+					originalPage: item.dataset.originalPage
+				});
+				return originalPageNum;
+			}
+		}
+		console.log(`[getOriginalPageNumber] No match found for display=${displayPageNum}, returning fallback`);
+		return displayPageNum; // Fallback
 	},
 
 	updateSelectionUI() {
@@ -231,7 +259,9 @@ const PageOperations = {
 
 		// Update lastSelectedPage with new page number
 		if (window.lastSelectedPage && oldToNew.has(window.lastSelectedPage)) {
-			window.lastSelectedPage = oldToNew.get(window.lastSelectedPage);
+			const newLast = oldToNew.get(window.lastSelectedPage);
+			window.lastSelectedPage = newLast;
+			window.AppState?.setLastSelectedPage(newLast);
 		}
 
 		// Refresh visual selection with checkmarks
@@ -284,10 +314,10 @@ const PageOperations = {
 			return;
 		}
 
-		// Get current page order from thumbnails
+		// Get current page order from thumbnails using original page numbers
 		const items = document.querySelectorAll('.thumbnail-item');
 		const pageOrder = Array.from(items).map((item) =>
-			Number.parseInt(item.dataset.pageNum),
+			Number.parseInt(item.dataset.originalPage || item.dataset.pageNum),
 		);
 
 		showConfirmModal(

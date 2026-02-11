@@ -30,6 +30,7 @@ export interface DateInsertOptions {
 	underline?: boolean;
 	// Text highlight (background behind text)
 	highlightColor?: { r: number; g: number; b: number };
+	highlightBlur?: number; // Gradient fade width at highlight edges (in pixels)
 }
 
 /**
@@ -221,20 +222,54 @@ export async function insertDate(
 				});
 			}
 
-			// Draw text highlight if specified (filled rectangle behind text)
+			// Draw text highlight if specified (filled rectangle behind text with gradient fade)
 			if (options.highlightColor) {
-				const highlightPadding = 2;
+				const highlightPadding = 0.5; // Minimal padding for tight fit
+				const blurWidth = (options as any).highlightBlur || 0; // Gradient fade width
+				const borderRadius = 1.5; // Slight rounding for softer look
+
+				const baseX = x - highlightPadding;
+				const baseY = y - highlightPadding;
+				const baseWidth = textWidth + highlightPadding * 2;
+				const baseHeight = textHeight + highlightPadding * 2;
+
+				if (blurWidth > 0) {
+					// Draw gradient fade: multiple layers with decreasing opacity
+					const steps = Math.ceil(blurWidth / 2); // Number of gradient steps
+					for (let i = steps; i > 0; i--) {
+						const offset = (blurWidth / steps) * i;
+						const opacity = 0.7 * (1 - i / (steps + 1)); // Fade from transparent to 70%
+
+						page.drawRectangle({
+							x: baseX - offset,
+							y: baseY - offset,
+							width: baseWidth + offset * 2,
+							height: baseHeight + offset * 2,
+							color: rgb(
+								options.highlightColor.r,
+								options.highlightColor.g,
+								options.highlightColor.b,
+							),
+							opacity: opacity,
+							borderRadius: borderRadius + offset * 0.2,
+							rotate: { angle: rotation, type: 'degrees' },
+						});
+					}
+				}
+
+				// Draw main highlight rectangle
 				page.drawRectangle({
-					x: x - highlightPadding,
-					y: y - highlightPadding,
-					width: textWidth + highlightPadding * 2,
-					height: textHeight + highlightPadding * 2,
+					x: baseX,
+					y: baseY,
+					width: baseWidth,
+					height: baseHeight,
 					color: rgb(
 						options.highlightColor.r,
 						options.highlightColor.g,
 						options.highlightColor.b,
 					),
 					opacity: 0.7, // Slightly transparent for highlight effect
+					borderRadius: borderRadius,
 					rotate: { angle: rotation, type: 'degrees' },
 				});
 			}

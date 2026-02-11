@@ -33,10 +33,12 @@ const PreviewController = {
 	},
 
 	async renderPage(pageNum) {
+		console.log(`[PreviewController.renderPage] Called with pageNum=${pageNum}`);
 		if (!window.pdfDocument) return;
 
 		// If already rendering, queue this render
 		if (this.isRendering) {
+			console.log(`[PreviewController.renderPage] Already rendering, queueing page ${pageNum}`);
 			this.pendingRender = pageNum;
 			return;
 		}
@@ -60,6 +62,7 @@ const PreviewController = {
 			}
 
 			window.currentPreviewPage = pageNum;
+			console.log(`[PreviewController.renderPage] Set currentPreviewPage to ${pageNum}, about to getPage(${pageNum})`);
 			const page = await window.pdfDocument.getPage(pageNum);
 
 			// Calculate scale
@@ -145,7 +148,12 @@ const PreviewController = {
 	},
 
 	zoomFit() {
-		this.setZoom('fit');
+		// Toggle between fit mode and actual size (100%)
+		if (window.zoomLevel === 'fit') {
+			this.setZoom(1.0); // Go to actual size
+		} else {
+			this.setZoom('fit'); // Go to fit
+		}
 	},
 
 	updateZoomDisplay() {
@@ -157,6 +165,69 @@ const PreviewController = {
 		} else {
 			const percentage = Math.round(window.zoomLevel * 100);
 			display.textContent = `${percentage}%`;
+		}
+
+		// Update fit button icon and tooltip
+		this.updateFitButton();
+	},
+
+	updateFitButton() {
+		const fitBtn = document.querySelector('.zoom-controls button:nth-child(4)'); // 4th button is fit
+		if (!fitBtn) return;
+
+		const icon = fitBtn.querySelector('i');
+		if (!icon) return;
+
+		if (window.zoomLevel === 'fit') {
+			// Currently at fit, button should show "go to actual size"
+			icon.setAttribute('data-lucide', 'scan');
+			fitBtn.setAttribute('title', 'Actual Size (Ctrl+0)');
+		} else {
+			// Currently at specific zoom, button should show "go to fit"
+			icon.setAttribute('data-lucide', 'maximize-2');
+			fitBtn.setAttribute('title', 'Fit to Width (Ctrl+0)');
+		}
+
+		// Refresh Lucide icons
+		if (window.lucide) window.lucide.createIcons();
+	},
+
+	toggleDarkMode() {
+		const previewArea = document.getElementById('previewArea');
+		const darkModeBtn = document.getElementById('darkModeBtn');
+		if (!previewArea || !darkModeBtn) return;
+
+		const isDark = previewArea.classList.toggle('dark-mode');
+
+		// Also toggle on body for global dark mode (affects thumbnails)
+		document.body.classList.toggle('dark-mode', isDark);
+
+		// Update button icon
+		const icon = darkModeBtn.querySelector('i');
+		if (icon) {
+			icon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+			if (window.lucide) window.lucide.createIcons();
+		}
+
+		// Store preference
+		localStorage.setItem('previewDarkMode', isDark ? 'true' : 'false');
+	},
+
+	initDarkMode() {
+		const previewArea = document.getElementById('previewArea');
+		const darkModeBtn = document.getElementById('darkModeBtn');
+		if (!previewArea || !darkModeBtn) return;
+
+		// Restore preference
+		const isDark = localStorage.getItem('previewDarkMode') === 'true';
+		if (isDark) {
+			previewArea.classList.add('dark-mode');
+			document.body.classList.add('dark-mode');
+			const icon = darkModeBtn.querySelector('i');
+			if (icon) {
+				icon.setAttribute('data-lucide', 'sun');
+				if (window.lucide) window.lucide.createIcons();
+			}
 		}
 	},
 
@@ -209,7 +280,7 @@ const PreviewController = {
 
 				// Use correct function name
 				if (window.GizmoManager) {
-					window.GizmoManager.addOverlayGizmo(overlay.type, label, scaledX, scaledY, i);
+					window.GizmoManager.createGizmo(overlay.type, label, scaledX, scaledY, i);
 				}
 
 				// Restore original overlay data
@@ -227,10 +298,13 @@ const PreviewController = {
 		previewArea.parentNode.replaceChild(newPreviewArea, previewArea);
 		const area = newPreviewArea;
 
-		// Mouse wheel zoom towards cursor
+		// Mouse wheel zoom towards cursor (only with Ctrl key)
 		area.addEventListener(
 			'wheel',
 			(e) => {
+				// Only zoom if Ctrl key is pressed
+				if (!e.ctrlKey) return;
+
 				e.preventDefault();
 
 				// Smooth zoom with smaller increments

@@ -15,35 +15,57 @@ const UIControls = (() => {
 		}
 	}
 
+	function showRectangleEditor() {
+		document.getElementById('rectangleEditorSection').style.display = 'block';
+		document.getElementById('selectedLayerEditor').style.display = 'none';
+		document.getElementById('textEditorSection').style.display = 'none';
+
+		// Reset rectangle editor state
+		window.selectedRectangleColor = '#000000';
+		window.selectedRectangleBorderFade = 0;
+
+		const fadeSlider = document.getElementById('rectangleBorderFadeSlider');
+		const fadeValue = document.getElementById('rectangleBorderFadeValue');
+		if (fadeSlider) fadeSlider.value = 0;
+		if (fadeValue) fadeValue.textContent = 0;
+	}
+
+	function closeRectangleEditor() {
+		document.getElementById('rectangleEditorSection').style.display = 'none';
+	}
+
+	function updateRectangleBorderFade(fadeWidth) {
+		const fadeValue = document.getElementById('rectangleBorderFadeValue');
+		if (fadeValue) {
+			fadeValue.textContent = fadeWidth;
+		}
+		window.selectedRectangleBorderFade = Number.parseFloat(fadeWidth);
+	}
+
 	function showLayerEditor(overlay, index) {
 		const editor = document.getElementById('selectedLayerEditor');
 		const textControls = document.getElementById('textLayerControls');
-		const transparentCheckbox = document.getElementById(
-			'layerTransparentCheckbox',
-		);
-		const transparentBtnText = document.getElementById('transparentBtnText');
-		const transparentHelpText = document.getElementById('transparentHelpText');
 		const titleEl = document.getElementById('selectedLayerTitle');
 		const opacitySlider = document.getElementById('opacitySlider');
 		const opacityValue = document.getElementById('opacityValue');
 
 		editor.style.display = 'block';
 		document.getElementById('textEditorSection').style.display = 'none';
+		document.getElementById('rectangleEditorSection').style.display = 'none';
 
 		const isText = overlay.type === 'date' || overlay.type === 'text';
-		titleEl.textContent = isText ? 'Edit Text' : 'Edit Image';
+		const isRectangle = overlay.type === 'rectangle';
+
+		if (isRectangle) {
+			titleEl.textContent = 'Edit Shape';
+		} else {
+			titleEl.textContent = isText ? 'Edit Text' : 'Edit Image';
+		}
+
 		textControls.style.display = isText ? 'block' : 'none';
 
-		if (isText) {
-			transparentBtnText.textContent = 'Background Box';
-			transparentHelpText.textContent = 'Show colored background box';
-			const hasBg = !overlay.transparentBg && overlay.bgColor;
-			transparentCheckbox.checked = hasBg;
-		} else {
-			transparentBtnText.textContent = 'Remove Background';
-			transparentHelpText.textContent = 'Remove image background (uses AI)';
-			transparentCheckbox.checked = overlay.removeBackground || false;
-
+		// Handle background removal for images (not text)
+		if (!isText && !isRectangle) {
 			// Apply background removal preview if enabled and not already processed
 			if (
 				overlay.removeBackground &&
@@ -67,14 +89,35 @@ const UIControls = (() => {
 				fontFamilySelect.value = overlay.fontFamily || 'Helvetica';
 			}
 
-			// Text style checkboxes
-			const boldCheckbox = document.getElementById('editBoldCheckbox');
-			const italicCheckbox = document.getElementById('editItalicCheckbox');
-			const underlineCheckbox = document.getElementById('editUnderlineCheckbox');
-			if (boldCheckbox) boldCheckbox.checked = overlay.bold || false;
-			if (italicCheckbox) italicCheckbox.checked = overlay.italic || false;
-			if (underlineCheckbox)
-				underlineCheckbox.checked = overlay.underline || false;
+			// Text style button state
+			const textStyleIcon = document.getElementById('textStyleIcon');
+			const textStyleLabel = document.getElementById('textStyleLabel');
+			const bold = overlay.bold || false;
+			const italic = overlay.italic || false;
+			const underline = overlay.underline || false;
+
+			// Determine current style
+			const styles = [
+				{ bold: false, italic: false, underline: false, icon: 'type', label: 'Regular' },
+				{ bold: true, italic: false, underline: false, icon: 'bold', label: 'Bold' },
+				{ bold: false, italic: true, underline: false, icon: 'italic', label: 'Italic' },
+				{ bold: false, italic: false, underline: true, icon: 'underline', label: 'Underline' },
+				{ bold: true, italic: true, underline: false, icon: 'bold', label: 'Bold Italic' },
+				{ bold: true, italic: false, underline: true, icon: 'bold', label: 'Bold Underline' },
+				{ bold: false, italic: true, underline: true, icon: 'italic', label: 'Italic Underline' },
+				{ bold: true, italic: true, underline: true, icon: 'bold', label: 'Bold Italic Underline' },
+			];
+			const currentStyle = styles.find(
+				s => s.bold === bold && s.italic === italic && s.underline === underline
+			) || styles[0];
+
+			if (textStyleIcon) {
+				textStyleIcon.setAttribute('data-lucide', currentStyle.icon);
+				if (window.lucide) window.lucide.createIcons();
+			}
+			if (textStyleLabel) {
+				textStyleLabel.textContent = currentStyle.label;
+			}
 
 			if (window.textColorPicker) {
 				const textColor = overlay.textColor || '#000000';
@@ -86,6 +129,19 @@ const UIControls = (() => {
 				const highlightColor = overlay.highlightColor || '#ffff00';
 				window.highlightColorPicker.setColor(highlightColor);
 				window.selectedHighlightColor = highlightColor;
+			}
+
+			// Show/update highlight blur slider if highlight is enabled
+			const highlightBlurGroup = document.getElementById('highlightBlurGroup');
+			const highlightBlurSlider = document.getElementById('highlightBlurSlider');
+			const highlightBlurValue = document.getElementById('highlightBlurValue');
+			if (overlay.highlightColor) {
+				if (highlightBlurGroup) highlightBlurGroup.style.display = 'block';
+				const blurWidth = overlay.highlightBlur || 0;
+				if (highlightBlurSlider) highlightBlurSlider.value = blurWidth;
+				if (highlightBlurValue) highlightBlurValue.textContent = blurWidth;
+			} else {
+				if (highlightBlurGroup) highlightBlurGroup.style.display = 'none';
 			}
 
 			if (window.bgColorPicker) {
@@ -258,7 +314,7 @@ const UIControls = (() => {
 		LayerManager.updateLayersList();
 	}
 
-	function updateLayerColor(color, isBackground = false) {
+	function updateLayerColor(color, isBackground = false, alpha = 1.0) {
 		const index = AppState.getSelectedIndex();
 		if (index === null) return;
 
@@ -268,26 +324,41 @@ const UIControls = (() => {
 		if (isBackground) {
 			window.selectedBgColor = color;
 			if (!overlay.transparentBg) {
-				AppState.updateOverlay(index, { bgColor: color });
+				AppState.updateOverlay(index, { bgColor: color, bgAlpha: alpha });
 				const gizmo = document.querySelector(
 					`.overlay-gizmo[data-overlay-index="${index}"]`,
 				);
 				if (gizmo) {
 					const textEl = gizmo.querySelector('.overlay-gizmo-text');
-					if (textEl) textEl.style.backgroundColor = color;
+					if (textEl) {
+						const rgba = hexToRgba(color, alpha);
+						textEl.style.backgroundColor = rgba;
+					}
 				}
 			}
 		} else {
 			window.selectedTextColor = color;
-			AppState.updateOverlay(index, { textColor: color });
+			AppState.updateOverlay(index, { textColor: color, textAlpha: alpha });
 			const gizmo = document.querySelector(
 				`.overlay-gizmo[data-overlay-index="${index}"]`,
 			);
 			if (gizmo) {
 				const textEl = gizmo.querySelector('.overlay-gizmo-text');
-				if (textEl) textEl.style.color = color;
+				if (textEl) {
+					const rgba = hexToRgba(color, alpha);
+					textEl.style.color = rgba;
+				}
 			}
 		}
+	}
+
+	// Helper function to convert hex + alpha to rgba
+	function hexToRgba(hex, alpha) {
+		hex = hex.replace('#', '');
+		const r = Number.parseInt(hex.substring(0, 2), 16);
+		const g = Number.parseInt(hex.substring(2, 4), 16);
+		const b = Number.parseInt(hex.substring(4, 6), 16);
+		return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 	}
 
 	function updateLayerFontFamily(fontFamily) {
@@ -400,6 +471,12 @@ const UIControls = (() => {
 		window.selectedHighlightColor = color;
 		AppState.updateOverlay(index, { highlightColor: color });
 
+		// Show blur slider if highlight is enabled
+		const highlightBlurGroup = document.getElementById('highlightBlurGroup');
+		if (highlightBlurGroup) {
+			highlightBlurGroup.style.display = color ? 'block' : 'none';
+		}
+
 		// Update gizmo visual
 		const gizmo = document.querySelector(
 			`.overlay-gizmo[data-overlay-index="${index}"]`,
@@ -415,9 +492,113 @@ const UIControls = (() => {
 		window.PreviewController?.renderPage(window.currentPreviewPage);
 	}
 
+	function updateHighlightBlur(blurWidth) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		// Update value display
+		const highlightBlurValue = document.getElementById('highlightBlurValue');
+		if (highlightBlurValue) {
+			highlightBlurValue.textContent = blurWidth;
+		}
+
+		// Store blur width in overlay
+		AppState.updateOverlay(index, { highlightBlur: Number.parseFloat(blurWidth) });
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function togglePagesPanel() {
+		const panel = document.getElementById('thumbnailsPanel');
+		const btn = panel?.querySelector('.collapse-btn i');
+		if (!panel) return;
+
+		const isCollapsed = panel.classList.toggle('collapsed');
+
+		// Update icon direction
+		if (btn) {
+			btn.setAttribute('data-lucide', isCollapsed ? 'chevron-right' : 'chevron-left');
+			if (window.lucide) lucide.createIcons();
+		}
+	}
+
+	function cycleTextStyle() {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		// Get current style state
+		const bold = overlay.bold || false;
+		const italic = overlay.italic || false;
+		const underline = overlay.underline || false;
+
+		// Define style combinations cycle (8 states)
+		const styles = [
+			{ bold: false, italic: false, underline: false, icon: 'type', label: 'Regular' },
+			{ bold: true, italic: false, underline: false, icon: 'bold', label: 'Bold' },
+			{ bold: false, italic: true, underline: false, icon: 'italic', label: 'Italic' },
+			{ bold: false, italic: false, underline: true, icon: 'underline', label: 'Underline' },
+			{ bold: true, italic: true, underline: false, icon: 'bold', label: 'Bold Italic' },
+			{ bold: true, italic: false, underline: true, icon: 'bold', label: 'Bold Underline' },
+			{ bold: false, italic: true, underline: true, icon: 'italic', label: 'Italic Underline' },
+			{ bold: true, italic: true, underline: true, icon: 'bold', label: 'Bold Italic Underline' },
+		];
+
+		// Find current style index
+		let currentIndex = styles.findIndex(
+			s => s.bold === bold && s.italic === italic && s.underline === underline
+		);
+		if (currentIndex === -1) currentIndex = 0;
+
+		// Move to next style
+		const nextIndex = (currentIndex + 1) % styles.length;
+		const nextStyle = styles[nextIndex];
+
+		// Update overlay
+		AppState.updateOverlay(index, {
+			bold: nextStyle.bold,
+			italic: nextStyle.italic,
+			underline: nextStyle.underline,
+		});
+
+		// Update button UI
+		const icon = document.getElementById('textStyleIcon');
+		const label = document.getElementById('textStyleLabel');
+		if (icon) {
+			icon.setAttribute('data-lucide', nextStyle.icon);
+			if (window.lucide) lucide.createIcons();
+		}
+		if (label) {
+			label.textContent = nextStyle.label;
+		}
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				textEl.style.fontWeight = nextStyle.bold ? 'bold' : 'normal';
+				textEl.style.fontStyle = nextStyle.italic ? 'italic' : 'normal';
+				textEl.style.textDecoration = nextStyle.underline ? 'underline' : 'none';
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
 	return {
 		showTextEditor,
 		closeTextEditor,
+		showRectangleEditor,
+		closeRectangleEditor,
+		updateRectangleBorderFade,
 		showLayerEditor,
 		toggleLayerTransparency,
 		updateLayerOpacity,
@@ -428,6 +609,9 @@ const UIControls = (() => {
 		updateLayerItalic,
 		updateLayerUnderline,
 		updateLayerHighlight,
+		updateHighlightBlur,
+		togglePagesPanel,
+		cycleTextStyle,
 	};
 })();
 
@@ -587,3 +771,6 @@ const SelectionManager = (() => {
 window.UIControls = UIControls;
 window.LayerManager = LayerManager;
 window.SelectionManager = SelectionManager;
+
+// Export togglePagesPanel as global function for onclick handler
+window.togglePagesPanel = UIControls.togglePagesPanel;

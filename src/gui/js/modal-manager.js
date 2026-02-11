@@ -29,7 +29,7 @@ const ModalManager = (() => {
 		window.modalCallback = null;
 	}
 
-	function showConfirmModal(title, message, onConfirm, onCancel) {
+	function showConfirmModal(title, message, onConfirm, onCancel, isDestructive = false) {
 		const overlay = document.getElementById('modalOverlay');
 		const header = document.getElementById('modalHeader');
 		const body = document.getElementById('modalBody');
@@ -38,9 +38,10 @@ const ModalManager = (() => {
 		header.textContent = title;
 		body.textContent = message;
 
+		const confirmBtnClass = isDestructive ? 'modal-btn-danger' : 'modal-btn-primary';
 		footer.innerHTML = `
             <button class="modal-btn modal-btn-secondary" onclick="window.modalCancelCallback(); closeModal()">Cancel</button>
-            <button class="modal-btn modal-btn-primary" onclick="window.modalConfirmCallback(); closeModal();">Confirm</button>
+            <button class="modal-btn ${confirmBtnClass}" onclick="window.modalConfirmCallback(); closeModal();">Confirm</button>
         `;
 
 		window.modalConfirmCallback = onConfirm || (() => {});
