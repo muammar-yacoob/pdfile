@@ -148,7 +148,7 @@ const PageOperations = {
 		const pageCount = pagesToRotate.length;
 
 		try {
-			showModal('Processing', 'Rotating pages...');
+			showProcessing('Rotating pages...');
 
 			const response = await fetch('/api/rotate-pages', {
 				method: 'POST',
@@ -195,11 +195,11 @@ const PageOperations = {
 				});
 				this.updateSelectionUI();
 
-				closeModal();
+				hideProcessing();
 			};
 			reader.readAsDataURL(blob);
 		} catch (error) {
-			closeModal();
+			hideProcessing();
 			showModal('Error', error.message || 'Failed to rotate pages');
 		}
 	},
@@ -295,7 +295,7 @@ const PageOperations = {
 			'Apply the new page order? This will download a reordered PDF file.',
 			async () => {
 				try {
-					showModal('Processing', 'Reordering pages...');
+					showProcessing('Reordering pages...');
 
 					const response = await fetch('/api/reorder-pages', {
 						method: 'POST',
@@ -313,10 +313,9 @@ const PageOperations = {
 					a.click();
 					URL.revokeObjectURL(url);
 
-					closeModal();
-					showModal('Success', 'Pages reordered successfully!', 2000);
+					hideProcessing();
 				} catch (err) {
-					closeModal();
+					hideProcessing();
 					showModal('Error', `Failed to reorder pages: ${err.message}`);
 				}
 			},

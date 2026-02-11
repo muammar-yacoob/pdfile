@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import type { ToolConfig } from '../cli/tools.js';
@@ -35,9 +35,9 @@ export async function runGUI(file: string): Promise<boolean> {
 	// Clean up any stale signal files from previous sessions
 	cleanupSignalFiles();
 
-	return new Promise((resolve) => {
-		// Track current working file (may change after merges)
-		let currentWorkingFile = file;
+	return new Promise((promiseResolve) => {
+		// Track current working file (may change after merges) - ensure absolute path
+		let currentWorkingFile = resolve(file);
 
 		const app = express();
 		app.use(express.json({ limit: '50mb' }));
@@ -202,11 +202,10 @@ export async function runGUI(file: string): Promise<boolean> {
 							bold: overlay.bold,
 							italic: overlay.italic,
 							underline: overlay.underline,
-							// Text border
-							borderColor: overlay.borderColor
-								? parseColor(overlay.borderColor)
+							// Text highlight
+							highlightColor: overlay.highlightColor
+								? parseColor(overlay.highlightColor)
 								: undefined,
-							borderWidth: overlay.borderWidth,
 								},
 								outputPath,
 							);
@@ -463,11 +462,10 @@ export async function runGUI(file: string): Promise<boolean> {
 								bold: overlay.bold,
 								italic: overlay.italic,
 								underline: overlay.underline,
-								// Text border
-								borderColor: overlay.borderColor
-									? parseColor(overlay.borderColor)
+								// Text highlight
+								highlightColor: overlay.highlightColor
+									? parseColor(overlay.highlightColor)
 									: undefined,
-								borderWidth: overlay.borderWidth,
 							},
 							outputPath,
 						);
@@ -1009,7 +1007,7 @@ export async function runGUI(file: string): Promise<boolean> {
 			const addr = server.address();
 			if (!addr || typeof addr === 'string') {
 				console.error('Failed to start server');
-				resolve(false);
+				promiseResolve(false);
 				return;
 			}
 
@@ -1028,7 +1026,7 @@ export async function runGUI(file: string): Promise<boolean> {
 		// Handle server errors
 		server.on('error', (err) => {
 			console.error('Server error:', err);
-			resolve(false);
+			promiseResolve(false);
 		});
 	});
 }

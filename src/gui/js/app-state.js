@@ -9,6 +9,7 @@ const AppState = (() => {
 	let lastSelectedPage = null;
 	let mergedPagesData = []; // Stores PDF.js docs - NOT serializable!
 	let currentPreviewPage = 1;
+	let hasUnsavedChanges = false;
 
 	return {
 		// File State
@@ -28,8 +29,11 @@ const AppState = (() => {
 		getOverlay: (index) => pendingOverlays[index],
 		addOverlay: (overlay) => pendingOverlays.push(overlay),
 		removeOverlay: (index) => pendingOverlays.splice(index, 1),
-		updateOverlay: (index, updates) =>
-			Object.assign(pendingOverlays[index], updates),
+		updateOverlay: (index, updates) => {
+			if (pendingOverlays[index] && updates) {
+				Object.assign(pendingOverlays[index], updates);
+			}
+		},
 		clearOverlays: () => {
 			pendingOverlays = [];
 		},
@@ -73,5 +77,17 @@ const AppState = (() => {
 		setCurrentPreviewPage: (page) => {
 			currentPreviewPage = page;
 		},
+
+		// Unsaved changes tracking
+		hasUnsavedChanges: () => hasUnsavedChanges,
+		markAsChanged: () => {
+			hasUnsavedChanges = true;
+		},
+		markAsSaved: () => {
+			hasUnsavedChanges = false;
+		},
 	};
 })();
+
+// Expose to window
+window.AppState = AppState;

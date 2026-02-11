@@ -28,9 +28,8 @@ export interface DateInsertOptions {
 	bold?: boolean;
 	italic?: boolean;
 	underline?: boolean;
-	// Text border
-	borderColor?: { r: number; g: number; b: number };
-	borderWidth?: number;
+	// Text highlight (background behind text)
+	highlightColor?: { r: number; g: number; b: number };
 }
 
 /**
@@ -222,20 +221,20 @@ export async function insertDate(
 				});
 			}
 
-			// Draw text border if specified
-			if (options.borderColor && options.borderWidth) {
-				const borderPadding = 2;
+			// Draw text highlight if specified (filled rectangle behind text)
+			if (options.highlightColor) {
+				const highlightPadding = 2;
 				page.drawRectangle({
-					x: x - borderPadding,
-					y: y - borderPadding,
-					width: textWidth + borderPadding * 2,
-					height: textHeight + borderPadding * 2,
-					borderColor: rgb(
-						options.borderColor.r,
-						options.borderColor.g,
-						options.borderColor.b,
+					x: x - highlightPadding,
+					y: y - highlightPadding,
+					width: textWidth + highlightPadding * 2,
+					height: textHeight + highlightPadding * 2,
+					color: rgb(
+						options.highlightColor.r,
+						options.highlightColor.g,
+						options.highlightColor.b,
 					),
-					borderWidth: options.borderWidth,
+					opacity: 0.7, // Slightly transparent for highlight effect
 					rotate: { angle: rotation, type: 'degrees' },
 				});
 			}

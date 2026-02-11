@@ -61,10 +61,31 @@ const UIControls = (() => {
 		if (isText) {
 			document.getElementById('editTextContent').value = overlay.dateText || '';
 
+			// Font family
+			const fontFamilySelect = document.getElementById('editFontFamily');
+			if (fontFamilySelect) {
+				fontFamilySelect.value = overlay.fontFamily || 'Helvetica';
+			}
+
+			// Text style checkboxes
+			const boldCheckbox = document.getElementById('editBoldCheckbox');
+			const italicCheckbox = document.getElementById('editItalicCheckbox');
+			const underlineCheckbox = document.getElementById('editUnderlineCheckbox');
+			if (boldCheckbox) boldCheckbox.checked = overlay.bold || false;
+			if (italicCheckbox) italicCheckbox.checked = overlay.italic || false;
+			if (underlineCheckbox)
+				underlineCheckbox.checked = overlay.underline || false;
+
 			if (window.textColorPicker) {
 				const textColor = overlay.textColor || '#000000';
 				window.textColorPicker.setColor(textColor);
 				window.selectedTextColor = textColor;
+			}
+
+			if (window.highlightColorPicker) {
+				const highlightColor = overlay.highlightColor || '#ffff00';
+				window.highlightColorPicker.setColor(highlightColor);
+				window.selectedHighlightColor = highlightColor;
 			}
 
 			if (window.bgColorPicker) {
@@ -269,6 +290,131 @@ const UIControls = (() => {
 		}
 	}
 
+	function updateLayerFontFamily(fontFamily) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		AppState.updateOverlay(index, { fontFamily });
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				// Load Google Font if needed
+				if (!['Helvetica', 'Times', 'Courier'].includes(fontFamily)) {
+					const link = document.createElement('link');
+					link.rel = 'stylesheet';
+					link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@400;700&display=swap`;
+					document.head.appendChild(link);
+				}
+				textEl.style.fontFamily =
+					fontFamily === 'Times' ? 'Times New Roman' : fontFamily;
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateLayerBold(bold) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		AppState.updateOverlay(index, { bold });
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				textEl.style.fontWeight = bold ? 'bold' : 'normal';
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateLayerItalic(italic) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		AppState.updateOverlay(index, { italic });
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				textEl.style.fontStyle = italic ? 'italic' : 'normal';
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateLayerUnderline(underline) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		AppState.updateOverlay(index, { underline });
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				textEl.style.textDecoration = underline ? 'underline' : 'none';
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateLayerHighlight(color) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		window.selectedHighlightColor = color;
+		AppState.updateOverlay(index, { highlightColor: color });
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				// Highlight is like a background color on the text itself
+				textEl.style.backgroundColor = color;
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
 	return {
 		showTextEditor,
 		closeTextEditor,
@@ -277,6 +423,11 @@ const UIControls = (() => {
 		updateLayerOpacity,
 		updateLayerText,
 		updateLayerColor,
+		updateLayerFontFamily,
+		updateLayerBold,
+		updateLayerItalic,
+		updateLayerUnderline,
+		updateLayerHighlight,
 	};
 })();
 
@@ -317,7 +468,7 @@ const LayerManager = (() => {
                 <div class="layer-icon">
                     <i data-lucide="${overlay.type === 'image' || overlay.type === 'signature' ? 'image' : 'type'}"></i>
                 </div>
-                <div class="layer-name">${displayLabel}</div>
+                <div class="layer-name">${displayLabel} <span style="opacity: 0.6; font-size: 11px;">(p${(overlay.pageIndex || 0) + 1})</span></div>
                 <div class="layer-controls">
                     <button class="layer-btn" onclick="LayerManager.moveLayerUp(${index})" title="Move up" ${isFirst ? 'disabled' : ''}>
                         <i data-lucide="chevron-up" style="width: 10px; height: 10px;"></i>
@@ -362,8 +513,8 @@ const LayerManager = (() => {
 		}
 
 		updateLayersList();
-		if (window.updateGizmosForPage) {
-			window.updateGizmosForPage(window.currentPreviewPage || 1);
+		if (window.PreviewController) {
+			window.PreviewController.updateGizmosForPage(window.currentPreviewPage || 1);
 		}
 	}
 
@@ -386,8 +537,8 @@ const LayerManager = (() => {
 		}
 
 		updateLayersList();
-		if (window.updateGizmosForPage) {
-			window.updateGizmosForPage(window.currentPreviewPage || 1);
+		if (window.PreviewController) {
+			window.PreviewController.updateGizmosForPage(window.currentPreviewPage || 1);
 		}
 	}
 

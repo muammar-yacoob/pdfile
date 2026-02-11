@@ -11,7 +11,6 @@
     <script src="/js/pdf.min.js"></script>
     <script src="/js/flatpickr.min.js"></script>
     <script src="/js/color-picker.js"></script>
-    <script src="/js/font-style-dialog.js"></script>
     <style>
         * { box-sizing: border-box; }
 
@@ -449,6 +448,168 @@
         .load-btn:hover {
             border-color: #7fa5df;
             color: #7fa5df;
+        }
+
+        /* Hotkeys Display */
+        .preview-hotkeys {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background: rgba(26, 26, 29, 0.95);
+            border: 1px solid var(--brd);
+            border-radius: 6px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(8px);
+            font-size: 10px;
+            color: var(--txt3);
+            pointer-events: auto;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .hotkey-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            color: var(--txt2);
+            transition: color 0.2s;
+        }
+
+        .preview-hotkeys:hover .hotkey-icon {
+            color: var(--blue);
+        }
+
+        .hotkey-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 0 12px;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+        }
+
+        .preview-hotkeys:hover .hotkey-content {
+            max-height: 200px;
+            opacity: 1;
+            padding: 8px 12px;
+        }
+
+        .hotkey-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .hotkey-item kbd {
+            background: var(--bg2);
+            border: 1px solid var(--brd);
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: monospace;
+            font-size: 9px;
+            color: var(--txt);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .hotkey-item span {
+            color: var(--txt3);
+        }
+
+        /* Zoom Controls */
+        .zoom-controls {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(26, 26, 29, 0.95);
+            border: 1px solid var(--brd);
+            border-radius: 6px;
+            padding: 6px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            backdrop-filter: blur(8px);
+        }
+
+        .zoom-btn {
+            background: var(--bg2);
+            border: 1px solid var(--brd);
+            border-radius: 4px;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--txt2);
+            transition: all 0.2s;
+        }
+
+        .zoom-btn:hover {
+            background: var(--bg3);
+            border-color: #7fa5df;
+            color: #7fa5df;
+        }
+
+        .zoom-btn:active {
+            transform: scale(0.95);
+        }
+
+        .zoom-display {
+            min-width: 50px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--txt);
+            padding: 0 8px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Processing Overlay */
+        .processing-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+
+        .processing-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .processing-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(127, 165, 223, 0.3);
+            border-top-color: #7fa5df;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .processing-text {
+            font-size: 14px;
+            font-weight: 500;
+            color: #fff;
+            letter-spacing: 0.5px;
         }
 
         /* Overlay gizmo */
@@ -930,6 +1091,28 @@
             font-weight: 600;
         }
 
+        /* Checkbox labels */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: var(--txt2);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+            accent-color: #7fa5df;
+        }
+
+        .checkbox-label span {
+            line-height: 1;
+        }
+
         /* Toggle Switch */
         .switch {
             position: relative;
@@ -1166,196 +1349,6 @@
             transform: scale(1.1);
             border-color: #7fa5df;
             box-shadow: 0 0 12px rgba(127, 165, 223, 0.5);
-        }
-
-        /* Font Style Dialog */
-        .font-style-dialog {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10001;
-            animation: fadeIn 0.2s ease-out;
-        }
-
-        .font-style-dialog-content {
-            background: var(--bg2);
-            border: 1px solid var(--brd);
-            border-radius: 8px;
-            padding: 20px;
-            width: 400px;
-            max-width: 90vw;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-            animation: slideUp 0.2s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                transform: translateY(20px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .font-style-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--brd);
-        }
-
-        .font-style-header h3 {
-            margin: 0;
-            font-size: 16px;
-            color: var(--txt);
-        }
-
-        .font-style-close {
-            background: none;
-            border: none;
-            color: var(--txt3);
-            cursor: pointer;
-            padding: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-            transition: all 0.2s;
-        }
-
-        .font-style-close:hover {
-            background: var(--bg3);
-            color: var(--txt);
-        }
-
-        .font-style-section {
-            margin-bottom: 16px;
-        }
-
-        .font-style-label {
-            display: block;
-            font-size: 11px;
-            color: var(--txt2);
-            margin-bottom: 6px;
-            font-weight: 500;
-        }
-
-        .font-style-select {
-            width: 100%;
-            padding: 8px 10px;
-            background: var(--bg);
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            color: var(--txt);
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .font-style-select:focus {
-            outline: none;
-            border-color: #7fa5df;
-            box-shadow: 0 0 0 3px rgba(127, 165, 223, 0.1);
-        }
-
-        .font-style-select optgroup {
-            background: var(--bg2);
-            color: var(--txt2);
-            font-weight: 600;
-        }
-
-        .font-style-select option {
-            background: var(--bg);
-            color: var(--txt);
-        }
-
-        .font-size-controls {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .font-size-input {
-            flex: 1;
-            padding: 8px 10px;
-            background: var(--bg);
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            color: var(--txt);
-            font-size: 13px;
-            transition: all 0.2s;
-        }
-
-        .font-size-input:focus {
-            outline: none;
-            border-color: #7fa5df;
-            box-shadow: 0 0 0 3px rgba(127, 165, 223, 0.1);
-        }
-
-        .font-size-unit {
-            font-size: 12px;
-            color: var(--txt3);
-            min-width: 24px;
-        }
-
-        .font-style-toggles {
-            display: flex;
-            gap: 8px;
-        }
-
-        .font-style-toggle {
-            flex: 1;
-            padding: 8px;
-            background: var(--bg);
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            color: var(--txt3);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-
-        .font-style-toggle:hover {
-            background: var(--bg3);
-            border-color: #7fa5df;
-            color: var(--txt);
-        }
-
-        .font-style-toggle.active {
-            background: #7fa5df;
-            border-color: #7fa5df;
-            color: #000;
-        }
-
-        .font-style-preview-section {
-            margin-top: 20px;
-            padding-top: 16px;
-            border-top: 1px solid var(--brd);
-        }
-
-        .font-style-preview {
-            background: var(--bg);
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            padding: 16px;
-            color: var(--txt);
-            text-align: center;
-            min-height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
         /* Tabs */
@@ -1686,6 +1679,49 @@
                         <p>PDF preview will appear here</p>
                         <button class="load-btn" onclick="loadPDF()">Load PDF</button>
                     </div>
+
+                    <!-- Hotkeys Display (Bottom Left) -->
+                    <div class="preview-hotkeys">
+                        <div class="hotkey-icon">
+                            <i data-lucide="info" style="width: 16px; height: 16px;"></i>
+                        </div>
+                        <div class="hotkey-content">
+                            <div class="hotkey-item">
+                                <kbd>←↑↓→</kbd><span>Move overlay</span>
+                            </div>
+                            <div class="hotkey-item">
+                                <kbd>Alt</kbd><span>+</span><kbd>←↑↓→</kbd><span>Precise move</span>
+                            </div>
+                            <div class="hotkey-item">
+                                <kbd>Del</kbd><span>Delete overlay</span>
+                            </div>
+                            <div class="hotkey-item">
+                                <kbd>Esc</kbd><span>Deselect</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Zoom Controls (Bottom Right) -->
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="PreviewController.zoomOut()" title="Zoom Out (Scroll Down)">
+                            <i data-lucide="minus" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <div class="zoom-display" id="zoomDisplay">100%</div>
+                        <button class="zoom-btn" onclick="PreviewController.zoomIn()" title="Zoom In (Scroll Up)">
+                            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <button class="zoom-btn" onclick="PreviewController.zoomFit()" title="Fit to Width">
+                            <i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
+
+                    <!-- Processing Overlay -->
+                    <div class="processing-overlay" id="processingOverlay" style="display: none;">
+                        <div class="processing-content">
+                            <div class="processing-spinner"></div>
+                            <div class="processing-text" id="processingText">Processing...</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1760,11 +1796,44 @@
                                     </button>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Font Style</label>
-                                    <button class="tool-btn" id="fontStyleBtn" onclick="openFontStyleDialog()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                                        <i data-lucide="type" style="width: 16px; height: 16px;"></i>
-                                        <span>Customize Font</span>
-                                    </button>
+                                    <label class="form-label">Font Family</label>
+                                    <select class="form-input" id="editFontFamily" onchange="UIControls.updateLayerFontFamily(this.value)">
+                                        <option value="Helvetica">Helvetica</option>
+                                        <option value="Times">Times New Roman</option>
+                                        <option value="Courier">Courier</option>
+                                        <option value="Roboto">Roboto</option>
+                                        <option value="Open Sans">Open Sans</option>
+                                        <option value="Lato">Lato</option>
+                                        <option value="Montserrat">Montserrat</option>
+                                        <option value="Oswald">Oswald</option>
+                                        <option value="Raleway">Raleway</option>
+                                        <option value="PT Sans">PT Sans</option>
+                                        <option value="Merriweather">Merriweather</option>
+                                        <option value="Nunito">Nunito</option>
+                                        <option value="Playfair Display">Playfair Display</option>
+                                        <option value="Ubuntu">Ubuntu</option>
+                                        <option value="Poppins">Poppins</option>
+                                        <option value="Work Sans">Work Sans</option>
+                                        <option value="Noto Sans">Noto Sans</option>
+                                        <option value="Fira Sans">Fira Sans</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Text Style</label>
+                                    <div style="display: flex; gap: 8px;">
+                                        <label class="checkbox-label" style="flex: 1;">
+                                            <input type="checkbox" id="editBoldCheckbox" onchange="UIControls.updateLayerBold(this.checked)">
+                                            <span>Bold</span>
+                                        </label>
+                                        <label class="checkbox-label" style="flex: 1;">
+                                            <input type="checkbox" id="editItalicCheckbox" onchange="UIControls.updateLayerItalic(this.checked)">
+                                            <span>Italic</span>
+                                        </label>
+                                        <label class="checkbox-label" style="flex: 1;">
+                                            <input type="checkbox" id="editUnderlineCheckbox" onchange="UIControls.updateLayerUnderline(this.checked)">
+                                            <span>Underline</span>
+                                        </label>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <div class="color-input-group">
@@ -1774,14 +1843,14 @@
                                 </div>
                                 <div class="form-group">
                                     <div class="color-input-group">
-                                        <div id="bgColorPicker"></div>
-                                        <label>Background</label>
+                                        <div id="highlightColorPicker"></div>
+                                        <label>Text Highlight</label>
                                     </div>
                                 </div>
                                 <div class="form-group">
                                     <div class="color-input-group">
-                                        <div id="borderColorPicker"></div>
-                                        <label>Text Border</label>
+                                        <div id="bgColorPicker"></div>
+                                        <label>Background Box</label>
                                     </div>
                                 </div>
                             </div>
@@ -1911,6 +1980,10 @@
     <script src="/js/pdf-export.js"></script>
     <script src="/js/background-remover.js"></script>
     <script src="/js/ui-controls.js"></script>
+    <script src="/js/gizmo-manager.js"></script>
+    <script src="/js/merge-handler.js"></script>
+    <script src="/js/tool-manager.js"></script>
+    <script src="/js/keyboard-handler.js"></script>
     <script src="/js/main.js"></script>
 </body>
 </html>

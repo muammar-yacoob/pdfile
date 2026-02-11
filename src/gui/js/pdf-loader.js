@@ -63,7 +63,45 @@ const PDFLoader = {
 
 			// Show preview
 			const previewArea = document.getElementById('previewArea');
-			previewArea.innerHTML = `<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>`;
+			previewArea.innerHTML = `
+				<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>
+				<!-- Hotkeys Display (Bottom Left) -->
+				<div class="preview-hotkeys">
+					<div class="hotkey-icon">
+						<i data-lucide="info" style="width: 16px; height: 16px;"></i>
+					</div>
+					<div class="hotkey-content">
+						<div class="hotkey-item">
+							<kbd>←↑↓→</kbd><span>Move overlay</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>Alt</kbd><span>+</span><kbd>←↑↓→</kbd><span>Precise move</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>Del</kbd><span>Delete overlay</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>Esc</kbd><span>Deselect</span>
+						</div>
+					</div>
+				</div>
+				<!-- Zoom Controls (Bottom Right) -->
+				<div class="zoom-controls">
+					<button class="zoom-btn" onclick="PreviewController.zoomOut()" title="Zoom Out (Scroll Down)">
+						<i data-lucide="minus" style="width: 14px; height: 14px;"></i>
+					</button>
+					<div class="zoom-display" id="zoomDisplay">100%</div>
+					<button class="zoom-btn" onclick="PreviewController.zoomIn()" title="Zoom In (Scroll Up)">
+						<i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+					</button>
+					<button class="zoom-btn" onclick="PreviewController.zoomFit()" title="Fit to Width">
+						<i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i>
+					</button>
+				</div>
+			`;
+
+			// Create Lucide icons
+			lucide.createIcons();
 
 			// Setup zoom and pan interactions
 			if (window.PreviewController) {
@@ -80,8 +118,6 @@ const PDFLoader = {
 
 			await window.ThumbnailRenderer?.generate();
 			await window.PreviewController?.renderPage(1);
-
-			showModal('Success', `Loaded: ${file.name}`);
 		} catch (err) {
 			showModal('Error', `Failed to load PDF: ${err.message}`);
 		}
