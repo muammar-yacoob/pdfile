@@ -89,12 +89,41 @@ const UIControls = (() => {
 				fontFamilySelect.value = overlay.fontFamily || 'Helvetica';
 			}
 
-			// Text style button state
-			const textStyleIcon = document.getElementById('textStyleIcon');
-			const textStyleLabel = document.getElementById('textStyleLabel');
+			// Text style button states
 			const bold = overlay.bold || false;
 			const italic = overlay.italic || false;
 			const underline = overlay.underline || false;
+
+			// Update individual toggle button states
+			const boldBtn = document.getElementById('boldBtn');
+			const italicBtn = document.getElementById('italicBtn');
+			const underlineBtn = document.getElementById('underlineBtn');
+
+			if (boldBtn) {
+				if (bold) {
+					boldBtn.classList.add('active');
+				} else {
+					boldBtn.classList.remove('active');
+				}
+			}
+			if (italicBtn) {
+				if (italic) {
+					italicBtn.classList.add('active');
+				} else {
+					italicBtn.classList.remove('active');
+				}
+			}
+			if (underlineBtn) {
+				if (underline) {
+					underlineBtn.classList.add('active');
+				} else {
+					underlineBtn.classList.remove('active');
+				}
+			}
+
+			// Text style cycling button state (for backwards compatibility)
+			const textStyleIcon = document.getElementById('textStyleIcon');
+			const textStyleLabel = document.getElementById('textStyleLabel');
 
 			// Determine current style
 			const styles = [
@@ -525,6 +554,69 @@ const UIControls = (() => {
 		}
 	}
 
+	function toggleBold() {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		const newBoldState = !overlay.bold;
+		updateLayerBold(newBoldState);
+
+		// Update button visual state
+		const btn = document.getElementById('boldBtn');
+		if (btn) {
+			if (newBoldState) {
+				btn.classList.add('active');
+			} else {
+				btn.classList.remove('active');
+			}
+		}
+	}
+
+	function toggleItalic() {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		const newItalicState = !overlay.italic;
+		updateLayerItalic(newItalicState);
+
+		// Update button visual state
+		const btn = document.getElementById('italicBtn');
+		if (btn) {
+			if (newItalicState) {
+				btn.classList.add('active');
+			} else {
+				btn.classList.remove('active');
+			}
+		}
+	}
+
+	function toggleUnderline() {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		const newUnderlineState = !overlay.underline;
+		updateLayerUnderline(newUnderlineState);
+
+		// Update button visual state
+		const btn = document.getElementById('underlineBtn');
+		if (btn) {
+			if (newUnderlineState) {
+				btn.classList.add('active');
+			} else {
+				btn.classList.remove('active');
+			}
+		}
+	}
+
 	function cycleTextStyle() {
 		const index = AppState.getSelectedIndex();
 		if (index === null) return;
@@ -611,6 +703,9 @@ const UIControls = (() => {
 		updateLayerHighlight,
 		updateHighlightBlur,
 		togglePagesPanel,
+		toggleBold,
+		toggleItalic,
+		toggleUnderline,
 		cycleTextStyle,
 	};
 })();
