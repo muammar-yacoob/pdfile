@@ -76,28 +76,10 @@ export async function processOverlays(
 		console.log(`Output file: ${outputPath}`);
 		console.log(`Is last: ${isLast}`);
 
-		// Get actual PDF page dimensions for coordinate conversion
-		const pageIndex = overlay.pageIndex ?? 0;
-		const page = pages[pageIndex];
-		const { width: pdfWidth, height: pdfHeight } = page.getSize();
-
-		// Calculate scale factors from canvas to PDF coordinates
-		const scaleX = overlay.canvasWidth ? pdfWidth / overlay.canvasWidth : 1;
-		const scaleY = overlay.canvasHeight ? pdfHeight / overlay.canvasHeight : 1;
-
+		// Frontend sends canvas coordinates - we need to pass them to tools
+		// The individual tools (insertDate, addImageOverlay, etc.) handle the conversion to PDF coords
+		console.log(`Canvas coords from frontend: x=${overlay.x?.toFixed(2)}, y=${overlay.y?.toFixed(2)}, w=${overlay.width?.toFixed(2)}, h=${overlay.height?.toFixed(2)}, fontSize=${overlay.fontSize?.toFixed(2)}`);
 		console.log(`Canvas dimensions: ${overlay.canvasWidth} x ${overlay.canvasHeight}`);
-		console.log(`PDF page dimensions: ${pdfWidth} x ${pdfHeight}`);
-		console.log(`Scale factors: X=${scaleX.toFixed(4)}, Y=${scaleY.toFixed(4)}`);
-
-		// Convert canvas coordinates to PDF coordinates
-		const pdfX = overlay.x * scaleX;
-		const pdfY = overlay.y * scaleY;
-		const pdfWidth_overlay = overlay.width ? overlay.width * scaleX : undefined;
-		const pdfHeight_overlay = overlay.height ? overlay.height * scaleY : undefined;
-		const pdfFontSize = overlay.fontSize ? overlay.fontSize * scaleX : undefined;
-
-		console.log(`Canvas coords: x=${overlay.x}, y=${overlay.y}, fontSize=${overlay.fontSize}`);
-		console.log(`PDF coords: x=${pdfX.toFixed(2)}, y=${pdfY.toFixed(2)}, fontSize=${pdfFontSize?.toFixed(2)}`);
 
 		let success = false;
 
@@ -107,12 +89,14 @@ export async function processOverlays(
 				{
 					dateText: overlay.dateText || '',
 					format: overlay.format,
-					fontSize: pdfFontSize,
+					fontSize: overlay.fontSize,
 					color: parseColor(overlay.textColor),
 					bgColor: overlay.bgColor ? parseColor(overlay.bgColor) : undefined,
 					rotation: overlay.rotation || 0,
-					x: pdfX,
-					y: pdfY,
+					x: overlay.x,
+					y: overlay.y,
+					canvasWidth: overlay.canvasWidth,
+					canvasHeight: overlay.canvasHeight,
 					pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
 					fontFamily: overlay.fontFamily,
 					bold: overlay.bold,
@@ -121,8 +105,8 @@ export async function processOverlays(
 					highlightColor: overlay.highlightColor
 						? parseColor(overlay.highlightColor)
 						: undefined,
-					highlightBlur: overlay.highlightBlur ? overlay.highlightBlur * scaleX : 0,
-					letterSpacing: overlay.letterSpacing ? overlay.letterSpacing * scaleX : undefined,
+					highlightBlur: overlay.highlightBlur || 0,
+					letterSpacing: overlay.letterSpacing,
 				},
 				outputPath,
 			);
@@ -172,10 +156,12 @@ export async function processOverlays(
 					currentFile,
 					{
 						signatureFile: imagePath,
-						x: pdfX,
-						y: pdfY,
-						width: pdfWidth_overlay,
-						height: pdfHeight_overlay,
+						x: overlay.x,
+						y: overlay.y,
+						width: overlay.width,
+						height: overlay.height,
+						canvasWidth: overlay.canvasWidth,
+						canvasHeight: overlay.canvasHeight,
 						opacity: overlay.opacity / 100,
 						rotation: overlay.rotation || 0,
 						removeBg: true,
@@ -188,10 +174,12 @@ export async function processOverlays(
 					currentFile,
 					{
 						imagePath,
-						x: pdfX,
-						y: pdfY,
-						width: pdfWidth_overlay,
-						height: pdfHeight_overlay,
+						x: overlay.x,
+						y: overlay.y,
+						width: overlay.width,
+						height: overlay.height,
+						canvasWidth: overlay.canvasWidth,
+						canvasHeight: overlay.canvasHeight,
 						opacity: overlay.opacity / 100,
 						rotation: overlay.rotation || 0,
 						pages: overlay.pageIndex !== undefined ? [overlay.pageIndex] : undefined,
@@ -218,10 +206,12 @@ export async function processOverlays(
 				currentFile,
 				{
 					signatureFile: imagePath,
-					x: pdfX,
-					y: pdfY,
-					width: pdfWidth_overlay,
-					height: pdfHeight_overlay,
+					x: overlay.x,
+					y: overlay.y,
+					width: overlay.width,
+					height: overlay.height,
+					canvasWidth: overlay.canvasWidth,
+					canvasHeight: overlay.canvasHeight,
 					opacity: overlay.opacity / 100,
 					rotation: overlay.rotation || 0,
 					removeBg: overlay.removeBackground !== false,
@@ -237,7 +227,11 @@ export async function processOverlays(
 
 			const rectPageIndex = overlay.pageIndex || 0;
 			const rectPage = rectPdfDoc.getPages()[rectPageIndex];
-			const { height: pageHeight } = rectPage.getSize();
+			const { width: pageWidth, height: pageHeight } = rectPage.getSize();
+
+			// Calculate scale factors from canvas to PDF
+			const scaleX = overlay.canvasWidth ? pageWidth / overlay.canvasWidth : 1;
+			const scaleY = overlay.canvasHeight ? pageHeight / overlay.canvasHeight : 1;
 
 			// Parse fill color
 			const fillColor = overlay.fillColor || '#000000';
@@ -246,29 +240,33 @@ export async function processOverlays(
 			const b = Number.parseInt(fillColor.slice(5, 7), 16) / 255;
 			const fillAlpha = overlay.fillAlpha !== undefined ? overlay.fillAlpha : 0.5;
 
-			// Use pre-calculated scaled coordinates
-			const rectX = pdfX;
-			const rectY = pageHeight - pdfY - (pdfHeight_overlay || 0);
-			const rectWidth = pdfWidth_overlay || 100;
-			const rectHeight = pdfHeight_overlay || 100;
+			// Convert canvas coordinates to PDF coordinates
+			const canvasX = overlay.x || 0;
+			const canvasY = overlay.y || 0;
+			const canvasWidth = overlay.width || 100;
+			const canvasHeight = overlay.height || 100;
+
+			const pdfX = canvasX * scaleX;
+			const pdfY = pageHeight - (canvasY * scaleY) - (canvasHeight * scaleY);
+			const pdfWidth = canvasWidth * scaleX;
+			const pdfHeight = canvasHeight * scaleY;
 
 			const rotation = overlay.rotation || 0;
-			const borderFade = overlay.borderFade || 0;
+			const borderFade = overlay.borderFade ? overlay.borderFade * scaleX : 0;
 
 			// Draw border fade layers if specified
 			if (borderFade > 0) {
 				const steps = Math.ceil(borderFade / 2);
-				const fadeScale = borderFade * scaleX; // Scale the fade width
 
 				for (let step = steps; step > 0; step--) {
-					const offset = (fadeScale / steps) * step;
+					const offset = (borderFade / steps) * step;
 					const opacity = fillAlpha * (1 - step / (steps + 1));
 
 					rectPage.drawRectangle({
-						x: rectX - offset,
-						y: rectY - offset,
-						width: rectWidth + offset * 2,
-						height: rectHeight + offset * 2,
+						x: pdfX - offset,
+						y: pdfY - offset,
+						width: pdfWidth + offset * 2,
+						height: pdfHeight + offset * 2,
 						color: rgb(r, g, b),
 						opacity: opacity,
 						borderRadius: offset * 0.2,
@@ -279,10 +277,10 @@ export async function processOverlays(
 
 			// Draw main rectangle
 			rectPage.drawRectangle({
-				x: rectX,
-				y: rectY,
-				width: rectWidth,
-				height: rectHeight,
+				x: pdfX,
+				y: pdfY,
+				width: pdfWidth,
+				height: pdfHeight,
 				color: rgb(r, g, b),
 				opacity: fillAlpha * (overlay.opacity / 100),
 				borderRadius: 2,

@@ -13,13 +13,27 @@ window.openFolder = function (folderPath) {
 		windowsPath = `${drive}:${folderPath.substring(6).replace(/\//g, '\\')}`;
 	}
 
+	console.log(`Opening folder: ${windowsPath}`);
+
 	// Use API to open the folder
 	fetch('/api/open-folder', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ folderPath: windowsPath }),
-	}).catch((err) => {
-		console.error('Failed to open folder:', err);
-		alert(`Could not open folder. Path: ${windowsPath}`);
-	});
+	})
+		.then((response) => {
+			if (!response.ok) {
+				return response.json().then((data) => {
+					throw new Error(data.details || data.error || 'Unknown error');
+				});
+			}
+			return response.json();
+		})
+		.then(() => {
+			console.log('Folder opened successfully');
+		})
+		.catch((err) => {
+			console.error('Failed to open folder:', err);
+			alert(`Could not open folder.\nPath: ${windowsPath}\nError: ${err.message}`);
+		});
 };

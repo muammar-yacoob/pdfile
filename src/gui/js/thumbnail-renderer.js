@@ -24,9 +24,20 @@ const ThumbnailRenderer = {
 			item.className = 'thumbnail-item';
 			item.draggable = true;
 			item.dataset.pageNum = pageNum;
+			item.dataset.sourceFileName = window.currentPdfFile || 'Original';
+			const sourceName = window.currentPdfFile || 'Original';
+			const sourceColor = window.getColorForSource ? window.getColorForSource(sourceName) : '#666';
+			const cleanName = (name) => {
+				if (!name) return 'Original';
+				let cleaned = name.replace(/\.pdf$/i, '');
+				cleaned = cleaned.replace(/_(merged|removed|reordered|modified|exported|abused)$/i, '');
+				return cleaned;
+			};
+			const displayName = cleanName(sourceName);
 			item.innerHTML = `
             <canvas class="thumbnail-canvas"></canvas>
             <div class="thumbnail-number">${pageNum}</div>
+            <div class="thumbnail-source-label" style="background: ${sourceColor};" title="${sourceName}">${displayName}</div>
         `;
 
 			const thumbnailCanvas = item.querySelector('.thumbnail-canvas');
@@ -88,9 +99,20 @@ const ThumbnailRenderer = {
 			item.dataset.pageNum = i + 1;
 			item.dataset.source = pageInfo.source;
 			item.dataset.originalPage = pageInfo.pageNum;
+			item.dataset.sourceFileName = pageInfo.sourceFileName || window.currentPdfFile || 'Original';
+			const sourceName = pageInfo.sourceFileName || window.currentPdfFile || 'Original';
+			const sourceColor = window.getColorForSource ? window.getColorForSource(sourceName) : '#666';
+			const cleanName = (name) => {
+				if (!name) return 'Original';
+				let cleaned = name.replace(/\.pdf$/i, '');
+				cleaned = cleaned.replace(/_(merged|removed|reordered|modified|exported|abused)$/i, '');
+				return cleaned;
+			};
+			const displayName = cleanName(sourceName);
 			item.innerHTML = `
                 <canvas class="thumbnail-canvas"></canvas>
                 <div class="thumbnail-number">${i + 1}</div>
+                <div class="thumbnail-source-label" style="background: ${sourceColor};" title="${sourceName}">${displayName}</div>
             `;
 
 			const thumbnailCanvas = item.querySelector('.thumbnail-canvas');

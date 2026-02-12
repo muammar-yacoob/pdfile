@@ -23,6 +23,8 @@ export interface DateInsertOptions {
 	pages?: number[]; // Specific page numbers (0-indexed), or all pages if undefined
 	rotation?: number; // Rotation angle in degrees
 	bgColor?: { r: number; g: number; b: number }; // Background color
+	canvasWidth?: number; // Original canvas width (for coordinate scaling)
+	canvasHeight?: number; // Original canvas height (for coordinate scaling)
 	// Font styling
 	fontFamily?: string;
 	bold?: boolean;
@@ -199,22 +201,47 @@ export async function insertDate(
 		const rotation = options.rotation ?? 0;
 
 		for (const page of targetPages) {
-			const { width, height } = page.getSize();
+			const { width: pageWidth, height: pageHeight } = page.getSize();
 
-			// Calculate position (default: bottom right with padding)
+			// Calculate scaling factors if canvas dimensions provided
+			const scaleX = options.canvasWidth ? pageWidth / options.canvasWidth : 1;
+			const scaleY = options.canvasHeight ? pageHeight / options.canvasHeight : 1;
+
+			// Scale font size if canvas dimensions provided
+			const scaledFontSize = fontSize * scaleX;
+
+			// Calculate text dimensions
 			// Account for letter spacing in width calculation
-			let textWidth = font.widthOfTextAtSize(dateText, fontSize);
+			let canvasTextWidth = font.widthOfTextAtSize(dateText, scaledFontSize);
 			if (options.letterSpacing && options.letterSpacing !== 0) {
 				// Add letter spacing for all characters except the last one
-				textWidth += options.letterSpacing * (dateText.length - 1);
+				canvasTextWidth += (options.letterSpacing * scaleX) * (dateText.length - 1);
 			}
-			const textHeight = fontSize;
-			const x = options.x ?? width - textWidth - 50;
+			const textWidth = canvasTextWidth;
+			const canvasTextHeight = scaledFontSize;
+			const textHeight = canvasTextHeight;
 
-			// CRITICAL FIX: Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
+			// Calculate position (default: bottom right with padding)
+			const canvasX = options.x ?? (options.canvasWidth ? options.canvasWidth - (textWidth / scaleX) - 50 : pageWidth - textWidth - 50);
+			const x = canvasX * scaleX;
+
+			// Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
 			// Canvas: y=0 at top, PDF: y=0 at bottom
 			const canvasY = options.y ?? 30;
-			const y = height - canvasY - textHeight;
+			const pdfY_topLeft = canvasY * scaleY;
+			const y = pageHeight - pdfY_topLeft - textHeight;
+
+			console.log(`\n=== Text Drawing Details ===`);
+			console.log(`Canvas dimensions: ${options.canvasWidth || 'N/A'}x${options.canvasHeight || 'N/A'}`);
+			console.log(`Page size: ${pageWidth}x${pageHeight}`);
+			console.log(`Scale factors: X=${scaleX.toFixed(4)}, Y=${scaleY.toFixed(4)}`);
+			console.log(`Canvas position: x=${canvasX}, y=${canvasY}`);
+			console.log(`Canvas font size: ${fontSize}`);
+			console.log(`Scaled font size: ${scaledFontSize.toFixed(2)}`);
+			console.log(`Text dimensions: ${textWidth.toFixed(2)}x${textHeight.toFixed(2)}`);
+			console.log(`PDF Y (top-left): ${pdfY_topLeft.toFixed(2)}`);
+			console.log(`PDF position: x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
+			console.log(`Rotation: ${rotation}°`);
 
 			// Draw background if specified
 			if (options.bgColor) {
@@ -290,22 +317,22 @@ export async function insertDate(
 					page.drawText(char, {
 						x: currentX,
 						y,
-						size: fontSize,
+						size: scaledFontSize,
 						font,
 						color: rgb(color.r, color.g, color.b),
 						rotate: { angle: rotation, type: 'degrees' },
 					});
 
 					// Calculate character width and add letter spacing
-					const charWidth = font.widthOfTextAtSize(char, fontSize);
-					currentX += charWidth + options.letterSpacing;
+					const charWidth = font.widthOfTextAtSize(char, scaledFontSize);
+					currentX += charWidth + (options.letterSpacing * scaleX);
 				}
 			} else {
 				// Normal rendering without letter spacing
 				page.drawText(dateText, {
 					x,
 					y,
-					size: fontSize,
+					size: scaledFontSize,
 					font,
 					color: rgb(color.r, color.g, color.b),
 					rotate: { angle: rotation, type: 'degrees' },

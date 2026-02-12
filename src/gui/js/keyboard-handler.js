@@ -69,8 +69,12 @@ const KeyboardHandler = (() => {
 
 		// Arrow key movement
 		if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-			// Don't intercept arrow keys if user is focused on an input/slider/textarea
-			if (e.target.matches('input, textarea, select')) {
+			// Only intercept arrow keys if cursor is over preview area (not over sidebar controls)
+			const previewArea = document.getElementById('previewArea');
+			const isOverPreview = previewArea && previewArea.matches(':hover');
+
+			// Don't intercept if user is focused on an input OR not hovering over preview
+			if (e.target.matches('input, textarea, select') || !isOverPreview) {
 				return;
 			}
 

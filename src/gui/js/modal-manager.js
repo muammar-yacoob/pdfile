@@ -7,7 +7,7 @@ const ModalManager = (() => {
 		const footer = document.getElementById('modalFooter');
 
 		header.textContent = title;
-		body.textContent = message;
+		body.innerHTML = message;
 
 		if (callback) {
 			footer.innerHTML = `
@@ -21,6 +21,11 @@ const ModalManager = (() => {
 		}
 
 		overlay.classList.add('active');
+
+		// Render any Lucide icons in the message
+		if (window.lucide) {
+			window.lucide.createIcons();
+		}
 	}
 
 	function closeModal() {
@@ -36,7 +41,7 @@ const ModalManager = (() => {
 		const footer = document.getElementById('modalFooter');
 
 		header.textContent = title;
-		body.textContent = message;
+		body.innerHTML = message;
 
 		const confirmBtnClass = isDestructive ? 'modal-btn-danger' : 'modal-btn-primary';
 		footer.innerHTML = `
@@ -48,6 +53,11 @@ const ModalManager = (() => {
 		window.modalCancelCallback = onCancel || (() => {});
 
 		overlay.classList.add('active');
+
+		// Render any Lucide icons in the message
+		if (window.lucide) {
+			window.lucide.createIcons();
+		}
 	}
 
 	return {

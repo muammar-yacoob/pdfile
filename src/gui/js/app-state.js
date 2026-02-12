@@ -155,6 +155,9 @@ const AppState = (() => {
 		markAsSaved: () => {
 			hasUnsavedChanges = false;
 		},
+		clearUnsavedChanges: () => {
+			hasUnsavedChanges = false;
+		},
 
 		// Undo/Redo functions
 		undo: () => {

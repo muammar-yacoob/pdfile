@@ -21,6 +21,8 @@ export interface ImageOverlayOptions {
 	opacity?: number;
 	rotation?: number; // Rotation angle in degrees
 	pages?: number[]; // Specific page numbers (0-indexed), or all pages if undefined
+	canvasWidth?: number; // Original canvas width (for coordinate scaling)
+	canvasHeight?: number; // Original canvas height (for coordinate scaling)
 }
 
 /**
@@ -113,23 +115,38 @@ export async function addImageOverlay(
 		for (const page of targetPages) {
 			const { width: pageWidth, height: pageHeight } = page.getSize();
 
-			// Calculate position and size
-			const width = options.width ?? imageDims.width;
-			const height = options.height ?? imageDims.height;
-			const x = options.x ?? (pageWidth - width) / 2;
+			// Calculate scaling factors if canvas dimensions provided
+			const scaleX = options.canvasWidth ? pageWidth / options.canvasWidth : 1;
+			const scaleY = options.canvasHeight ? pageHeight / options.canvasHeight : 1;
 
-			// CRITICAL FIX: Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
+			// Calculate position and size (scale from canvas to PDF if needed)
+			const canvasWidth = options.width ?? imageDims.width;
+			const canvasHeight = options.height ?? imageDims.height;
+			const width = canvasWidth * scaleX;
+			const height = canvasHeight * scaleY;
+
+			const canvasX = options.x ?? (options.canvasWidth ? (options.canvasWidth - canvasWidth) / 2 : (pageWidth - width) / 2);
+			const x = canvasX * scaleX;
+
+			// Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
 			// Canvas: y=0 at top, PDF: y=0 at bottom
-			const canvasY = options.y ?? (pageHeight - height) / 2;
-			const y = pageHeight - canvasY - height;
+			const canvasY = options.y ?? (options.canvasHeight ? (options.canvasHeight - canvasHeight) / 2 : (pageHeight - height) / 2);
+			const pdfY_topLeft = canvasY * scaleY;
+			const y = pageHeight - pdfY_topLeft - height;
 
 			const opacity = options.opacity ?? 1.0;
 			const rotation = options.rotation ?? 0;
 
-			console.log(
-				`Drawing image: x=${x}, y=${y}, w=${width}, h=${height}, opacity=${opacity}, rotation=${rotation}`,
-			);
+			console.log(`\n=== Image Drawing Details ===`);
+			console.log(`Canvas dimensions: ${options.canvasWidth || 'N/A'}x${options.canvasHeight || 'N/A'}`);
 			console.log(`Page size: ${pageWidth}x${pageHeight}`);
+			console.log(`Scale factors: X=${scaleX.toFixed(4)}, Y=${scaleY.toFixed(4)}`);
+			console.log(`Canvas position: x=${canvasX}, y=${canvasY}`);
+			console.log(`Canvas size: ${canvasWidth}x${canvasHeight}`);
+			console.log(`PDF Y (top-left): ${pdfY_topLeft.toFixed(2)}`);
+			console.log(`PDF position: x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
+			console.log(`PDF size: ${width.toFixed(2)}x${height.toFixed(2)}`);
+			console.log(`Final: x=${x.toFixed(2)}, y=${y.toFixed(2)}, w=${width.toFixed(2)}, h=${height.toFixed(2)}, opacity=${opacity}, rotation=${rotation}°`);
 
 			// Validate dimensions
 			if (width <= 0 || height <= 0 || !isFinite(width) || !isFinite(height)) {
@@ -143,14 +160,24 @@ export async function addImageOverlay(
 
 			// Draw image
 			try {
-				page.drawImage(image, {
+				// pdf-lib rotates around bottom-left corner of the image
+				// If rotation is applied, we may need to adjust position
+				const drawOptions: any = {
 					x,
 					y,
 					width,
 					height,
 					opacity,
-					rotate: { angle: rotation, type: 'degrees' },
-				});
+				};
+
+				// Only add rotation if non-zero
+				if (rotation !== 0) {
+					drawOptions.rotate = { angle: rotation, type: 'degrees' };
+					console.log(`Applying rotation: ${rotation}° around point (${x}, ${y})`);
+				}
+
+				page.drawImage(image, drawOptions);
+				console.log(`✓ Image drawn successfully`);
 			} catch (drawError) {
 				console.error('drawImage failed:', drawError);
 				throw drawError;

@@ -26,6 +26,8 @@ export interface SignatureOptions {
 	opacity?: number;
 	rotation?: number; // Rotation angle in degrees
 	pages?: number[]; // Specific page numbers (0-indexed), or all pages if undefined
+	canvasWidth?: number; // Original canvas width (for coordinate scaling)
+	canvasHeight?: number; // Original canvas height (for coordinate scaling)
 	// Transparency removal options (applied automatically)
 	removeBg?: boolean; // Default: true
 	fuzz?: number; // Default: 15
@@ -189,18 +191,26 @@ export async function addSignature(
 		for (const page of targetPages) {
 			const { width: pageWidth, height: pageHeight } = page.getSize();
 
+			// Calculate scaling factors if canvas dimensions provided
+			const scaleX = options.canvasWidth ? pageWidth / options.canvasWidth : 1;
+			const scaleY = options.canvasHeight ? pageHeight / options.canvasHeight : 1;
+
 			// Calculate position (default: bottom right with padding)
-			const sigWidth = options.width ?? signatureDims.width * 0.3; // 30% of original
-			const sigHeight =
+			const canvasSigWidth = options.width ?? signatureDims.width * 0.3; // 30% of original
+			const canvasSigHeight =
 				options.height ??
-				(signatureDims.height * sigWidth) / signatureDims.width;
+				(signatureDims.height * canvasSigWidth) / signatureDims.width;
+			const sigWidth = canvasSigWidth * scaleX;
+			const sigHeight = canvasSigHeight * scaleY;
 
-			const x = options.x ?? pageWidth - sigWidth - 50;
+			const canvasX = options.x ?? (options.canvasWidth ? options.canvasWidth - canvasSigWidth - 50 : pageWidth - sigWidth - 50);
+			const x = canvasX * scaleX;
 
-			// CRITICAL FIX: Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
+			// Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
 			// Canvas: y=0 at top, PDF: y=0 at bottom
 			const canvasY = options.y ?? 80;
-			const y = pageHeight - canvasY - sigHeight;
+			const pdfY_topLeft = canvasY * scaleY;
+			const y = pageHeight - pdfY_topLeft - sigHeight;
 
 			const opacity = options.opacity ?? 1.0;
 			const rotation = options.rotation ?? 0;

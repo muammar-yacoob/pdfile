@@ -10,10 +10,15 @@ const MergeHandler = {
 		const input = document.createElement('input');
 		input.type = 'file';
 		input.accept = '.pdf,image/*';
+		input.multiple = true; // Allow multiple file selection
 		input.onchange = (e) => {
-			const file = e.target.files[0];
-			if (file) {
-				this.showMergeDialog(file);
+			const files = Array.from(e.target.files);
+			if (files.length === 0) return;
+
+			if (files.length === 1) {
+				this.showMergeDialog(files[0]);
+			} else {
+				this.showBatchMergeDialog(files);
 			}
 		};
 		input.click();
@@ -203,13 +208,23 @@ const MergeHandler = {
 					reader2.onload = async (e2) => {
 						const mergedPdfData = e2.target.result;
 						try {
-							await fetch('/api/update-working-file', {
+							const updateResponse = await fetch('/api/update-working-file', {
 								method: 'POST',
 								headers: { 'Content-Type': 'application/json' },
 								body: JSON.stringify({ pdfData: mergedPdfData }),
 							});
+
+							if (!updateResponse.ok) {
+								throw new Error('Failed to update working file on server');
+							}
+
+							const updateResult = await updateResponse.json();
+							console.log('[Merge] Working file updated on server:', updateResult.filePath);
 						} catch (err) {
-							console.warn('Failed to update working file on server:', err);
+							console.error('[Merge] Failed to update working file on server:', err);
+							window.hideProcessing();
+							window.showModal('Error', `Failed to update working file: ${err.message}`);
+							return;
 						}
 
 						// Load the merged PDF
@@ -238,6 +253,104 @@ const MergeHandler = {
 			window.showModal('Error', `Failed to merge: ${err.message}`);
 		}
 	},
+
+	/**
+	 * Show batch merge dialog for multiple files
+	 * @param {File[]} files - Array of files to merge
+	 */
+	showBatchMergeDialog(files) {
+		const modal = document.getElementById('modalOverlay');
+		const header = document.getElementById('modalHeader');
+		const body = document.getElementById('modalBody');
+		const footer = document.getElementById('modalFooter');
+
+		const fileCount = files.length;
+		const pdfCount = files.filter((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')).length;
+		const imageCount = fileCount - pdfCount;
+
+		let fileTypeLabel = '';
+		if (pdfCount > 0 && imageCount > 0) {
+			fileTypeLabel = `${pdfCount} PDF${pdfCount > 1 ? 's' : ''} and ${imageCount} image${imageCount > 1 ? 's' : ''}`;
+		} else if (pdfCount > 0) {
+			fileTypeLabel = `${pdfCount} PDF${pdfCount > 1 ? 's' : ''}`;
+		} else {
+			fileTypeLabel = `${imageCount} image${imageCount > 1 ? 's' : ''}`;
+		}
+
+		header.textContent = `Merge ${fileCount} Files`;
+		body.innerHTML = `
+            <p>How would you like to merge ${fileTypeLabel}?</p>
+            <p style="font-size: 10px; color: var(--txt3); margin-top: 8px;">Files will be merged in the order they were selected.</p>
+            <div style="margin-top: 12px; max-height: 200px; overflow-y: auto; background: var(--bg3); padding: 8px; border-radius: 4px; font-size: 11px;">
+                ${files.map((f, i) => `<div style="padding: 2px 0;">${i + 1}. ${f.name}</div>`).join('')}
+            </div>
+        `;
+		footer.innerHTML = `
+            <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="modal-btn modal-btn-secondary" onclick="closeModal(); MergeHandler.batchMergeFiles('beginning')">Add to Beginning</button>
+            <button class="modal-btn modal-btn-primary" onclick="closeModal(); MergeHandler.batchMergeFiles('end')">Add to End</button>
+        `;
+
+		// Store files for batch merge
+		window.pendingBatchMergeFiles = files;
+		modal.classList.add('active');
+	},
+
+	/**
+	 * Merge multiple files in sequence
+	 * @param {string} position - 'beginning' or 'end'
+	 */
+	async batchMergeFiles(position) {
+		const files = window.pendingBatchMergeFiles;
+		if (!files || files.length === 0) {
+			console.error('[Merge] No pending batch merge files found');
+			return;
+		}
+
+		console.log(`[Merge] Starting batch merge of ${files.length} files, position: ${position}`);
+
+		try {
+			// For 'beginning', we need to reverse the order so the first file ends up at the beginning
+			const filesToProcess = position === 'beginning' ? [...files].reverse() : files;
+
+			let successCount = 0;
+			let failCount = 0;
+
+			for (let i = 0; i < filesToProcess.length; i++) {
+				const file = filesToProcess[i];
+				console.log(`[Merge] Processing file ${i + 1}/${filesToProcess.length}: ${file.name}`);
+
+				// Set the pending merge file
+				window.pendingMergeFile = file;
+
+				try {
+					// Call the existing merge logic
+					await this.mergeFiles(position, file.name);
+					successCount++;
+
+					// Small delay between merges to allow UI to update
+					await new Promise((resolve) => setTimeout(resolve, 500));
+				} catch (error) {
+					console.error(`[Merge] Failed to merge ${file.name}:`, error);
+					failCount++;
+				}
+			}
+
+			console.log(`[Merge] Batch merge complete: ${successCount} succeeded, ${failCount} failed`);
+
+			if (failCount > 0) {
+				window.showModal(
+					'Batch Merge Complete',
+					`Successfully merged ${successCount} file${successCount !== 1 ? 's' : ''}.<br>${failCount} file${failCount !== 1 ? 's' : ''} failed to merge.`
+				);
+			}
+		} catch (error) {
+			console.error('[Merge] Batch merge error:', error);
+			window.showModal('Error', `Batch merge failed: ${error.message}`);
+		}
+
+		window.pendingBatchMergeFiles = null;
+	},
 };
 
 // Export to window
@@ -248,3 +361,5 @@ window.openMergePDF = () => MergeHandler.openMergePDF();
 window.showMergeDialog = (file) => MergeHandler.showMergeDialog(file);
 window.mergeFiles = (position, fileName) =>
 	MergeHandler.mergeFiles(position, fileName);
+window.showBatchMergeDialog = (files) => MergeHandler.showBatchMergeDialog(files);
+window.batchMergeFiles = (position) => MergeHandler.batchMergeFiles(position);

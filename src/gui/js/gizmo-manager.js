@@ -42,15 +42,9 @@ const GizmoManager = {
 			width = 200;
 			height = 150;
 		} else if (type === 'text' || type === 'date') {
-			// Calculate better initial size based on text content
-			const overlay = window.AppState.getOverlay(overlayIndex);
-			if (overlay && overlay.dateText) {
-				const textLength = overlay.dateText.length;
-				const fontSize = overlay.fontSize || 12;
-				// Estimate width based on character count and font size
-				width = Math.max(60, Math.min(300, textLength * fontSize * 0.7));
-				height = Math.max(30, fontSize * 1.8);
-			}
+			// Will be auto-sized after text element is created
+			width = 150; // Temporary
+			height = 50; // Temporary
 		}
 
 		gizmo.style.width = `${width}px`;
@@ -102,6 +96,26 @@ const GizmoManager = {
 				</div>
 				<div class="rotation-guide" style="display: none;"></div>
 			`;
+
+			// Populate image immediately for image/signature overlays
+			const overlay = window.AppState.getOverlay(overlayIndex);
+			if (overlay && overlay.imageData) {
+				const imagePreview = gizmo.querySelector('.overlay-gizmo-image-preview');
+				if (imagePreview) {
+					const img = document.createElement('img');
+					img.src = overlay.imageData;
+					img.style.width = '100%';
+					img.style.height = '100%';
+					img.style.objectFit = 'contain';
+					img.style.pointerEvents = 'none';
+					imagePreview.appendChild(img);
+
+					// Apply opacity if set
+					if (overlay.opacity !== undefined) {
+						imagePreview.style.opacity = overlay.opacity / 100;
+					}
+				}
+			}
 		}
 
 		canvasWrapper.appendChild(gizmo);
@@ -109,6 +123,40 @@ const GizmoManager = {
 		// Initialize Lucide icons for the new gizmo
 		if (window.lucide) {
 			window.lucide.createIcons();
+		}
+
+		// Auto-size text gizmos to fit content
+		if (isText) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			const overlay = window.AppState.getOverlay(overlayIndex);
+			if (textEl && overlay) {
+				// Measure actual text width using canvas
+				const canvas = document.createElement('canvas');
+				const ctx = canvas.getContext('2d');
+
+				const fontSize = overlay.fontSize || 12;
+				const fontWeight = overlay.bold ? 'bold' : 'normal';
+				const fontStyle = overlay.italic ? 'italic' : 'normal';
+				const fontFamily = overlay.fontFamily || 'sans-serif';
+
+				ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+				const text = overlay.dateText || overlay.text || label;
+				const metrics = ctx.measureText(text);
+				const textWidth = metrics.width;
+
+				// Set gizmo size to fit text (add small padding)
+				const newWidth = Math.ceil(textWidth) + 4; // 4px total padding (2px each side)
+				const newHeight = Math.ceil(fontSize * 1.5); // Height based on font size
+
+				gizmo.style.width = `${newWidth}px`;
+				gizmo.style.height = `${newHeight}px`;
+
+				// Update overlay state with new dimensions
+				window.AppState.updateOverlay(overlayIndex, {
+					width: newWidth,
+					height: newHeight,
+				});
+			}
 		}
 
 		// Set up interaction handlers
@@ -133,7 +181,9 @@ const GizmoManager = {
 			// Don't start drag on delete button
 			if (e.target.classList.contains('overlay-gizmo-delete')) return;
 
-			const targetAction = e.target.dataset.action;
+			// Find the action element (might be a parent if icon was clicked)
+			const actionElement = e.target.closest('[data-action]');
+			const targetAction = actionElement?.dataset.action;
 			const canvas = document.getElementById('pdfCanvas');
 			const canvasRect = canvas.getBoundingClientRect();
 
@@ -155,7 +205,7 @@ const GizmoManager = {
 
 			if (targetAction === 'resize') {
 				action = 'resize';
-				resizeHandle = e.target.dataset.handle;
+				resizeHandle = actionElement.dataset.handle;
 
 				// Store initial state
 				initialWidth = gizmo.offsetWidth;
@@ -236,10 +286,12 @@ const GizmoManager = {
 				gizmo.style.left = `${newLeft}px`;
 				gizmo.style.top = `${newTop}px`;
 
-				// Update state
+				// Update state (also save current width/height)
 				window.AppState.updateOverlay(index, {
 					x: newLeft,
 					y: newTop,
+					width: gizmo.offsetWidth,
+					height: gizmo.offsetHeight,
 					canvasWidth: canvas.width,
 					canvasHeight: canvas.height,
 				});
@@ -475,19 +527,71 @@ const GizmoManager = {
 					const g = parseInt(overlay.highlightColor.slice(3, 5), 16);
 					const b = parseInt(overlay.highlightColor.slice(5, 7), 16);
 					textEl.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-
-					// Add padding for highlight box effect
-					textEl.style.padding = '2px 4px';
-					textEl.style.display = 'inline-block';
 				} else {
 					textEl.style.backgroundColor = 'transparent';
-					textEl.style.padding = '0';
-					textEl.style.display = 'inline-block';
 				}
 
 				if (overlay.fontSize) {
 					const displayFontSize = Math.min(overlay.fontSize * scale, 24);
 					textEl.style.fontSize = `${displayFontSize}px`;
+				}
+
+				// Auto-resize gizmo to fit text content
+				const measureCanvas = document.createElement('canvas');
+				const ctx = measureCanvas.getContext('2d');
+
+				const fontSize = overlay.fontSize || 12;
+				const fontWeight = overlay.bold ? 'bold' : 'normal';
+				const fontStyle = overlay.italic ? 'italic' : 'normal';
+				const fontFamily = overlay.fontFamily || 'sans-serif';
+
+				ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+				const text = overlay.dateText || overlay.text || 'Text';
+				const metrics = ctx.measureText(text);
+				let textWidth = metrics.width;
+
+				// Account for letter spacing
+				if (overlay.letterSpacing && overlay.letterSpacing !== 0) {
+					textWidth += overlay.letterSpacing * (text.length - 1);
+				}
+
+				// Set gizmo size to fit text (add small padding)
+				const newWidth = Math.ceil(textWidth) + 4; // 4px total padding
+				const newHeight = Math.ceil(fontSize * 1.5); // Height based on font size
+
+				// Update overlay state with new dimensions (before scaling)
+				window.AppState.updateOverlay(overlayIndex, {
+					width: newWidth,
+					height: newHeight,
+					canvasWidth: canvas.width,
+					canvasHeight: canvas.height,
+				});
+
+				// Apply scaled dimensions to gizmo
+				gizmo.style.width = `${newWidth * scale}px`;
+				gizmo.style.height = `${newHeight * scale}px`;
+			}
+		}
+
+		// Update image content for image/signature overlays
+		if (overlay.type === 'image' || overlay.type === 'signature') {
+			const imagePreview = gizmo.querySelector('.overlay-gizmo-image-preview');
+			if (imagePreview && overlay.imageData) {
+				// Clear existing content
+				imagePreview.innerHTML = '';
+
+				// Create img element
+				const img = document.createElement('img');
+				img.src = overlay.imageData;
+				img.style.width = '100%';
+				img.style.height = '100%';
+				img.style.objectFit = 'contain';
+				img.style.pointerEvents = 'none'; // Prevent img from interfering with drag/resize
+				imagePreview.appendChild(img);
+
+				// Apply opacity if set
+				if (overlay.opacity !== undefined) {
+					imagePreview.style.opacity = overlay.opacity / 100;
 				}
 			}
 		}
@@ -541,3 +645,6 @@ const GizmoManager = {
 
 // Export to window
 window.GizmoManager = GizmoManager;
+
+// Backward compatibility - export removeOverlay to window
+window.removeOverlay = (index) => GizmoManager.removeOverlay(index);

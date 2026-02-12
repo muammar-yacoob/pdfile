@@ -179,6 +179,9 @@ async function loadPDFFile(file) {
 		mergedPagesData = [];
 		window.mergedPagesData = []; // Expose to window for merge handler
 
+		// Clear page source mapping
+		pageSourceMap.clear();
+
 		// Show preview
 		const previewArea = document.getElementById('previewArea');
 		previewArea.innerHTML = `
@@ -275,6 +278,13 @@ async function generateThumbnailsFromDoc() {
 	const pageCount = pdfDocument.numPages;
 	pageOrder = Array.from({ length: pageCount }, (_, i) => i + 1);
 
+	// Initialize page sources if not already set
+	for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
+		if (!pageSourceMap.has(pageNum)) {
+			pageSourceMap.set(pageNum, currentPdfFile);
+		}
+	}
+
 	for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
 		const page = await pdfDocument.getPage(pageNum);
 		const viewport = page.getViewport({ scale: 0.3 });
@@ -290,9 +300,14 @@ async function generateThumbnailsFromDoc() {
 		item.className = 'thumbnail-item';
 		item.draggable = true;
 		item.dataset.pageNum = pageNum;
+		const sourceName = getPageSource(pageNum);
+		item.dataset.sourceFileName = sourceName;
+		const sourceColor = getColorForSource(sourceName);
+		const displayName = cleanFileName(sourceName);
 		item.innerHTML = `
             <canvas class="thumbnail-canvas"></canvas>
             <div class="thumbnail-number">${pageNum}</div>
+            <div class="thumbnail-source-label" style="background: ${sourceColor};" title="${sourceName}">${displayName}</div>
         `;
 		const thumbCanvas = item.querySelector('canvas');
 		thumbCanvas.width = canvas.width;
@@ -315,6 +330,117 @@ async function generateThumbnailsFromDoc() {
 		thumbnailsList.appendChild(item);
 	}
 }
+
+// ===== PANEL RESIZER =====
+function initPanelResizer() {
+	const resizer = document.getElementById('thumbnailResizer');
+	const thumbnailsPanel = document.getElementById('thumbnailsPanel');
+
+	if (!resizer || !thumbnailsPanel) return;
+
+	let isResizing = false;
+	let startX = 0;
+	let startWidth = 0;
+
+	resizer.addEventListener('mousedown', (e) => {
+		isResizing = true;
+		startX = e.clientX;
+		startWidth = thumbnailsPanel.offsetWidth;
+		resizer.classList.add('dragging');
+		document.body.style.cursor = 'col-resize';
+		document.body.style.userSelect = 'none';
+		e.preventDefault();
+	});
+
+	document.addEventListener('mousemove', (e) => {
+		if (!isResizing) return;
+
+		const diff = e.clientX - startX;
+		const newWidth = startWidth + diff;
+
+		// Constrain to min/max
+		const constrainedWidth = Math.max(120, Math.min(400, newWidth));
+		thumbnailsPanel.style.flexBasis = `${constrainedWidth}px`;
+	});
+
+	document.addEventListener('mouseup', () => {
+		if (isResizing) {
+			isResizing = false;
+			resizer.classList.remove('dragging');
+			document.body.style.cursor = '';
+			document.body.style.userSelect = '';
+		}
+	});
+}
+
+// ===== SOURCE FILE LABELS =====
+const sourceFileColors = [
+	'#ff6b6b', // Red
+	'#4ecdc4', // Teal
+	'#45b7d1', // Blue
+	'#96ceb4', // Green
+	'#ffa07a', // Orange
+	'#dda15e', // Gold
+	'#bc6c25', // Brown
+	'#9b59b6', // Purple
+	'#3498db', // Sky blue
+	'#e74c3c', // Crimson
+];
+
+const sourceFileMap = new Map(); // Maps source file names to colors
+const pageSourceMap = new Map(); // Maps page numbers to source file names
+let sourceLabelsVisible = false;
+
+function setPageSource(pageNum, sourceName) {
+	pageSourceMap.set(pageNum, sourceName);
+}
+
+function getPageSource(pageNum) {
+	return pageSourceMap.get(pageNum) || currentPdfFile || 'Original';
+}
+
+window.setPageSource = setPageSource;
+window.getPageSource = getPageSource;
+window.getColorForSource = getColorForSource;
+
+function cleanFileName(fileName) {
+	if (!fileName) return 'Original';
+	// Remove extension
+	let name = fileName.replace(/\.pdf$/i, '');
+	// Remove common suffixes
+	name = name.replace(/_(merged|removed|reordered|modified|exported|abused)$/i, '');
+	return name;
+}
+
+function getSourceFileName(item) {
+	return item.dataset.sourceFileName || window.currentPdfFile || 'Original';
+}
+
+function getColorForSource(sourceName) {
+	if (!sourceFileMap.has(sourceName)) {
+		const colorIndex = sourceFileMap.size % sourceFileColors.length;
+		sourceFileMap.set(sourceName, sourceFileColors[colorIndex]);
+	}
+	return sourceFileMap.get(sourceName);
+}
+
+function toggleSourceLabels() {
+	sourceLabelsVisible = !sourceLabelsVisible;
+	const thumbnailsList = document.getElementById('thumbnailsList');
+	const toggleBtn = document.getElementById('toggleSourceLabelsBtn');
+
+	if (sourceLabelsVisible) {
+		thumbnailsList.classList.add('show-source-labels');
+		toggleBtn.style.background = 'rgba(127, 165, 223, 0.2)';
+		toggleBtn.style.color = '#7fa5df';
+	} else {
+		thumbnailsList.classList.remove('show-source-labels');
+		toggleBtn.style.background = '';
+		toggleBtn.style.color = '';
+	}
+}
+
+window.toggleSourceLabels = toggleSourceLabels;
 
 // ===== PDF PREVIEW RENDERING =====
 let currentPreviewPage = 1;
@@ -1008,6 +1134,13 @@ async function removeSelectedPages() {
 		return;
 	}
 
+	// Check if trying to remove all pages
+	const totalPages = pdfDocument ? pdfDocument.numPages : 0;
+	if (selectedPages.size >= totalPages) {
+		showModal('Cannot Remove All Pages', 'A PDF must have at least one page. You cannot remove all pages from the document.');
+		return;
+	}
+
 	const pageCount = selectedPages.size;
 
 	showConfirmModal(
@@ -1023,7 +1156,10 @@ async function removeSelectedPages() {
 					body: JSON.stringify({ pages: Array.from(selectedPages) }),
 				});
 
-				if (!response.ok) throw new Error('Remove failed');
+				if (!response.ok) {
+					const errorData = await response.json();
+					throw new Error(errorData.error || 'Remove failed');
+				}
 
 				const blob = await response.blob();
 
@@ -1313,6 +1449,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	// Initialize modules
 	ShareModal.init();
 	KeyboardHandler.init();
+	initPanelResizer();
 
 	loadInitialPDF();
 	lucide.createIcons();
@@ -1325,9 +1462,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	// Load recent images from localStorage
 	loadRecentImages();
 
-	// Set up file input change listener
-	document.getElementById('imageFile').addEventListener('change', (e) => {
-		const file = e.target.files[0];
+	// Helper function to add image as overlay
+	function addImageAsOverlay(file) {
 		if (!file || !currentPdfFile) return;
 
 		// Read file as base64
@@ -1371,11 +1507,18 @@ document.addEventListener('DOMContentLoaded', () => {
 			// Add visual gizmo to preview
 			window.GizmoManager.createGizmo('image', 'Image', centerX, centerY, overlayIndex);
 			LayerManager.updateLayersList();
-
-			// Clear file input
-			e.target.value = '';
 		};
 		reader.readAsDataURL(file);
+	}
+
+	// Set up file input change listener
+	document.getElementById('imageFile').addEventListener('change', (e) => {
+		const file = e.target.files[0];
+		if (file) {
+			addImageAsOverlay(file);
+			// Clear file input
+			e.target.value = '';
+		}
 	});
 
 	// Initialize Flatpickr date picker (hidden input)
@@ -1507,18 +1650,23 @@ document.addEventListener('DOMContentLoaded', () => {
 			body.innerHTML = `
 				<p style="margin-bottom: 12px;">Choose how to handle this PDF file:</p>
 			`;
+			footer.innerHTML = `
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('replace')">Replace Current File</button>
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('beginning')">Merge to Beginning</button>
+				<button class="modal-btn modal-btn-primary" onclick="closeModal(); handleDropOption('end')">Merge to End</button>
+			`;
 		} else {
 			body.innerHTML = `
 				<p style="margin-bottom: 12px;">Choose how to handle this image:</p>
 			`;
+			footer.innerHTML = `
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
+				<button class="modal-btn modal-btn-primary" onclick="closeModal(); handleDropOption('overlay')">Add as Overlay</button>
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('beginning')">Merge as Page (Beginning)</button>
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('end')">Merge as Page (End)</button>
+			`;
 		}
-
-		footer.innerHTML = `
-			<button class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
-			<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('replace')">Replace Current File</button>
-			<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('beginning')">Merge to Beginning</button>
-			<button class="modal-btn modal-btn-primary" onclick="closeModal(); handleDropOption('end')">Merge to End</button>
-		`;
 
 		// Store file for later use
 		window.pendingDropFile = file;
@@ -1539,6 +1687,9 @@ document.addEventListener('DOMContentLoaded', () => {
 		if (option === 'replace') {
 			// Load as new file (replace current)
 			await loadPDFFile(file);
+		} else if (option === 'overlay') {
+			// Add image as overlay
+			addImageAsOverlay(file);
 		} else if (option === 'beginning' || option === 'end') {
 			// Merge to beginning or end
 			window.pendingMergeFile = file;
@@ -1562,15 +1713,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	// Thumbnails panel - always merge as page
 	thumbnailsPanel.addEventListener('dragover', (e) => {
-		e.preventDefault();
-		e.stopPropagation();
-		e.dataTransfer.dropEffect = 'copy';
-
-		// Only highlight if dragging files (not thumbnail reordering)
+		// Check if dragging files (not thumbnail reordering)
 		if (e.dataTransfer.types.includes('Files')) {
+			e.preventDefault();
+			e.stopPropagation();
+			e.dataTransfer.dropEffect = 'copy';
 			thumbnailsPanel.classList.add('drop-zone-active');
 		}
-	});
+	}, true); // Use capture phase to ensure we catch events even when dragging over thumbnails
 
 	thumbnailsPanel.addEventListener('dragleave', (e) => {
 		// Check if we're actually leaving the thumbnailsPanel element
@@ -1581,30 +1731,53 @@ document.addEventListener('DOMContentLoaded', () => {
 	});
 
 	thumbnailsPanel.addEventListener('drop', async (e) => {
-		e.preventDefault();
-		e.stopPropagation();
-		thumbnailsPanel.classList.remove('drop-zone-active');
+		// Only handle file drops, not thumbnail reordering
+		if (e.dataTransfer.types.includes('Files')) {
+			e.preventDefault();
+			e.stopPropagation();
+			thumbnailsPanel.classList.remove('drop-zone-active');
 
-		const files = e.dataTransfer.files;
-		if (files.length > 0) {
-			const file = files[0];
-			const fileType = file.type.toLowerCase();
-			const fileName = file.name.toLowerCase();
+			const files = Array.from(e.dataTransfer.files);
+			if (files.length === 0) return;
 
-			const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
-			const isImage =
-				fileType.startsWith('image/') ||
-				fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
+			// Validate all files first
+			const validFiles = [];
+			const invalidFiles = [];
 
-			if (isPdf || isImage) {
-				// Merge as page
-				window.pendingMergeFile = file;
-				showMergeDialog(file);
+			for (const file of files) {
+				const fileType = file.type.toLowerCase();
+				const fileName = file.name.toLowerCase();
+				const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
+				const isImage =
+					fileType.startsWith('image/') ||
+					fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
+
+				if (isPdf || isImage) {
+					validFiles.push(file);
+				} else {
+					invalidFiles.push(file.name);
+				}
+			}
+
+			if (invalidFiles.length > 0) {
+				showModal(
+					'Invalid Files',
+					`The following files are not PDF or image files and will be skipped:<br><br>${invalidFiles.map((name) => `• ${name}`).join('<br>')}`
+				);
+			}
+
+			if (validFiles.length === 0) return;
+
+			// If single file, show merge dialog
+			if (validFiles.length === 1) {
+				window.pendingMergeFile = validFiles[0];
+				showMergeDialog(validFiles[0]);
 			} else {
-				showModal('Invalid File', 'Please drop a PDF or image file');
+				// Multiple files - show batch merge dialog
+				showBatchMergeDialog(validFiles);
 			}
 		}
-	});
+	}, true); // Use capture phase
 
 	// Preview area - show options dialog
 	previewArea.addEventListener('dragover', (e) => {
@@ -1639,23 +1812,60 @@ document.addEventListener('DOMContentLoaded', () => {
 		e.stopPropagation();
 		previewArea.classList.remove('drop-zone-active');
 
-		const files = e.dataTransfer.files;
-		if (files.length > 0) {
-			const file = files[0];
-			const fileType = file.type.toLowerCase();
-			const fileName = file.name.toLowerCase();
+		const files = Array.from(e.dataTransfer.files);
+		if (files.length === 0) return;
 
-			const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
-			const isImage =
-				fileType.startsWith('image/') ||
-				fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
+		// If multiple files, they must all be images (to add as overlays) or all PDFs (to merge)
+		if (files.length > 1) {
+			const allImages = files.every((f) => {
+				const fileType = f.type.toLowerCase();
+				const fileName = f.name.toLowerCase();
+				return (
+					fileType.startsWith('image/') ||
+					fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/)
+				);
+			});
 
-			if (isPdf || isImage) {
-				// Show options dialog
-				showDropOptionsDialog(file, isPdf, isImage);
+			const allPdfs = files.every((f) => {
+				const fileType = f.type.toLowerCase();
+				const fileName = f.name.toLowerCase();
+				return fileType === 'application/pdf' || fileName.endsWith('.pdf');
+			});
+
+			if (allImages) {
+				showModal(
+					'Multiple Images',
+					'For multiple images, please drag them to the thumbnails panel to merge as pages. Dropping on the preview area is only for single overlay images.'
+				);
+				return;
+			} else if (allPdfs) {
+				// Show batch merge dialog
+				showBatchMergeDialog(files);
+				return;
 			} else {
-				showModal('Invalid File', 'Please drop a PDF or image file');
+				showModal(
+					'Mixed File Types',
+					'When dropping multiple files, they must all be PDFs or all be images. Please drop them to the thumbnails panel to merge as pages.'
+				);
+				return;
 			}
+		}
+
+		// Single file
+		const file = files[0];
+		const fileType = file.type.toLowerCase();
+		const fileName = file.name.toLowerCase();
+
+		const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
+		const isImage =
+			fileType.startsWith('image/') ||
+			fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
+
+		if (isPdf || isImage) {
+			// Show dialog for both PDFs and images
+			showDropOptionsDialog(file, isPdf, isImage);
+		} else {
+			showModal('Invalid File', 'Please drop a PDF or image file');
 		}
 	});
 

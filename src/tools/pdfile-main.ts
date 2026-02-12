@@ -9,6 +9,7 @@ import {
 	cleanupSignalFiles,
 	signalLoadingComplete,
 } from '../lib/edge-launcher.js';
+import { wslToWindows } from '../lib/paths.js';
 import { addImageOverlay } from './add-image-overlay.js';
 import { addSignature } from './add-signature.js';
 import { insertDate } from './insert-date.js';
@@ -38,6 +39,10 @@ export async function runGUI(file: string): Promise<boolean> {
 	return new Promise((promiseResolve) => {
 		// Track current working file (may change after merges) - ensure absolute path
 		let currentWorkingFile = resolve(file);
+
+		console.log('=== PDFile GUI Starting ===');
+		console.log(`WSL Path (internal): ${currentWorkingFile}`);
+		console.log(`Windows Path (display): ${wslToWindows(currentWorkingFile)}`);
 
 		const app = express();
 		app.use(express.json({ limit: '50mb' }));
@@ -71,15 +76,17 @@ export async function runGUI(file: string): Promise<boolean> {
 		app.get('/api/file', (_req, res) => {
 			res.json({
 				fileName: basename(currentWorkingFile),
-				filePath: currentWorkingFile,
+				filePath: wslToWindows(currentWorkingFile),
 			});
 		});
 
 		// Serve the actual PDF file for preview
 		app.get('/pdf/:filename', (_req, res) => {
+			// Ensure currentWorkingFile exists, fallback to original file
+			const fileToServe = existsSync(currentWorkingFile) ? currentWorkingFile : resolve(file);
 			res.setHeader('Content-Type', 'application/pdf');
 			res.setHeader('Content-Disposition', 'inline');
-			res.sendFile(currentWorkingFile);
+			res.sendFile(fileToServe);
 		});
 
 		// API endpoint to update current working file (after merge)
@@ -99,10 +106,20 @@ export async function runGUI(file: string): Promise<boolean> {
 				const tempPath = join(tmpDir, `working_${Date.now()}.pdf`);
 				await writeFile(tempPath, pdfBuffer);
 
+				console.log(`[Server] Updating working file from ${currentWorkingFile} to ${tempPath}`);
+
+				// Delete the old working file if it exists and is in temp directory
+				const oldWorkingFile = currentWorkingFile;
+				if (oldWorkingFile && oldWorkingFile.includes('/temp/working_') && existsSync(oldWorkingFile)) {
+					console.log(`[Server] Cleaning up old working file: ${oldWorkingFile}`);
+					unlink(oldWorkingFile).catch((err) => console.warn('Failed to delete old working file:', err));
+				}
+
 				// Update the current working file
 				currentWorkingFile = tempPath;
 
-				res.json({ success: true, filePath: tempPath });
+				console.log(`[Server] Working file updated successfully: ${tempPath}`);
+				res.json({ success: true, filePath: wslToWindows(tempPath) });
 			} catch (error) {
 				console.error('Update working file error:', error);
 				res.status(500).json({ error: 'Failed to update working file' });
@@ -120,6 +137,10 @@ export async function runGUI(file: string): Promise<boolean> {
 					mergedPagesData,
 				} = req.body;
 
+				console.log('\n=== Export PDF Started ===');
+				console.log(`Current working file: ${currentWorkingFile}`);
+				console.log(`Working file exists: ${existsSync(currentWorkingFile)}`);
+
 				const tmpDir = join(__dirname, 'temp');
 				const { mkdir } = await import('node:fs/promises');
 				await mkdir(tmpDir, { recursive: true });
@@ -129,7 +150,14 @@ export async function runGUI(file: string): Promise<boolean> {
 				const outputDir = join(sourceDir, 'PDFile');
 				await mkdir(outputDir, { recursive: true });
 
+				// Ensure currentWorkingFile exists, fallback to original file
+				if (!existsSync(currentWorkingFile)) {
+					console.warn(`[Export] Warning: currentWorkingFile ${currentWorkingFile} does not exist, using original file: ${file}`);
+					currentWorkingFile = resolve(file);
+				}
+
 				let currentFile = currentWorkingFile;
+				console.log(`[Export] Using file for export: ${currentFile}`);
 				const tempFiles: string[] = [];
 
 				// Step 1: Handle merged pages or reordering if needed
@@ -160,6 +188,8 @@ export async function runGUI(file: string): Promise<boolean> {
 
 				// Step 2: Apply overlays if any
 				if (overlays && overlays.length > 0) {
+					console.log(`\n=== Processing ${overlays.length} overlays ===`);
+
 					const parseColor = (hex: string) => {
 						if (!hex) return undefined;
 						const r = Number.parseInt(hex.slice(1, 3), 16) / 255;
@@ -174,9 +204,27 @@ export async function runGUI(file: string): Promise<boolean> {
 					const pdfDoc = await PDFDocument.load(pdfBytes);
 					const pages = pdfDoc.getPages();
 
-					for (let i = 0; i < overlays.length; i++) {
-						const overlay = overlays[i];
-						const isLast = i === overlays.length - 1;
+					console.log(`PDF has ${pages.length} pages`);
+
+					// Filter out overlays with invalid page indices
+					const validOverlays = overlays.filter((overlay, i) => {
+						const pageIndex = overlay.pageIndex ?? 0;
+						if (pageIndex < 0 || pageIndex >= pages.length) {
+							console.warn(`Skipping overlay ${i} (${overlay.type}): pageIndex ${pageIndex} is out of bounds (PDF has ${pages.length} pages)`);
+							return false;
+						}
+						return true;
+					});
+
+					if (validOverlays.length === 0) {
+						console.log('No valid overlays to process - skipping overlay step');
+					} else if (validOverlays.length < overlays.length) {
+						console.warn(`${overlays.length - validOverlays.length} overlay(s) were skipped due to invalid page indices`);
+					}
+
+					for (let i = 0; i < validOverlays.length; i++) {
+						const overlay = validOverlays[i];
+						const isLast = i === validOverlays.length - 1;
 						const outputPath = isLast
 							? join(outputDir, basename(file).replace(/\.pdf$/i, '_abused.pdf'))
 							: join(tmpDir, `temp_overlay_${i}_${Date.now()}.pdf`);
@@ -190,6 +238,9 @@ export async function runGUI(file: string): Promise<boolean> {
 
 						// Get actual PDF page dimensions for coordinate conversion
 						const pageIndex = overlay.pageIndex ?? 0;
+						console.log(`Overlay pageIndex: ${pageIndex}, Total pages: ${pages.length}`);
+
+						// Page is already validated in the filter above
 						const page = pages[pageIndex];
 						const { width: pdfWidth, height: pdfHeight } = page.getSize();
 
@@ -219,14 +270,16 @@ export async function runGUI(file: string): Promise<boolean> {
 								{
 									dateText: overlay.dateText,
 									format: overlay.format,
-									fontSize: pdfFontSize,
+									fontSize: overlay.fontSize,
 									color: parseColor(overlay.textColor),
 									bgColor: overlay.bgColor
 										? parseColor(overlay.bgColor)
 										: undefined,
 									rotation: overlay.rotation || 0,
-									x: pdfX,
-									y: pdfY,
+									x: overlay.x,
+									y: overlay.y,
+									canvasWidth: overlay.canvasWidth,
+									canvasHeight: overlay.canvasHeight,
 									pages:
 										overlay.pageIndex !== undefined
 											? [overlay.pageIndex]
@@ -240,7 +293,7 @@ export async function runGUI(file: string): Promise<boolean> {
 							highlightColor: overlay.highlightColor
 								? parseColor(overlay.highlightColor)
 								: undefined,
-							highlightBlur: overlay.highlightBlur ? overlay.highlightBlur * scaleX : 0,
+							highlightBlur: overlay.highlightBlur,
 								},
 								outputPath,
 							);
@@ -295,10 +348,12 @@ export async function runGUI(file: string): Promise<boolean> {
 									currentFile,
 									{
 										signatureFile: imagePath,
-										x: pdfX,
-										y: pdfY,
-										width: pdfWidth_overlay,
-										height: pdfHeight_overlay,
+										x: overlay.x,
+										y: overlay.y,
+										width: overlay.width,
+										height: overlay.height,
+										canvasWidth: overlay.canvasWidth,
+										canvasHeight: overlay.canvasHeight,
 										opacity: overlay.opacity / 100,
 										rotation: overlay.rotation || 0,
 										removeBg: true,
@@ -314,10 +369,12 @@ export async function runGUI(file: string): Promise<boolean> {
 									currentFile,
 									{
 										imagePath,
-										x: pdfX,
-										y: pdfY,
-										width: pdfWidth_overlay,
-										height: pdfHeight_overlay,
+										x: overlay.x,
+										y: overlay.y,
+										width: overlay.width,
+										height: overlay.height,
+										canvasWidth: overlay.canvasWidth,
+										canvasHeight: overlay.canvasHeight,
 										opacity: overlay.opacity / 100,
 										rotation: overlay.rotation || 0,
 										pages:
@@ -350,10 +407,12 @@ export async function runGUI(file: string): Promise<boolean> {
 								currentFile,
 								{
 									signatureFile: imagePath,
-									x: pdfX,
-									y: pdfY,
-									width: pdfWidth_overlay,
-									height: pdfHeight_overlay,
+									x: overlay.x,
+									y: overlay.y,
+									width: overlay.width,
+									height: overlay.height,
+									canvasWidth: overlay.canvasWidth,
+									canvasHeight: overlay.canvasHeight,
 									opacity: overlay.opacity / 100,
 									rotation: overlay.rotation || 0,
 									removeBg: overlay.removeBackground !== false,
@@ -372,7 +431,7 @@ export async function runGUI(file: string): Promise<boolean> {
 
 							const pageIndex = overlay.pageIndex || 0;
 							const page = pdfDoc.getPages()[pageIndex];
-							const { height: pageHeight } = page.getSize();
+							const { width: pageWidth_rect, height: pageHeight_rect } = page.getSize();
 
 							// Parse fill color
 							const fillColor = overlay.fillColor || '#000000';
@@ -381,11 +440,16 @@ export async function runGUI(file: string): Promise<boolean> {
 							const b = Number.parseInt(fillColor.slice(5, 7), 16) / 255;
 							const fillAlpha = overlay.fillAlpha !== undefined ? overlay.fillAlpha : 0.5;
 
-							// Use pre-calculated scaled coordinates
-							const rectX = pdfX;
-							const rectY = pageHeight - pdfY - (pdfHeight_overlay || 0);
-							const rectWidth = pdfWidth_overlay || 100;
-							const rectHeight = pdfHeight_overlay || 100;
+							// Calculate scaled dimensions from canvas coordinates
+							const canvasRectX = overlay.x;
+							const canvasRectY = overlay.y;
+							const canvasRectWidth = overlay.width || 100;
+							const canvasRectHeight = overlay.height || 100;
+
+							const rectX = canvasRectX * scaleX;
+							const rectY = pageHeight_rect - (canvasRectY * scaleY) - (canvasRectHeight * scaleY);
+							const rectWidth = canvasRectWidth * scaleX;
+							const rectHeight = canvasRectHeight * scaleY;
 
 							const rotation = overlay.rotation || 0;
 							const borderFade = overlay.borderFade || 0;
@@ -465,15 +529,11 @@ export async function runGUI(file: string): Promise<boolean> {
 				}
 
 				// Return the final file
-				const finalOutput =
-					currentFile === file
-						? file.replace(/\.pdf$/i, '_modified.pdf')
-						: currentFile;
-
-				// If currentFile is still the original, copy it
-				if (currentFile === file && hasMergedPages) {
+				// If no changes were made, save a copy to PDFile subdirectory
+				if (currentFile === currentWorkingFile) {
 					const { copyFile } = await import('node:fs/promises');
-					await copyFile(file, finalOutput);
+					const finalOutput = join(outputDir, basename(file).replace(/\.pdf$/i, '_exported.pdf'));
+					await copyFile(currentWorkingFile, finalOutput);
 					currentFile = finalOutput;
 				}
 
@@ -482,9 +542,14 @@ export async function runGUI(file: string): Promise<boolean> {
 					tempFiles.forEach((f) => unlink(f).catch(() => {}));
 
 					// Return the saved file path instead of downloading
+					// Convert to Windows path for proper display and folder opening
+					const windowsPath = wslToWindows(currentFile);
+					console.log(`\n=== Export Complete ===`);
+					console.log(`WSL Path (internal): ${currentFile}`);
+					console.log(`Windows Path (returned): ${windowsPath}`);
 					res.json({
 						success: true,
-						filePath: currentFile,
+						filePath: windowsPath,
 						fileName: basename(currentFile),
 					});
 				} else {
@@ -497,6 +562,164 @@ export async function runGUI(file: string): Promise<boolean> {
 				}
 				res.status(500).json({
 					error: 'Internal server error: ' + (error as Error).message,
+					stack: error instanceof Error ? error.stack : undefined,
+				});
+			}
+		});
+
+		// API: Export PDF V2 - Simple canvas capture approach
+		app.post('/api/export-pdf-v2', async (req, res) => {
+			try {
+				const {
+					hasMergedPages,
+					hasReordering,
+					pageOrder,
+					capturedPages,
+					mergedPagesData,
+				} = req.body;
+
+				console.log('\n=== Export PDF V2 (Canvas Capture) Started ===');
+				console.log(`Current working file: ${currentWorkingFile}`);
+				console.log(`Captured pages: ${capturedPages?.length || 0}`);
+
+				const tmpDir = join(__dirname, 'temp');
+				const { mkdir } = await import('node:fs/promises');
+				await mkdir(tmpDir, { recursive: true });
+
+				// Create PDFile subdirectory in source file's directory
+				const sourceDir = dirname(file);
+				const outputDir = join(sourceDir, 'PDFile');
+				await mkdir(outputDir, { recursive: true });
+
+				// Ensure currentWorkingFile exists, fallback to original file
+				if (!existsSync(currentWorkingFile)) {
+					console.warn(`[Export] Warning: currentWorkingFile ${currentWorkingFile} does not exist, using original file: ${file}`);
+					currentWorkingFile = resolve(file);
+				}
+
+				let currentFile = currentWorkingFile;
+				console.log(`[Export] Using file for export: ${currentFile}`);
+				const tempFiles: string[] = [];
+
+				// Step 1: Handle merged pages or reordering if needed
+				if (
+					(hasMergedPages || hasReordering) &&
+					pageOrder &&
+					pageOrder.length > 0
+				) {
+					const { PDFDocument } = await import('pdf-lib');
+					const pdfBytes = await readFile(currentFile);
+					const pdfDoc = await PDFDocument.load(pdfBytes);
+
+					const newPdf = await PDFDocument.create();
+
+					for (const item of pageOrder) {
+						const pageIndex = item.pageNum - 1;
+						const [copiedPage] = await newPdf.copyPages(pdfDoc, [pageIndex]);
+						newPdf.addPage(copiedPage);
+					}
+
+					const reorderedPath = join(tmpDir, `reordered_${Date.now()}.pdf`);
+					const reorderedBytes = await newPdf.save({ useObjectStreams: true });
+					await writeFile(reorderedPath, reorderedBytes);
+					tempFiles.push(reorderedPath);
+
+					currentFile = reorderedPath;
+					console.log(`✓ Pages reordered/merged, saved to: ${currentFile}`);
+				}
+
+				// Step 2: Replace pages with captured images
+				if (capturedPages && capturedPages.length > 0) {
+					const { PDFDocument } = await import('pdf-lib');
+					const pdfBytes = await readFile(currentFile);
+					const pdfDoc = await PDFDocument.load(pdfBytes);
+
+					console.log(`\n=== Replacing ${capturedPages.length} Pages with Captured Images ===`);
+
+					for (const captured of capturedPages) {
+						const pageNum = captured.pageNum;
+						const pageIndex = pageNum - 1;
+						const imageData = captured.imageData;
+
+						console.log(`Processing captured page ${pageNum}...`);
+
+						// Extract base64 data from data URL
+						const base64Data = imageData.split(',')[1];
+						const imageBuffer = Buffer.from(base64Data, 'base64');
+
+						// Embed PNG image
+						const image = await pdfDoc.embedPng(imageBuffer);
+						const imageDims = image.scale(1);
+
+						// Get the page to replace
+						const page = pdfDoc.getPages()[pageIndex];
+						const { width: pageWidth, height: pageHeight } = page.getSize();
+
+						console.log(`  Page size: ${pageWidth}x${pageHeight}`);
+						console.log(`  Image size: ${imageDims.width}x${imageDims.height}`);
+
+						// Clear the page content but keep the page dimensions
+						// We'll draw the captured image over it
+						page.drawImage(image, {
+							x: 0,
+							y: 0,
+							width: pageWidth,
+							height: pageHeight,
+						});
+
+						console.log(`  ✓ Page ${pageNum} replaced with captured image`);
+					}
+
+					// Save the modified PDF
+					const finalPath = join(outputDir, `${basename(file, '.pdf')}_abused.pdf`);
+					const finalBytes = await pdfDoc.save({ useObjectStreams: true });
+					await writeFile(finalPath, finalBytes);
+
+					console.log(`\n✓ Export complete: ${finalPath}`);
+
+					// Clean up temp files
+					for (const tempFile of tempFiles) {
+						try {
+							await unlink(tempFile);
+						} catch (err) {
+							console.warn(`Failed to delete temp file: ${tempFile}`);
+						}
+					}
+
+					const windowsPath = wslToWindows(finalPath);
+					res.json({
+						success: true,
+						filePath: windowsPath,
+						fileName: basename(finalPath),
+					});
+				} else {
+					// No captured pages, just save the current file
+					const finalPath = join(outputDir, `${basename(file, '.pdf')}_abused.pdf`);
+					await writeFile(finalPath, await readFile(currentFile));
+
+					console.log(`\n✓ Export complete (no overlays): ${finalPath}`);
+
+					// Clean up temp files
+					for (const tempFile of tempFiles) {
+						try {
+							await unlink(tempFile);
+						} catch (err) {
+							console.warn(`Failed to delete temp file: ${tempFile}`);
+						}
+					}
+
+					const windowsPath = wslToWindows(finalPath);
+					res.json({
+						success: true,
+						filePath: windowsPath,
+						fileName: basename(finalPath),
+					});
+				}
+			} catch (error) {
+				console.error('Export V2 error:', error);
+				res.status(500).json({
+					error: 'Failed to export PDF',
+					details: error instanceof Error ? error.message : 'Unknown error',
 					stack: error instanceof Error ? error.stack : undefined,
 				});
 			}
@@ -741,6 +964,24 @@ export async function runGUI(file: string): Promise<boolean> {
 					return res.status(400).json({ error: 'No pages specified' });
 				}
 
+				// Ensure currentWorkingFile exists, fallback to original file
+				if (!existsSync(currentWorkingFile)) {
+					console.warn(`Warning: currentWorkingFile ${currentWorkingFile} does not exist, using original file: ${file}`);
+					currentWorkingFile = resolve(file);
+				}
+
+				// Check if trying to remove all pages
+				const { PDFDocument } = await import('pdf-lib');
+				const pdfBytes = await readFile(currentWorkingFile);
+				const pdfDoc = await PDFDocument.load(pdfBytes);
+				const totalPages = pdfDoc.getPageCount();
+
+				if (pages.length >= totalPages) {
+					return res.status(400).json({
+						error: 'Cannot remove all pages. A PDF must have at least one page.'
+					});
+				}
+
 				const tmpDir = join(__dirname, 'temp');
 				const outputPath = join(
 					tmpDir,
@@ -768,7 +1009,9 @@ export async function runGUI(file: string): Promise<boolean> {
 				}
 			} catch (error) {
 				console.error('Remove pages error:', error);
-				res.status(500).json({ error: 'Internal server error' });
+				res.status(500).json({
+					error: 'Internal server error: ' + (error as Error).message
+				});
 			}
 		});
 
@@ -778,6 +1021,12 @@ export async function runGUI(file: string): Promise<boolean> {
 				const { order } = req.body;
 				if (!order || !Array.isArray(order) || order.length === 0) {
 					return res.status(400).json({ error: 'No page order specified' });
+				}
+
+				// Ensure currentWorkingFile exists, fallback to original file
+				if (!existsSync(currentWorkingFile)) {
+					console.warn(`Warning: currentWorkingFile ${currentWorkingFile} does not exist, using original file: ${file}`);
+					currentWorkingFile = resolve(file);
 				}
 
 				const tmpDir = join(__dirname, 'temp');
@@ -820,6 +1069,12 @@ export async function runGUI(file: string): Promise<boolean> {
 				const validRotations = [90, 180, 270, -90];
 				if (!validRotations.includes(rotation)) {
 					return res.status(400).json({ error: 'Invalid rotation angle' });
+				}
+
+				// Ensure currentWorkingFile exists, fallback to original file
+				if (!existsSync(currentWorkingFile)) {
+					console.warn(`Warning: currentWorkingFile ${currentWorkingFile} does not exist, using original file: ${file}`);
+					currentWorkingFile = resolve(file);
 				}
 
 				// If no pages specified, rotate all pages
@@ -1041,6 +1296,12 @@ export async function runGUI(file: string): Promise<boolean> {
 					return res.status(400).json({ error: 'No data provided' });
 				}
 
+				// Ensure currentWorkingFile exists, fallback to original file
+				if (!existsSync(currentWorkingFile)) {
+					console.warn(`Warning: currentWorkingFile ${currentWorkingFile} does not exist, using original file: ${file}`);
+					currentWorkingFile = resolve(file);
+				}
+
 				const tmpDir = join(__dirname, 'temp');
 				await (await import('node:fs/promises')).mkdir(tmpDir, {
 					recursive: true,
@@ -1173,14 +1434,35 @@ export async function runGUI(file: string): Promise<boolean> {
 					return res.status(400).json({ error: 'No folder path provided' });
 				}
 
-				// Use explorer.exe to open the folder
-				const { execSync } = await import('node:child_process');
-				execSync(`explorer.exe "${folderPath}"`, { stdio: 'ignore' });
+				console.log(`Opening folder: ${folderPath}`);
 
+				// Use cmd.exe with start command for reliable folder opening from WSL
+				const { execSync } = await import('node:child_process');
+
+				// Normalize path - ensure it's a valid Windows path
+				let normalizedPath = folderPath;
+				if (normalizedPath.startsWith('/mnt/')) {
+					normalizedPath = wslToWindows(normalizedPath);
+					console.log(`Converted WSL path to Windows: ${normalizedPath}`);
+				}
+
+				// Use cmd.exe /c start to open the folder
+				// The empty quotes "" are required for the window title parameter
+				execSync(`cmd.exe /c start "" "${normalizedPath}"`, {
+					stdio: 'ignore',
+					windowsHide: true
+				});
+
+				console.log(`Successfully opened folder: ${normalizedPath}`);
 				res.json({ success: true });
 			} catch (error) {
 				console.error('Open folder error:', error);
-				res.status(500).json({ error: 'Failed to open folder' });
+				const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+				console.error('Error details:', errorMsg);
+				res.status(500).json({
+					error: 'Failed to open folder',
+					details: errorMsg
+				});
 			}
 		});
 
