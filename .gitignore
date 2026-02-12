@@ -4,8 +4,34 @@ dist/
 # Dependencies
 node_modules/
 
-# Logs
+# Logs and test outputs
 *.log
+*.txt
+server-output.txt
+server.log
+test-results.txt
+
+# Test files in root
+test-*.js
+test-*.html
+test-*.ts
+
+# Screenshots and images in root
+/*.png
+/*.jpg
+/*.jpeg
+
+# Documentation (keep only README, LICENSE, PRIVACY, CLAUDE)
+/COMPLETE_TEST_REPORT.md
+/FEATURE_STATUS.md
+/IMPROVEMENTS.md
+/MAIN_JS_REFACTORING.md
+/MIGRATION.md
+/REFACTORING.md
+/TESTING.md
+/TEST_REPORT.md
+/ZOOM_FIX_SUMMARY.md
+/ZOOM_TESTS_PASSED.md
 
 # Editor
 *.*~
@@ -13,7 +39,20 @@ node_modules/
 # Legacy
 /libs
 /demo
+/Demo
+/pdfile-web
+
+# Promo - keep only Pdfile.png (the logo)
+/Promo/*
+!/Promo/Pdfile.png
+
+# Lock files (npm only)
+bun.lock
+yarn.lock
+pnpm-lock.yaml
 
 # Generated social media cards (regenerate with: npm run social-cards)
 social-cards/*.png
-/pdfile-web
+
+# Test fixtures
+test-fixtures/
