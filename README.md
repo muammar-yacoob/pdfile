@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./src/imgs/pdfile-logo.png" alt="PDFile Logo" width="200"/>
+<img src="https://raw.githubusercontent.com/muammar-yacoob/PDFile/main/src/imgs/pdfile-logo.png" alt="PDFile Logo" width="200"/>
 
 ### Comprehensive PDF Utility Toolkit for Windows
 
