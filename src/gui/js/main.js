@@ -14,6 +14,10 @@ let selectedPages = new Set(); // Will sync with AppState
 // Expose pdfDocument to window for export functionality
 window.pdfDocument = pdfDocument;
 let lastSelectedPage = null; // Will sync with AppState
+
+// Expose to window for cross-module access
+window.selectedPages = selectedPages;
+window.lastSelectedPage = lastSelectedPage;
 let pendingOverlays = []; // Will sync with AppState
 let selectedOverlayIndex = null; // Will sync with AppState
 
@@ -23,7 +27,9 @@ function syncStateToLocal() {
 	pdfDocument = AppState.getPdfDocument();
 	mergedPagesData = AppState.getMergedPagesData();
 	selectedPages = AppState.getSelectedPages();
+	window.selectedPages = selectedPages; // Keep window reference in sync
 	lastSelectedPage = AppState.getLastSelectedPage();
+	window.lastSelectedPage = lastSelectedPage; // Keep window reference in sync
 	pendingOverlays = AppState.getOverlays();
 	selectedOverlayIndex = AppState.getSelectedIndex();
 }
@@ -59,6 +65,9 @@ async function loadInitialPDF() {
 		if (data.filePath) {
 			currentPdfPath = data.filePath;
 			currentPdfFile = data.fileName;
+			AppState.setCurrentFile(data.fileName); // Sync to AppState
+			window.currentPdfFile = data.fileName; // Expose to window for merge handler
+			window.mergedPagesData = []; // Initialize for merge handler
 			document.getElementById('fileName').textContent = data.fileName;
 
 			// Enable merge button
@@ -66,15 +75,75 @@ async function loadInitialPDF() {
 
 			// Load PDF preview
 			const previewArea = document.getElementById('previewArea');
-			previewArea.innerHTML = `<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>`;
+			previewArea.innerHTML = `
+				<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>
+
+				<!-- Hotkeys Display (Bottom Left) -->
+				<div class="preview-hotkeys" id="previewHotkeys" onclick="toggleHotkeys(event)">
+					<div class="hotkey-icon">
+						<i data-lucide="keyboard" style="width: 16px; height: 16px;"></i>
+					</div>
+					<div class="hotkey-content">
+						<div class="hotkey-item">
+							<kbd>Ctrl</kbd><span>+</span><kbd>0</kbd><span>Toggle fit/100%</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>Ctrl</kbd><span>+</span><kbd>+/-</kbd><span>Zoom in/out</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>Ctrl</kbd><span>+</span><kbd>Scroll</kbd><span>Zoom</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>←↑↓→</kbd><span>Move overlay</span>
+						</div>
+						<div class="hotkey-item">
+							<kbd>Del</kbd><span>Delete</span>
+						</div>
+					</div>
+				</div>
+
+				<!-- Zoom Controls (Bottom Right) -->
+				<div class="zoom-controls">
+					<button class="zoom-btn" onclick="PreviewController.zoomOut()" title="Zoom Out (Ctrl+-)">
+						<i data-lucide="minus" style="width: 11px; height: 11px;"></i>
+					</button>
+					<div class="zoom-display" id="zoomDisplay">100%</div>
+					<button class="zoom-btn" onclick="PreviewController.zoomIn()" title="Zoom In (Ctrl++)">
+						<i data-lucide="plus" style="width: 11px; height: 11px;"></i>
+					</button>
+					<button class="zoom-btn" onclick="PreviewController.zoomFit()" title="Fit to Width (Ctrl+0)">
+						<i data-lucide="maximize-2" style="width: 11px; height: 11px;"></i>
+					</button>
+					<div style="width: 1px; height: 20px; background: var(--brd); margin: 0 4px;"></div>
+					<button class="zoom-btn" id="darkModeBtn" onclick="PreviewController.toggleDarkMode()" title="Toggle Dark Background">
+						<i data-lucide="moon" style="width: 11px; height: 11px;"></i>
+					</button>
+				</div>
+
+				<!-- Processing Overlay -->
+				<div class="processing-overlay" id="processingOverlay" style="display: none;">
+					<div class="processing-content">
+						<div class="processing-spinner"></div>
+						<div class="processing-text" id="processingText">Processing...</div>
+					</div>
+				</div>
+			`;
+
+			// Initialize Lucide icons for toolbar
+			if (window.lucide) {
+				window.lucide.createIcons();
+			}
 
 			// Setup zoom and pan interactions
-			setupPreviewInteraction();
+			PreviewController.setupInteraction();
+
+			// Initialize dark mode preference
+			PreviewController.initDarkMode();
 
 			// Auto-fit to width on initial load
-			zoomLevel = 'fit';
+			zoomLevel = window.zoomLevel = 'fit';
 			await generateThumbnails(data.filePath);
-			await renderPreviewPage(1);
+			await PreviewController.renderPage(1);
 		}
 	} catch (err) {
 		console.error('Failed to load initial PDF:', err);
@@ -99,6 +168,8 @@ async function loadPDFFile(file) {
 	try {
 		const objectUrl = URL.createObjectURL(file);
 		currentPdfFile = file.name;
+		AppState.setCurrentFile(file.name); // Sync to AppState
+		window.currentPdfFile = file.name; // Expose to window for merge handler
 		document.getElementById('fileName').textContent = file.name;
 
 		// Enable merge button
@@ -106,123 +177,84 @@ async function loadPDFFile(file) {
 
 		// Clear merged pages data when loading new PDF
 		mergedPagesData = [];
+		window.mergedPagesData = []; // Expose to window for merge handler
+
+		// Clear page source mapping
+		pageSourceMap.clear();
 
 		// Show preview
 		const previewArea = document.getElementById('previewArea');
-		previewArea.innerHTML = `<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>`;
+		previewArea.innerHTML = `
+			<div class="canvas-wrapper"><canvas id="pdfCanvas"></canvas></div>
+			<!-- Hotkeys Display (Bottom Left) -->
+			<div class="preview-hotkeys" id="previewHotkeys" onclick="toggleHotkeys(event)">
+				<div class="hotkey-icon">
+					<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i>
+				</div>
+				<div class="hotkey-content">
+					<div class="hotkey-item">
+						<kbd>←↑↓→</kbd><span>Move overlay</span>
+					</div>
+					<div class="hotkey-item">
+						<kbd>Alt</kbd><span>+</span><kbd>←↑↓→</kbd><span>Precise move</span>
+					</div>
+					<div class="hotkey-item">
+						<kbd>Del</kbd><span>Delete overlay</span>
+					</div>
+					<div class="hotkey-item">
+						<kbd>Esc</kbd><span>Deselect</span>
+					</div>
+				</div>
+			</div>
+			<!-- Zoom Controls (Bottom Right) -->
+			<div class="zoom-controls">
+				<button class="zoom-btn" onclick="PreviewController.zoomOut()" title="Zoom Out (Scroll Down)">
+					<i data-lucide="minus" style="width: 11px; height: 11px;"></i>
+				</button>
+				<div class="zoom-display" id="zoomDisplay">100%</div>
+				<button class="zoom-btn" onclick="PreviewController.zoomIn()" title="Zoom In (Scroll Up)">
+					<i data-lucide="plus" style="width: 11px; height: 11px;"></i>
+				</button>
+				<button class="zoom-btn" onclick="PreviewController.zoomFit()" title="Fit to Width">
+					<i data-lucide="maximize-2" style="width: 11px; height: 11px;"></i>
+				</button>
+				<button class="zoom-btn" id="darkModeBtn" onclick="PreviewController.toggleDarkMode()" title="Toggle Dark Background">
+					<i data-lucide="moon" style="width: 11px; height: 11px;"></i>
+				</button>
+			</div>
+		`;
+
+		// Create Lucide icons
+		lucide.createIcons();
 
 		// Setup zoom and pan interactions
-		setupPreviewInteraction();
+		PreviewController.setupInteraction();
 
 		// Load PDF for thumbnails
 		const arrayBuffer = await file.arrayBuffer();
 		pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 		window.pdfDocument = pdfDocument; // Expose to window
+		// Initialize undo/redo history
+		AppState.initHistory();
 
 		// Auto-fit to width
-		zoomLevel = 'fit';
+		zoomLevel = window.zoomLevel = 'fit';
 
 		await generateThumbnailsFromDoc();
-		await renderPreviewPage(1);
 
-		showModal('Success', `Loaded: ${file.name}`);
+		// Auto-select first page if PDF has only one page
+		if (pdfDocument.numPages === 1) {
+			handlePageSelection(1, true);
+		}
+
+		await PreviewController.renderPage(1);
 	} catch (err) {
 		showModal('Error', `Failed to load PDF: ${err.message}`);
 	}
 }
 
 // ===== PREVIEW AREA INTERACTION SETUP =====
-function setupPreviewInteraction() {
-	const previewArea = document.getElementById('previewArea');
-	if (!previewArea) return;
-
-	// Remove old listeners by cloning and replacing the element
-	const newPreviewArea = previewArea.cloneNode(true);
-	previewArea.parentNode.replaceChild(newPreviewArea, previewArea);
-	const area = newPreviewArea;
-
-	// Mouse wheel zoom
-	area.addEventListener(
-		'wheel',
-		(e) => {
-			e.preventDefault();
-
-			// Smooth zoom with smaller increments
-			const delta = e.deltaY < 0 ? 0.15 : -0.15;
-
-			// Get current scroll position
-			const scrollLeft = area.scrollLeft;
-			const scrollTop = area.scrollTop;
-			const oldZoom = zoomLevel === 'fit' ? 1.0 : zoomLevel;
-
-			// Calculate new zoom level
-			const newZoom = Math.max(0.5, Math.min(3.0, oldZoom + delta));
-
-			// Update zoom immediately (no debounce)
-			setZoomLevel(newZoom);
-
-			// Adjust scroll to zoom toward center
-			requestAnimationFrame(() => {
-				const zoomRatio = newZoom / oldZoom;
-				area.scrollLeft = scrollLeft * zoomRatio;
-				area.scrollTop = scrollTop * zoomRatio;
-			});
-		},
-		{ passive: false },
-	);
-
-	// Panning functionality
-	let isPanning = false;
-	let startX = 0;
-	let startY = 0;
-	let scrollLeft = 0;
-	let scrollTop = 0;
-
-	area.addEventListener('mousedown', (e) => {
-		// Only pan if clicking on the preview area itself, not on overlays/gizmos
-		if (e.target === area || e.target.classList.contains('canvas-wrapper') || e.target.id === 'pdfCanvas') {
-			isPanning = true;
-			startX = e.pageX - area.offsetLeft;
-			startY = e.pageY - area.offsetTop;
-			scrollLeft = area.scrollLeft;
-			scrollTop = area.scrollTop;
-			area.classList.add('panning');
-		}
-	});
-
-	area.addEventListener('mousemove', (e) => {
-		if (!isPanning) return;
-		e.preventDefault();
-
-		const x = e.pageX - area.offsetLeft;
-		const y = e.pageY - area.offsetTop;
-		const walkX = (x - startX) * 1.5; // Multiply for faster panning
-		const walkY = (y - startY) * 1.5;
-
-		area.scrollLeft = scrollLeft - walkX;
-		area.scrollTop = scrollTop - walkY;
-	});
-
-	area.addEventListener('mouseup', () => {
-		isPanning = false;
-		area.classList.remove('panning');
-	});
-
-	area.addEventListener('mouseleave', () => {
-		isPanning = false;
-		area.classList.remove('panning');
-	});
-
-	// Click to deselect overlays
-	const canvasWrapper = area.querySelector('.canvas-wrapper');
-	if (canvasWrapper) {
-		canvasWrapper.addEventListener('click', (e) => {
-			if (e.target === canvasWrapper || e.target.id === 'pdfCanvas') {
-				SelectionManager.deselectOverlay();
-			}
-		});
-	}
-}
+// Removed duplicate - using PreviewController.setupInteraction() instead
 
 // ===== THUMBNAIL GENERATION =====
 async function generateThumbnails(filePath) {
@@ -231,6 +263,8 @@ async function generateThumbnails(filePath) {
 		const arrayBuffer = await response.arrayBuffer();
 		pdfDocument = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 		window.pdfDocument = pdfDocument; // Expose to window
+		// Initialize undo/redo history
+		AppState.initHistory();
 		await generateThumbnailsFromDoc();
 	} catch (err) {
 		console.error('Failed to generate thumbnails:', err);
@@ -243,6 +277,13 @@ async function generateThumbnailsFromDoc() {
 
 	const pageCount = pdfDocument.numPages;
 	pageOrder = Array.from({ length: pageCount }, (_, i) => i + 1);
+
+	// Initialize page sources if not already set
+	for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
+		if (!pageSourceMap.has(pageNum)) {
+			pageSourceMap.set(pageNum, currentPdfFile);
+		}
+	}
 
 	for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
 		const page = await pdfDocument.getPage(pageNum);
@@ -259,9 +300,14 @@ async function generateThumbnailsFromDoc() {
 		item.className = 'thumbnail-item';
 		item.draggable = true;
 		item.dataset.pageNum = pageNum;
+		const sourceName = getPageSource(pageNum);
+		item.dataset.sourceFileName = sourceName;
+		const sourceColor = getColorForSource(sourceName);
+		const displayName = cleanFileName(sourceName);
 		item.innerHTML = `
             <canvas class="thumbnail-canvas"></canvas>
             <div class="thumbnail-number">${pageNum}</div>
+            <div class="thumbnail-source-label" style="background: ${sourceColor};" title="${sourceName}">${displayName}</div>
         `;
 		const thumbCanvas = item.querySelector('canvas');
 		thumbCanvas.width = canvas.width;
@@ -285,10 +331,125 @@ async function generateThumbnailsFromDoc() {
 	}
 }
 
+// ===== PANEL RESIZER =====
+function initPanelResizer() {
+	const resizer = document.getElementById('thumbnailResizer');
+	const thumbnailsPanel = document.getElementById('thumbnailsPanel');
+
+	if (!resizer || !thumbnailsPanel) return;
+
+	let isResizing = false;
+	let startX = 0;
+	let startWidth = 0;
+
+	resizer.addEventListener('mousedown', (e) => {
+		isResizing = true;
+		startX = e.clientX;
+		startWidth = thumbnailsPanel.offsetWidth;
+		resizer.classList.add('dragging');
+		document.body.style.cursor = 'col-resize';
+		document.body.style.userSelect = 'none';
+		e.preventDefault();
+	});
+
+	document.addEventListener('mousemove', (e) => {
+		if (!isResizing) return;
+
+		const diff = e.clientX - startX;
+		const newWidth = startWidth + diff;
+
+		// Constrain to min/max
+		const constrainedWidth = Math.max(120, Math.min(400, newWidth));
+		thumbnailsPanel.style.flexBasis = `${constrainedWidth}px`;
+	});
+
+	document.addEventListener('mouseup', () => {
+		if (isResizing) {
+			isResizing = false;
+			resizer.classList.remove('dragging');
+			document.body.style.cursor = '';
+			document.body.style.userSelect = '';
+		}
+	});
+}
+
+// ===== SOURCE FILE LABELS =====
+const sourceFileColors = [
+	'#ff6b6b', // Red
+	'#4ecdc4', // Teal
+	'#45b7d1', // Blue
+	'#96ceb4', // Green
+	'#ffa07a', // Orange
+	'#dda15e', // Gold
+	'#bc6c25', // Brown
+	'#9b59b6', // Purple
+	'#3498db', // Sky blue
+	'#e74c3c', // Crimson
+];
+
+const sourceFileMap = new Map(); // Maps source file names to colors
+const pageSourceMap = new Map(); // Maps page numbers to source file names
+let sourceLabelsVisible = false;
+
+function setPageSource(pageNum, sourceName) {
+	pageSourceMap.set(pageNum, sourceName);
+}
+
+function getPageSource(pageNum) {
+	return pageSourceMap.get(pageNum) || currentPdfFile || 'Original';
+}
+
+window.setPageSource = setPageSource;
+window.getPageSource = getPageSource;
+window.getColorForSource = getColorForSource;
+
+function cleanFileName(fileName) {
+	if (!fileName) return 'Original';
+	// Remove extension
+	let name = fileName.replace(/\.pdf$/i, '');
+	// Remove common suffixes
+	name = name.replace(/_(merged|removed|reordered|modified|exported|abused)$/i, '');
+	return name;
+}
+
+function getSourceFileName(item) {
+	return item.dataset.sourceFileName || window.currentPdfFile || 'Original';
+}
+
+function getColorForSource(sourceName) {
+	if (!sourceFileMap.has(sourceName)) {
+		const colorIndex = sourceFileMap.size % sourceFileColors.length;
+		sourceFileMap.set(sourceName, sourceFileColors[colorIndex]);
+	}
+	return sourceFileMap.get(sourceName);
+}
+
+function toggleSourceLabels() {
+	sourceLabelsVisible = !sourceLabelsVisible;
+	const thumbnailsList = document.getElementById('thumbnailsList');
+	const toggleBtn = document.getElementById('toggleSourceLabelsBtn');
+
+	if (sourceLabelsVisible) {
+		thumbnailsList.classList.add('show-source-labels');
+		toggleBtn.style.background = 'rgba(127, 165, 223, 0.2)';
+		toggleBtn.style.color = '#7fa5df';
+	} else {
+		thumbnailsList.classList.remove('show-source-labels');
+		toggleBtn.style.background = '';
+		toggleBtn.style.color = '';
+	}
+}
+
+window.toggleSourceLabels = toggleSourceLabels;
+
 // ===== PDF PREVIEW RENDERING =====
 let currentPreviewPage = 1;
 let previewScale = 1;
 let zoomLevel = 1.0; // 1.0 = 100%, 2.0 = 200%
+
+// Expose to window for PreviewController
+window.currentPreviewPage = currentPreviewPage;
+window.zoomLevel = zoomLevel;
 
 // Helper functions to convert between canvas pixels and PDF points
 async function getPDFPageDimensions(pageNum) {
@@ -319,91 +480,7 @@ function canvasToPDFCoords(
 	};
 }
 
-async function renderPreviewPage(pageNum) {
-	if (!pdfDocument) return;
-
-	try {
-		currentPreviewPage = pageNum;
-		const canvas = document.getElementById('pdfCanvas');
-		if (!canvas) return;
-
-		// CRITICAL FIX: Get the ORIGINAL page number from thumbnail data
-		// This handles page reordering correctly
-		const thumbnails = document.querySelectorAll('.thumbnail-item');
-		const thumbnail = Array.from(thumbnails).find(
-			(t) => Number.parseInt(t.dataset.pageNum) === pageNum,
-		);
-		const originalPageNum = thumbnail
-			? Number.parseInt(
-					thumbnail.dataset.originalPage || thumbnail.dataset.pageNum,
-				)
-			: pageNum;
-
-		const page = await pdfDocument.getPage(originalPageNum);
-
-		// Calculate base scale to fill width
-		const previewArea = document.getElementById('previewArea');
-		const containerWidth = previewArea.clientWidth - 20;
-		const pageViewport = page.getViewport({ scale: 1 });
-
-		const baseScale = containerWidth / pageViewport.width; // Fill width
-
-		// Apply zoom level - if 'fit', use baseScale; otherwise apply zoom multiplier
-		const scale = zoomLevel === 'fit' ? baseScale : baseScale * zoomLevel;
-		previewScale = scale;
-
-		const viewport = page.getViewport({ scale });
-
-		canvas.width = viewport.width;
-		canvas.height = viewport.height;
-
-		const context = canvas.getContext('2d');
-		await page.render({ canvasContext: context, viewport }).promise;
-
-		// Update gizmos visibility for current page (overlays are only rendered server-side on export)
-		updateGizmosForPage(pageNum);
-	} catch (err) {
-		console.error('Error rendering preview page:', err);
-	}
-}
-
-function setZoomLevel(newZoom) {
-	// Convert 'fit' to 1.0 if transitioning from fit mode
-	if (zoomLevel === 'fit') {
-		zoomLevel = 1.0;
-	}
-
-	// If newZoom is a delta adjustment, add it to current zoom
-	if (typeof newZoom === 'number') {
-		zoomLevel = Math.max(0.5, Math.min(3.0, newZoom)); // Clamp between 50% and 300%
-	} else if (newZoom === 'fit') {
-		zoomLevel = 'fit';
-	}
-
-	renderPreviewPage(currentPreviewPage);
-}
-
-function updateGizmosForPage(pageNum) {
-	// Remove all existing gizmos
-	document.querySelectorAll('.overlay-gizmo').forEach((g) => g.remove());
-
-	// Recreate gizmos only for the current page (use AppState!)
-	const overlays = AppState.getOverlays();
-	overlays.forEach((overlay, i) => {
-		const overlayPage = (overlay.pageIndex || 0) + 1;
-		if (overlayPage === pageNum) {
-			const label =
-				overlay.type === 'date'
-					? `${overlay.dateText || 'Today'}`
-					: overlay.type === 'text'
-						? `Text: ${overlay.text || overlay.dateText}`
-						: overlay.type === 'image'
-							? 'Image'
-							: 'Signature';
-			addOverlayGizmo(overlay.type, label, overlay.x, overlay.y, i);
-		}
-	});
-}
+// Removed duplicate functions - using PreviewController instead
 
 let draggedElement = null;
 
@@ -483,7 +560,7 @@ function handlePageSelection(pageNum, isSelected) {
 		selectedPages.add(pageNum);
 		lastSelectedPage = pageNum;
 		// Show the selected page in preview (always show the last selected one)
-		renderPreviewPage(pageNum);
+		PreviewController.renderPage(pageNum);
 	} else {
 		selectedPages.delete(pageNum);
 		// If we're unselecting the last selected page, update to another selected page
@@ -493,7 +570,7 @@ function handlePageSelection(pageNum, isSelected) {
 		}
 		// If there are still selected pages, show one of them
 		if (selectedPages.size > 0 && lastSelectedPage) {
-			renderPreviewPage(lastSelectedPage);
+			PreviewController.renderPage(lastSelectedPage);
 		}
 	}
 
@@ -618,7 +695,7 @@ async function rotateSelectedPages(rotation) {
 	const pageCount = pagesToRotate.length;
 
 	try {
-		showModal('Processing', 'Rotating pages...');
+		showProcessing('Rotating pages...');
 
 		const response = await fetch('/api/rotate-pages', {
 			method: 'POST',
@@ -659,14 +736,23 @@ async function rotateSelectedPages(rotation) {
 			// Reload the rotated PDF
 			await loadPDFFile(rotatedFile);
 
-			// Clear selection
-			selectedPages.clear();
+			// Re-select the rotated pages
+			pagesToRotate.forEach((pageNum) => {
+				selectedPages.add(pageNum);
+			});
 
-			closeModal();
+			// Update selection UI
+			if (window.PageOperations) {
+				window.PageOperations.updateSelectionUI();
+			}
+
+			AppState.markAsChanged(); // Track unsaved changes
+
+			hideProcessing();
 		};
 		reader.readAsDataURL(blob);
 	} catch (error) {
-		closeModal();
+		hideProcessing();
 		showModal('Error', error.message || 'Failed to rotate pages');
 	}
 }
@@ -750,9 +836,9 @@ function updatePageNumbers() {
 
 	// Re-render the preview page to show overlays in new positions
 	if (lastSelectedPage) {
-		renderPreviewPage(lastSelectedPage);
+		PreviewController.renderPage(lastSelectedPage);
 	} else if (currentPreviewPage) {
-		renderPreviewPage(currentPreviewPage);
+		PreviewController.renderPage(currentPreviewPage);
 	}
 }
 
@@ -773,7 +859,7 @@ async function applyReorder() {
 		'Apply the new page order? This will download a reordered PDF file.',
 		async () => {
 			try {
-				showModal('Processing', 'Reordering pages...');
+				showProcessing('Reordering pages...');
 
 				const response = await fetch('/api/reorder-pages', {
 					method: 'POST',
@@ -793,167 +879,17 @@ async function applyReorder() {
 				window.URL.revokeObjectURL(url);
 				document.body.removeChild(a);
 
-				closeModal();
-				showModal('Success', 'Pages reordered successfully!');
+				hideProcessing();
 				document.getElementById('reorderBtn').style.display = 'none';
 			} catch (err) {
-				closeModal();
+				hideProcessing();
 				showModal('Error', `Failed to reorder pages: ${err.message}`);
 			}
 		},
 	);
 }
 
-// ===== TOOL FUNCTIONS =====
-function toggleTool(toolId) {
-	const tools = document.querySelectorAll('.tool');
-	const clickedTool = document.getElementById(toolId);
-
-	tools.forEach((tool) => {
-		if (tool.id === toolId) {
-			tool.classList.toggle('active');
-		} else {
-			tool.classList.remove('active');
-		}
-	});
-}
-
-function switchOverlayTab(tabName) {
-	document.querySelectorAll('.tabs .tab').forEach((tab, i) => {
-		tab.classList.toggle('active', ['text', 'image'][i] === tabName);
-	});
-	document.querySelectorAll('.tab-content').forEach((content, i) => {
-		content.classList.toggle('active', ['text', 'image'][i] === tabName);
-	});
-}
-
-function cycleDateFormat() {
-	const currentIndex = dateFormats.indexOf(currentDateFormat);
-	const nextIndex = (currentIndex + 1) % dateFormats.length;
-	currentDateFormat = dateFormats[nextIndex];
-	document.getElementById('dateFormatBtn').textContent = currentDateFormat;
-
-	// If a date was already picked, update the text field with new format
-	if (lastPickedDate) {
-		const textInput = document.getElementById('textContent');
-		textInput.value = formatDateByFormat(lastPickedDate, currentDateFormat);
-		textContentIsDate = true; // Mark as date content
-	}
-}
-
-function cycleSelectedLayerDateFormat() {
-	const index = AppState.getSelectedIndex();
-	if (index === null) return;
-
-	const overlay = AppState.getOverlay(index);
-	if (!overlay || overlay.type !== 'date') return;
-
-	// Get current format or default
-	const currentFormat = overlay.dateFormat || 'MM/DD/YYYY';
-	const currentIndex = dateFormats.indexOf(currentFormat);
-	const nextIndex = (currentIndex + 1) % dateFormats.length;
-	const newFormat = dateFormats[nextIndex];
-
-	// Parse the current date text to extract the date
-	let date;
-	try {
-		// Try to parse the existing date text
-		const dateText = overlay.dateText || '';
-		if (dateText) {
-			// Simple parsing - try multiple formats
-			date = parseDateFromText(dateText, currentFormat);
-		}
-	} catch (e) {
-		console.warn('Could not parse date:', e);
-	}
-
-	// If we have a valid date, reformat it; otherwise keep the original text
-	let newDateText = overlay.dateText;
-	if (date && !isNaN(date.getTime())) {
-		newDateText = formatDateByFormat(date, newFormat);
-	}
-
-	// Update the overlay
-	AppState.updateOverlay(index, {
-		dateFormat: newFormat,
-		dateText: newDateText,
-	});
-
-	// Update the UI
-	document.getElementById('editDateFormatBtn').textContent = newFormat;
-	document.getElementById('editTextContent').value = newDateText;
-
-	// Update the gizmo
-	UIControls.updateLayerText(newDateText);
-}
-
-function parseDateFromText(text, format) {
-	// Remove common separators and extract numbers
-	const parts = text.match(/\d+/g);
-	if (!parts || parts.length < 3) return null;
-
-	let year, month, day;
-
-	switch (format) {
-		case 'MM/DD/YYYY':
-			month = Number.parseInt(parts[0]) - 1;
-			day = Number.parseInt(parts[1]);
-			year = Number.parseInt(parts[2]);
-			break;
-		case 'DD/MM/YYYY':
-			day = Number.parseInt(parts[0]);
-			month = Number.parseInt(parts[1]) - 1;
-			year = Number.parseInt(parts[2]);
-			break;
-		case 'YYYY-MM-DD':
-			year = Number.parseInt(parts[0]);
-			month = Number.parseInt(parts[1]) - 1;
-			day = Number.parseInt(parts[2]);
-			break;
-		case 'Month DD, YYYY':
-			// For month name format, try to parse differently
-			const monthNames = [
-				'january',
-				'february',
-				'march',
-				'april',
-				'may',
-				'june',
-				'july',
-				'august',
-				'september',
-				'october',
-				'november',
-				'december',
-			];
-			const textLower = text.toLowerCase();
-			month = monthNames.findIndex((m) => textLower.includes(m));
-			if (month === -1) return null;
-			day = Number.parseInt(parts[0]);
-			year = Number.parseInt(parts[1]);
-			break;
-		default:
-			return null;
-	}
-
-	return new Date(year, month, day);
-}
-
-function updateAddTextButtonState() {
-	const textInput = document.getElementById('textContent');
-	const addTextBtn = document.getElementById('addTextBtn');
-	const hasContent = textInput.value.trim().length > 0;
-	addTextBtn.disabled = !hasContent;
-}
-
-function onTextContentChange() {
-	updateAddTextButtonState();
-
-	// If manually edited, hide date format button (user typed custom text)
-	if (!textContentIsDate) {
-		document.getElementById('dateFormatBtn').style.display = 'none';
-	}
-}
+// ===== TOOL FUNCTIONS ===== (moved to tool-manager.js)
 
 function browseImage() {
 	document.getElementById('imageFile').click();
@@ -1027,161 +963,65 @@ function insertRecentImage(index) {
 	const img = recentImages[index];
 	if (!img) return;
 
-	const overlayIndex = AppState.getOverlays().length;
+	// Load image to get actual dimensions and aspect ratio
+	const imgElement = new Image();
+	imgElement.onload = () => {
+		const overlayIndex = AppState.getOverlays().length;
 
-	AppState.addOverlay({
-		type: 'image',
-		imageData: img.data,
-		x: 100,
-		y: 100,
-		width: 150,
-		height: 150,
-		opacity: 100,
-		removeBackground: false,
-		pageIndex: currentPreviewPage - 1,
-	});
+		const canvas = document.getElementById('pdfCanvas');
+		const canvasWidth = canvas ? canvas.width : 1;
+		const canvasHeight = canvas ? canvas.height : 1;
 
-	addOverlayGizmo('image', 'Image', 100, 100, overlayIndex);
-	LayerManager.updateLayersList();
+		// Calculate size maintaining aspect ratio
+		const aspectRatio = imgElement.width / imgElement.height;
+		let width, height;
+
+		if (aspectRatio > 1) {
+			// Wider than tall
+			width = 150;
+			height = width / aspectRatio;
+		} else {
+			// Taller than wide
+			height = 150;
+			width = height * aspectRatio;
+		}
+
+		// Calculate center position for initial placement
+		const centerX = Math.max(0, (canvasWidth - width) / 2);
+		const centerY = Math.max(0, (canvasHeight - height) / 2);
+
+		AppState.addOverlay({
+			type: 'image',
+			imageData: img.data,
+			x: centerX,
+			y: centerY,
+			width: width,
+			height: height,
+			aspectRatio: aspectRatio,
+			opacity: 100,
+			removeBackground: false,
+			pageIndex: window.currentPreviewPage - 1,
+			canvasWidth,
+			canvasHeight,
+		});
+
+		AppState.markAsChanged(); // Track unsaved changes
+
+		window.GizmoManager.createGizmo('image', 'Image', centerX, centerY, overlayIndex);
+		LayerManager.updateLayersList();
+
+		// Auto-select the newly added overlay
+		if (window.SelectionManager) {
+			window.SelectionManager.selectOverlay(overlayIndex);
+		}
+	};
+
+	imgElement.src = img.data;
 }
 
 function openDatePicker() {
 	if (datePicker) {
 		datePicker.open();
-	}
-}
-
-function openFontStyleDialog() {
-	const index = AppState.getSelectedIndex();
-	if (index === null) return;
-
-	const overlay = AppState.getOverlay(index);
-	if (!overlay || overlay.type !== 'date') return;
-
-	// Open font style dialog with current values
-	window.FontStyleDialog.open({
-		fontFamily: overlay.fontFamily || 'Helvetica',
-		fontSize: overlay.baseFontSize || 12,
-		bold: overlay.bold || false,
-		italic: overlay.italic || false,
-		underline: overlay.underline || false,
-		onChange: (style) => {
-			// Update overlay with new font style
-			AppState.updateOverlay(index, {
-				fontFamily: style.fontFamily,
-				baseFontSize: style.fontSize,
-				fontSize: style.fontSize, // Update both
-				bold: style.bold,
-				italic: style.italic,
-				underline: style.underline,
-			});
-
-			// Re-render gizmo with new style
-			const gizmo = document.querySelector(`.overlay-gizmo[data-overlay-index="${index}"]`);
-			if (gizmo) {
-				const textElement = gizmo.querySelector('.overlay-gizmo-text');
-				if (textElement) {
-					// Apply font family
-					const fontFamily = style.fontFamily === 'Helvetica' || style.fontFamily === 'Arial' ||
-									   style.fontFamily === 'Times New Roman' || style.fontFamily === 'Courier New' ||
-									   style.fontFamily === 'Georgia' || style.fontFamily === 'Verdana'
-						? style.fontFamily
-						: `'${style.fontFamily}', sans-serif`;
-					textElement.style.fontFamily = fontFamily;
-
-					// Apply styles
-					textElement.style.fontWeight = style.bold ? 'bold' : 'normal';
-					textElement.style.fontStyle = style.italic ? 'italic' : 'normal';
-					textElement.style.textDecoration = style.underline ? 'underline' : 'none';
-				}
-			}
-
-			// Re-render preview
-			window.PreviewController?.renderPage(window.currentPreviewPage);
-		},
-	});
-}
-
-function openMergePDF() {
-	if (!currentPdfFile) return;
-
-	const input = document.createElement('input');
-	input.type = 'file';
-	input.accept = '.pdf,image/*';
-	input.onchange = (e) => {
-		const file = e.target.files[0];
-		if (file) {
-			showMergeDialog(file);
-		}
-	};
-	input.click();
-}
-
-function showMergeDialog(file) {
-	const modal = document.getElementById('modalOverlay');
-	const header = document.getElementById('modalHeader');
-	const body = document.getElementById('modalBody');
-	const footer = document.getElementById('modalFooter');
-
-	// Determine file type
-	const fileType = file.type.toLowerCase();
-	const fileName = file.name.toLowerCase();
-	const isImage =
-		fileType.startsWith('image/') ||
-		fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
-	const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
-
-	let fileTypeLabel = 'file';
-	if (isImage) fileTypeLabel = 'image';
-	else if (isPdf) fileTypeLabel = 'PDF';
-
-	header.textContent = `Merge ${fileTypeLabel.charAt(0).toUpperCase() + fileTypeLabel.slice(1)}`;
-	body.innerHTML = `
-        <p>How would you like to merge "${file.name}"?</p>
-        ${isImage ? '<p style="font-size: 10px; color: var(--txt3); margin-top: 8px;">Image will be added as a full page.</p>' : ''}
-    `;
-	footer.innerHTML = `
-        <button class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
-        <button class="modal-btn modal-btn-secondary" onclick="closeModal(); mergeFiles('beginning', '${file.name}')">Add to Beginning</button>
-        <button class="modal-btn modal-btn-primary" onclick="closeModal(); mergeFiles('end', '${file.name}')">Add to End</button>
-    `;
-
-	// Store file for merge
-	window.pendingMergeFile = file;
-	modal.classList.add('active');
-}
-
-function formatDateByFormat(date, format) {
-	const months = [
-		'January',
-		'February',
-		'March',
-		'April',
-		'May',
-		'June',
-		'July',
-		'August',
-		'September',
-		'October',
-		'November',
-		'December',
-	];
-
-	const mm = String(date.getMonth() + 1).padStart(2, '0');
-	const dd = String(date.getDate()).padStart(2, '0');
-	const yyyy = date.getFullYear();
-
-	switch (format) {
-		case 'MM/DD/YYYY':
-			return `${mm}/${dd}/${yyyy}`;
-		case 'DD/MM/YYYY':
-			return `${dd}/${mm}/${yyyy}`;
-		case 'YYYY-MM-DD':
-			return `${yyyy}-${mm}-${dd}`;
-		case 'Month DD, YYYY':
-			return `${months[date.getMonth()]} ${dd}, ${yyyy}`;
-		default:
-			return `${mm}/${dd}/${yyyy}`;
 	}
 }
 
@@ -1194,12 +1034,24 @@ function addTextOverlay() {
 
 	// Add new overlay (default to transparent background)
 	const overlayIndex = AppState.getOverlays().length;
+
+	const canvas = document.getElementById('pdfCanvas');
+	const canvasWidth = canvas ? canvas.width : 1;
+	const canvasHeight = canvas ? canvas.height : 1;
+
+	// Calculate center position for initial placement
+	const baseFontSize = 12;
+	const estimatedWidth = baseFontSize * text.length * 0.6; // Rough estimate
+	const estimatedHeight = baseFontSize * 1.5;
+	const centerX = Math.max(0, (canvasWidth - estimatedWidth) / 2);
+	const centerY = Math.max(0, (canvasHeight - estimatedHeight) / 2);
+
 	AppState.addOverlay({
 		type: 'date', // Using date type since it handles text rendering
 		dateText: text,
 		dateFormat: textContentIsDate ? currentDateFormat : undefined, // Store format if it's a date
-		x: 100,
-		y: 100,
+		x: centerX,
+		y: centerY,
 		fontSize: 12, // Base font size, will be scaled by gizmo
 		baseFontSize: 12, // Store base font size for scaling
 		textColor: textColor,
@@ -1207,26 +1059,35 @@ function addTextOverlay() {
 		transparentBg: true, // Default to transparent
 		opacity: 100,
 		scale: 1,
-		pageIndex: currentPreviewPage - 1,
+		pageIndex: window.currentPreviewPage - 1,
 		// Font styling
 		fontFamily: 'Helvetica',
 		bold: false,
 		italic: false,
 		underline: false,
-		// Text border
-		borderColor: null,
-		borderWidth: 0,
+		// Text highlight
+		highlightColor: null,
+		highlightBlur: 0,
+		canvasWidth,
+		canvasHeight,
 	});
+
+	AppState.markAsChanged(); // Track unsaved changes
 
 	// Add visual gizmo to preview
 	const label = text.length > 20 ? `${text.substring(0, 20)}...` : text;
-	addOverlayGizmo('text', label, 100, 100, overlayIndex);
+	window.GizmoManager.createGizmo('text', label, centerX, centerY, overlayIndex);
 
 	LayerManager.updateLayersList();
 	UIControls.closeTextEditor();
 
 	// Reset date flags
 	textContentIsDate = false;
+
+	// Auto-select the newly added overlay
+	if (window.SelectionManager) {
+		window.SelectionManager.selectOverlay(overlayIndex);
+	}
 }
 
 async function convertToWord() {
@@ -1236,7 +1097,7 @@ async function convertToWord() {
 	}
 
 	try {
-		showModal('Processing', 'Converting PDF to Word document...');
+		showProcessing('Converting PDF to Word document...');
 
 		const response = await fetch('/api/convert-to-word', {
 			method: 'POST',
@@ -1255,232 +1116,10 @@ async function convertToWord() {
 		window.URL.revokeObjectURL(url);
 		document.body.removeChild(a);
 
-		closeModal();
-		showModal('Success', `Converted "${currentPdfFile}" to Word successfully!`);
+		hideProcessing();
 	} catch (err) {
-		closeModal();
+		hideProcessing();
 		showModal('Error', `Failed to convert: ${err.message}`);
-	}
-}
-
-async function mergeFiles(position, fileName) {
-	if (!currentPdfFile) {
-		showModal('Error', 'Please load a PDF file first');
-		return;
-	}
-
-	// Use the pending merge file
-	const file = window.pendingMergeFile;
-	if (!file) return;
-
-	try {
-		const fileNameLower = file.name.toLowerCase();
-		const fileType = file.type.toLowerCase();
-		const isPdf =
-			fileNameLower.endsWith('.pdf') || fileType === 'application/pdf';
-		const isImage =
-			fileType.startsWith('image/') ||
-			fileNameLower.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
-
-		if (!isPdf && !isImage) {
-			showModal('Invalid File', 'Please select a PDF or image file');
-			return;
-		}
-
-		// If it's an image, convert to PDF via backend first
-		if (isImage) {
-			showModal('Processing', 'Converting image to PDF...');
-
-			const reader = new FileReader();
-			reader.onload = async (e) => {
-				const imageData = e.target.result;
-
-				try {
-					const response = await fetch('/api/merge-pdfs', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							pdfData: imageData,
-							position: position,
-							isImage: true,
-						}),
-					});
-
-					if (!response.ok) {
-						throw new Error('Failed to merge image');
-					}
-
-					// Download the merged PDF
-					const blob = await response.blob();
-
-					// Create a file object from the blob
-					const mergedFile = new File(
-						[blob],
-						`${currentPdfFile.replace('.pdf', '')}_merged.pdf`,
-						{ type: 'application/pdf' },
-					);
-
-					// Convert blob to base64 and update server's working file
-					const reader2 = new FileReader();
-					reader2.onload = async (e2) => {
-						const pdfData = e2.target.result;
-						try {
-							await fetch('/api/update-working-file', {
-								method: 'POST',
-								headers: { 'Content-Type': 'application/json' },
-								body: JSON.stringify({ pdfData }),
-							});
-						} catch (err) {
-							console.warn('Failed to update working file on server:', err);
-						}
-
-						// Load the merged PDF
-						await loadPDFFile(mergedFile);
-
-						// Clear merged pages data since PDF is now merged
-						mergedPagesData = [];
-
-						closeModal();
-						showModal('Success', 'Image merged successfully!', 2000);
-					};
-					reader2.readAsDataURL(blob);
-				} catch (error) {
-					console.error('Merge error:', error);
-					showModal('Error', `Failed to merge image: ${error.message}`);
-				}
-			};
-			reader.readAsDataURL(file);
-			return;
-		}
-
-		showModal('Processing', 'Merging PDF pages...');
-
-		// Load the new PDF using PDF.js
-		const arrayBuffer = await file.arrayBuffer();
-		const newPdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-		const newPageCount = newPdfDoc.numPages;
-
-		// Load current PDF if not already loaded
-		if (!pdfDocument) {
-			const response = await fetch(
-				`/pdf/${encodeURIComponent(currentPdfFile)}`,
-			);
-			const currentArrayBuffer = await response.arrayBuffer();
-			pdfDocument = await pdfjsLib.getDocument({ data: currentArrayBuffer })
-				.promise;
-			window.pdfDocument = pdfDocument; // Expose to window
-		}
-
-		// Get current state: either existing merged pages or create from thumbnails
-		let currentPages = [];
-		if (mergedPagesData.length > 0) {
-			// Already have merged pages - use them in current order
-			const thumbnails = document.querySelectorAll('.thumbnail-item');
-			currentPages = Array.from(thumbnails).map((item, idx) => {
-				const pageNum = Number.parseInt(item.dataset.pageNum);
-				const source = item.dataset.source || 'current';
-				const originalPage =
-					Number.parseInt(item.dataset.originalPage) || pageNum;
-
-				// Find the page info from mergedPagesData
-				const pageInfo = mergedPagesData.find((p, i) => i + 1 === pageNum) || {
-					doc: pdfDocument,
-					pageNum: originalPage,
-					source,
-				};
-				return pageInfo;
-			});
-		} else {
-			// No merged pages yet - use original document
-			for (let i = 1; i <= pdfDocument.numPages; i++) {
-				currentPages.push({ doc: pdfDocument, pageNum: i, source: 'original' });
-			}
-		}
-
-		// Create merged pages array
-		const mergedPages = [];
-
-		if (position === 'beginning') {
-			// Add new pages first, then current pages
-			for (let i = 1; i <= newPageCount; i++) {
-				mergedPages.push({ doc: newPdfDoc, pageNum: i, source: 'new' });
-			}
-			mergedPages.push(...currentPages);
-		} else {
-			// 'end' or default
-			// Add current pages first, then new pages
-			mergedPages.push(...currentPages);
-			for (let i = 1; i <= newPageCount; i++) {
-				mergedPages.push({ doc: newPdfDoc, pageNum: i, source: 'new' });
-			}
-		}
-
-		// Generate thumbnails for all pages
-		const thumbnailsList = document.getElementById('thumbnailsList');
-		thumbnailsList.innerHTML = '';
-
-		for (let i = 0; i < mergedPages.length; i++) {
-			const pageInfo = mergedPages[i];
-			const canvas = document.createElement('canvas');
-			const context = canvas.getContext('2d');
-
-			// Render PDF page
-			const page = await pageInfo.doc.getPage(pageInfo.pageNum);
-			const viewport = page.getViewport({ scale: 0.3 });
-			canvas.width = viewport.width;
-			canvas.height = viewport.height;
-			await page.render({ canvasContext: context, viewport }).promise;
-
-			const item = document.createElement('div');
-			item.className = 'thumbnail-item';
-			item.draggable = true;
-			item.dataset.pageNum = i + 1;
-			item.dataset.source = pageInfo.source;
-			item.dataset.originalPage = pageInfo.pageNum;
-			item.innerHTML = `
-                <canvas class="thumbnail-canvas"></canvas>
-                <div class="thumbnail-number">${i + 1}</div>
-            `;
-
-			if (pageInfo.source === 'new') {
-				item.style.borderColor = '#4CAF50'; // Green border for new pages
-			}
-
-			const thumbCanvas = item.querySelector('canvas');
-			thumbCanvas.width = canvas.width;
-			thumbCanvas.height = canvas.height;
-			thumbCanvas.getContext('2d').drawImage(canvas, 0, 0);
-
-			// Click to toggle selection
-			item.addEventListener('click', (e) => {
-				const currentPageNum = Number.parseInt(e.currentTarget.dataset.pageNum);
-				const isSelected = selectedPages.has(currentPageNum);
-				handlePageSelection(currentPageNum, !isSelected);
-			});
-
-			// Drag events for reordering
-			item.addEventListener('dragstart', handleDragStart);
-			item.addEventListener('dragover', handleDragOver);
-			item.addEventListener('drop', handleDrop);
-			item.addEventListener('dragend', handleDragEnd);
-
-			thumbnailsList.appendChild(item);
-		}
-
-		// Store merged pages data for export
-		mergedPagesData = mergedPages;
-
-		// Update page order
-		pageOrder = Array.from({ length: mergedPages.length }, (_, i) => i + 1);
-
-		// Store merged state
-		window.mergedPdfData = { mergedPages, arrayBuffer };
-
-		closeModal();
-		showModal('Success', `Merged ${newPageCount} pages successfully!`);
-	} catch (err) {
-		closeModal();
-		showModal('Error', `Failed to merge: ${err.message}`);
 	}
 }
 
@@ -1495,6 +1134,13 @@ async function removeSelectedPages() {
 		return;
 	}
 
+	// Check if trying to remove all pages
+	const totalPages = pdfDocument ? pdfDocument.numPages : 0;
+	if (selectedPages.size >= totalPages) {
+		showModal('Cannot Remove All Pages', 'A PDF must have at least one page. You cannot remove all pages from the document.');
+		return;
+	}
+
 	const pageCount = selectedPages.size;
 
 	showConfirmModal(
@@ -1502,7 +1148,7 @@ async function removeSelectedPages() {
 		`Are you sure you want to remove ${pageCount} page(s)?`,
 		async () => {
 			try {
-				showModal('Processing', `Removing ${pageCount} page(s)...`);
+				showProcessing(`Removing ${pageCount} page(s)...`);
 
 				const response = await fetch('/api/remove-pages', {
 					method: 'POST',
@@ -1510,7 +1156,10 @@ async function removeSelectedPages() {
 					body: JSON.stringify({ pages: Array.from(selectedPages) }),
 				});
 
-				if (!response.ok) throw new Error('Remove failed');
+				if (!response.ok) {
+					const errorData = await response.json();
+					throw new Error(errorData.error || 'Remove failed');
+				}
 
 				const blob = await response.blob();
 
@@ -1542,19 +1191,16 @@ async function removeSelectedPages() {
 					selectedPages.clear();
 					document.getElementById('removePageBtn').style.display = 'none';
 
-					closeModal();
-					showModal(
-						'Success',
-						`Removed ${pageCount} page(s) successfully!`,
-						2000,
-					);
+					hideProcessing();
 				};
 				reader.readAsDataURL(blob);
 			} catch (err) {
-				closeModal();
+				hideProcessing();
 				showModal('Error', `Failed to remove pages: ${err.message}`);
 			}
 		},
+		null,
+		true,
 	);
 }
 
@@ -1575,290 +1221,8 @@ function handleEmailShare() {
 	ShareModal.handleEmailShare();
 }
 
-// ===== OVERLAY GIZMO =====
-function addOverlayGizmo(type, label, x, y, overlayIndex) {
-	const canvasWrapper = document.querySelector('.canvas-wrapper');
-	if (!canvasWrapper) return; // Canvas not loaded yet
-
-	const overlay = AppState.getOverlay(overlayIndex);
-
-	// Create gizmo element
-	const gizmo = document.createElement('div');
-	gizmo.className = 'overlay-gizmo';
-
-	// Add selected class if this is the currently selected overlay
-	if (AppState.getSelectedIndex() === overlayIndex) {
-		gizmo.classList.add('selected');
-	}
-
-	gizmo.style.left = x + 'px';
-	gizmo.style.top = y + 'px';
-	gizmo.style.opacity = (overlay.opacity || 100) / 100;
-	gizmo.dataset.overlayIndex = overlayIndex;
-
-	// Set gizmo size based on overlay dimensions
-	if (overlay && (type === 'image' || type === 'signature')) {
-		gizmo.style.width = (overlay.width || 120) + 'px';
-		gizmo.style.height = (overlay.height || 60) + 'px';
-	}
-
-	// Build inner HTML based on type
-	let content = '';
-	if (type === 'image' || type === 'signature') {
-		// Show image preview
-		content =
-			overlay && overlay.imageData
-				? `<img src="${overlay.imageData}" alt="${label}">`
-				: `<div class="overlay-gizmo-text">${label}</div>`;
-	} else {
-		// Show text label for date/text overlays with colors
-		const textColor = overlay.textColor || '#000000';
-		const bgColor = overlay.transparentBg
-			? 'transparent'
-			: overlay.bgColor || '#ffffff';
-
-		// Calculate font size to fit the gizmo
-		// Available area after padding: width - 4px, height - 12px
-		const availableWidth = (overlay.width || 120) - 20; // Remove padding + some margin
-		const availableHeight = (overlay.height || 60) - 20;
-
-		// Estimate font size based on text length and available space
-		const textLength = label.length;
-		const estimatedFontSize = Math.min(
-			Math.floor(availableHeight * 0.6), // 60% of height
-			Math.floor(availableWidth / (textLength * 0.5)), // Based on character width
-			overlay.fontSize || 48, // Cap at stored font size or 48px
-		);
-		const fontSize = Math.max(8, Math.min(estimatedFontSize, 48));
-
-		content = `<div class="overlay-gizmo-text" style="color: ${textColor}; background-color: ${bgColor}; font-size: ${fontSize}px;">${label}</div>`;
-	}
-
-	// Add background removal indicator badge if applicable
-	const bgRemovalBadge =
-		overlay && overlay.removeBackground
-			? `<div class="bg-removal-badge" title="Background removal enabled">BG-</div>`
-			: '';
-
-	// Create resize handles (6 total: 2 corners + 4 sides)
-	// Upper corners reserved for rotate (left) and delete (right)
-	// Bottom corners lock aspect ratio, sides allow free resize
-	const resizeHandles = `
-        <div class="overlay-gizmo-handle n" data-action="resize" data-handle="n" title="Resize height"></div>
-        <div class="overlay-gizmo-handle e" data-action="resize" data-handle="e" title="Resize width"></div>
-        <div class="overlay-gizmo-handle se" data-action="resize" data-handle="se" title="Resize (locked ratio)"></div>
-        <div class="overlay-gizmo-handle s" data-action="resize" data-handle="s" title="Resize height"></div>
-        <div class="overlay-gizmo-handle sw" data-action="resize" data-handle="sw" title="Resize (locked ratio)"></div>
-        <div class="overlay-gizmo-handle w" data-action="resize" data-handle="w" title="Resize width"></div>
-    `;
-
-	gizmo.innerHTML = `
-        <div class="overlay-gizmo-label">${label}</div>
-        <div class="overlay-gizmo-rotate" data-action="rotate" title="Rotate">⟳</div>
-        <button class="overlay-gizmo-delete" onclick="removeOverlay(${overlayIndex})" title="Delete">✕</button>
-        ${resizeHandles}
-        ${bgRemovalBadge}
-        ${content}
-    `;
-
-	// Handle drag, resize, and rotate
-	let action = null;
-	let resizeHandle = null;
-	let startX, startY, initialLeft, initialTop, initialWidth, initialHeight;
-	let centerX, centerY, initialAngle;
-	let initialAspectRatio = 1;
-
-	gizmo.addEventListener('mousedown', (e) => {
-		if (e.target.classList.contains('overlay-gizmo-delete')) return;
-
-		const targetAction = e.target.dataset.action;
-
-		// If no special action, select this overlay (unless starting drag/resize/rotate)
-		if (!targetAction) {
-			SelectionManager.selectOverlay(overlayIndex);
-		}
-
-		if (targetAction === 'resize') {
-			action = 'resize';
-			resizeHandle = e.target.dataset.handle; // Store which handle (nw, n, ne, e, se, s, sw, w)
-			startX = e.clientX;
-			startY = e.clientY;
-			initialWidth = gizmo.offsetWidth;
-			initialHeight = gizmo.offsetHeight;
-			initialLeft = Number.parseInt(gizmo.style.left) || 0;
-			initialTop = Number.parseInt(gizmo.style.top) || 0;
-			initialAspectRatio = initialWidth / initialHeight;
-		} else if (targetAction === 'rotate') {
-			action = 'rotate';
-			const rect = gizmo.getBoundingClientRect();
-			centerX = rect.left + rect.width / 2;
-			centerY = rect.top + rect.height / 2;
-			initialAngle =
-				Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-			const currentRotation = AppState.getOverlay(overlayIndex)?.rotation || 0;
-			initialAngle = initialAngle - currentRotation;
-		} else {
-			action = 'move';
-			startX = e.clientX;
-			startY = e.clientY;
-			initialLeft = Number.parseInt(gizmo.style.left) || 0;
-			initialTop = Number.parseInt(gizmo.style.top) || 0;
-			gizmo.style.cursor = 'grabbing';
-		}
-		e.preventDefault();
-		e.stopPropagation();
-	});
-
-	document.addEventListener('mousemove', (e) => {
-		if (!action) return;
-
-		const index = Number.parseInt(gizmo.dataset.overlayIndex);
-
-		if (action === 'move') {
-			const deltaX = e.clientX - startX;
-			const deltaY = e.clientY - startY;
-
-			// Allow movement outside page bounds
-			const newLeft = initialLeft + deltaX;
-			const newTop = initialTop + deltaY;
-
-			gizmo.style.left = newLeft + 'px';
-			gizmo.style.top = newTop + 'px';
-
-			AppState.updateOverlay(index, { x: newLeft, y: newTop });
-		} else if (action === 'resize') {
-			const deltaX = e.clientX - startX;
-			const deltaY = e.clientY - startY;
-
-			let newWidth = initialWidth;
-			let newHeight = initialHeight;
-			let newLeft = initialLeft;
-			let newTop = initialTop;
-
-			// Determine if this is a corner (aspect-ratio locked) or side handle (free resize)
-			const isCorner = ['sw', 'se'].includes(resizeHandle);
-
-			if (isCorner) {
-				// Corner handles: maintain aspect ratio
-				let scale;
-				if (resizeHandle === 'se') {
-					// Bottom-right: expand from top-left anchor
-					scale = Math.max(
-						(initialWidth + deltaX) / initialWidth,
-						(initialHeight + deltaY) / initialHeight,
-					);
-				} else if (resizeHandle === 'sw') {
-					// Bottom-left: expand from top-right anchor
-					scale = Math.max(
-						(initialWidth - deltaX) / initialWidth,
-						(initialHeight + deltaY) / initialHeight,
-					);
-					newLeft = initialLeft + (initialWidth - initialWidth * scale);
-				}
-
-				newWidth = Math.max(30, initialWidth * scale);
-				newHeight = Math.max(20, initialHeight * scale);
-			} else {
-				// Side handles: free resize (only one dimension changes)
-				if (resizeHandle === 'e') {
-					newWidth = Math.max(30, initialWidth + deltaX);
-				} else if (resizeHandle === 'w') {
-					newWidth = Math.max(30, initialWidth - deltaX);
-					newLeft = initialLeft + (initialWidth - newWidth);
-				} else if (resizeHandle === 's') {
-					newHeight = Math.max(20, initialHeight + deltaY);
-				} else if (resizeHandle === 'n') {
-					newHeight = Math.max(20, initialHeight - deltaY);
-					newTop = initialTop + (initialHeight - newHeight);
-				}
-			}
-
-			// Apply new dimensions and position
-			gizmo.style.width = newWidth + 'px';
-			gizmo.style.height = newHeight + 'px';
-			gizmo.style.left = newLeft + 'px';
-			gizmo.style.top = newTop + 'px';
-
-			const currentOverlay = AppState.getOverlay(index);
-			if (currentOverlay) {
-				const updates = {
-					width: newWidth,
-					height: newHeight,
-					x: newLeft,
-					y: newTop,
-				};
-
-				// Scale font size for text overlays
-				if (currentOverlay.type === 'date' || currentOverlay.type === 'text') {
-					const scale = newWidth / initialWidth;
-					const baseFontSize = currentOverlay.baseFontSize || 12;
-					const newFontSize = Math.max(8, Math.round(baseFontSize * scale));
-					updates.fontSize = newFontSize;
-
-					// Update visual text size in gizmo
-					const textElement = gizmo.querySelector('.overlay-gizmo-text');
-					if (textElement) {
-						textElement.style.fontSize = newFontSize + 'px';
-					}
-
-					// Store the initial base font size
-					if (!currentOverlay.baseFontSize) {
-						updates.baseFontSize = 12;
-					}
-				}
-
-				AppState.updateOverlay(index, updates);
-			}
-		} else if (action === 'rotate') {
-			const currentAngle =
-				Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-			const rotation = currentAngle - initialAngle;
-
-			gizmo.style.transform = `rotate(${rotation}deg)`;
-
-			AppState.updateOverlay(index, { rotation });
-		}
-	});
-
-	document.addEventListener('mouseup', () => {
-		if (action) {
-			action = null;
-			gizmo.style.cursor = 'move';
-		}
-	});
-
-	canvasWrapper.appendChild(gizmo);
-
-	// Initialize Lucide icons in the gizmo
-	lucide.createIcons();
-}
-
-function removeOverlay(index) {
-	const overlay = AppState.getOverlay(index);
-	if (!overlay) return;
-
-	const label = overlay.dateText || overlay.type || 'overlay';
-
-	showConfirmModal(
-		'Remove Overlay',
-		`Remove this ${overlay.type === 'signature' ? 'signature' : overlay.type}?`,
-		() => {
-			AppState.removeOverlay(index);
-
-			// Deselect if this was selected
-			const selectedIndex = AppState.getSelectedIndex();
-			if (selectedIndex === index) {
-				SelectionManager.deselectOverlay();
-			} else if (selectedIndex > index) {
-				AppState.setSelectedIndex(selectedIndex - 1);
-			}
-
-			// Remove all gizmos and recreate them with updated indices for current page
-			updateGizmosForPage(currentPreviewPage);
-			LayerManager.updateLayersList();
-		},
-	);
-}
+// ===== GIZMO & MERGE FUNCTIONS ===== (moved to gizmo-manager.js and merge-handler.js)
+// Functions are available via window.GizmoManager.createGizmo, window.GizmoManager.removeOverlay, window.mergeFiles, etc.
 
 // ===== LAYERS MANAGEMENT =====
 // Old functions removed - now using LayerManager and SelectionManager modules
@@ -1930,6 +1294,8 @@ async function handleImageDrop(file) {
 				// Store original aspect ratio for this image
 				const aspectRatio = width / height;
 
+				// canvasWidth and canvasHeight already available from above
+
 				pendingOverlays.push({
 					type: 'image',
 					imageData: imageData,
@@ -1940,23 +1306,23 @@ async function handleImageDrop(file) {
 					aspectRatio: aspectRatio, // Store for resize operations
 					opacity: 100,
 					removeBackground: false,
-					pageIndex: currentPreviewPage - 1,
+					pageIndex: window.currentPreviewPage - 1,
+					canvasWidth,
+					canvasHeight,
 				});
+
+				AppState.markAsChanged(); // Track unsaved changes
 
 				// Add visual gizmo to preview
 				const label = isLargeImage ? 'Image (Full Page)' : 'Image';
-				addOverlayGizmo(
+				window.GizmoManager.createGizmo(
 					'image',
 					label,
 					Math.max(0, x),
 					Math.max(0, y),
 					overlayIndex,
 				);
-				updateLayersList();
-
-				console.log(
-					`Image dropped: ${file.name} (${img.width}x${img.height}) - ${isLargeImage ? 'large' : 'small'} - centered at (${x}, ${y})`,
-				);
+				window.LayerManager.updateLayersList();
 			};
 
 			img.onerror = () => {
@@ -2000,29 +1366,104 @@ async function handleImageDrop(file) {
 
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 // Initialize components
-let datePicker, textColorPicker, bgColorPicker, borderColorPicker;
+let datePicker, textColorPicker, bgColorPicker, highlightColorPicker;
 let selectedTextColor = '#000000';
 let selectedBgColor = '#ffffff';
-let selectedBorderColor = null;
+let selectedHighlightColor = null;
 
 // Expose to window for UI controls
 window.selectedTextColor = selectedTextColor;
 window.selectedBgColor = selectedBgColor;
-window.selectedBorderColor = selectedBorderColor;
+window.selectedHighlightColor = selectedHighlightColor;
+
+// Processing overlay utilities
+function showProcessing(message = 'Processing...') {
+	const overlay = document.getElementById('processingOverlay');
+	const text = document.getElementById('processingText');
+	if (overlay && text) {
+		text.textContent = message;
+		overlay.style.display = 'flex';
+	}
+}
+
+function hideProcessing() {
+	const overlay = document.getElementById('processingOverlay');
+	if (overlay) {
+		overlay.style.display = 'none';
+	}
+}
+
+// Export processing utilities
+window.showProcessing = showProcessing;
+window.hideProcessing = hideProcessing;
+
+// Export edited PDF with changes
+async function exportEditedPDF() {
+	if (!currentPdfFile) {
+		showModal('No PDF Loaded', 'Please load a PDF first');
+		return;
+	}
+
+	try {
+		showProcessing('Exporting edited PDF...');
+
+		// Create the export request
+		const response = await fetch('/api/export-pdf', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				overlays: pendingOverlays,
+				mergedPages: AppState.getSerializableMergedPages(),
+			}),
+		});
+
+		if (!response.ok) throw new Error('Export failed');
+
+		const blob = await response.blob();
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+
+		// Add " - Edited.pdf" suffix
+		const baseName = currentPdfFile.replace(/\.pdf$/i, '');
+		a.download = `${baseName} - Edited.pdf`;
+
+		document.body.appendChild(a);
+		a.click();
+		URL.revokeObjectURL(url);
+		document.body.removeChild(a);
+
+		// Mark as saved
+		AppState.markAsSaved();
+
+		hideProcessing();
+	} catch (err) {
+		hideProcessing();
+		showModal('Error', `Failed to export: ${err.message}`);
+	}
+}
+
+window.exportEditedPDF = exportEditedPDF;
 
 document.addEventListener('DOMContentLoaded', () => {
 	// Initialize modules
 	ShareModal.init();
+	KeyboardHandler.init();
+	initPanelResizer();
 
 	loadInitialPDF();
 	lucide.createIcons();
 
+	// Initialize zoom display
+	if (window.PreviewController) {
+		window.PreviewController.updateZoomDisplay();
+	}
+
 	// Load recent images from localStorage
 	loadRecentImages();
 
-	// Set up file input change listener
-	document.getElementById('imageFile').addEventListener('change', (e) => {
-		const file = e.target.files[0];
+	// Helper function to add image as overlay
+	function addImageAsOverlay(file) {
 		if (!file || !currentPdfFile) return;
 
 		// Read file as base64
@@ -2036,28 +1477,48 @@ document.addEventListener('DOMContentLoaded', () => {
 			// Add to pending overlays
 			const overlayIndex = AppState.getOverlays().length;
 
+			const canvas = document.getElementById('pdfCanvas');
+			const canvasWidth = canvas ? canvas.width : 1;
+			const canvasHeight = canvas ? canvas.height : 1;
+
+			// Calculate center position for initial placement
+			const imgWidth = 150;
+			const imgHeight = 150;
+			const centerX = Math.max(0, (canvasWidth - imgWidth) / 2);
+			const centerY = Math.max(0, (canvasHeight - imgHeight) / 2);
+
 			const overlayData = {
 				type: 'image',
 				imageData: imageData,
-				x: 100,
-				y: 100,
-				width: 150,
-				height: 150,
+				x: centerX,
+				y: centerY,
+				width: imgWidth,
+				height: imgHeight,
 				opacity: 100,
 				removeBackground: false,
-				pageIndex: currentPreviewPage - 1,
+				pageIndex: window.currentPreviewPage - 1,
+				canvasWidth,
+				canvasHeight,
 			};
 
 			AppState.addOverlay(overlayData);
+			AppState.markAsChanged(); // Track unsaved changes
 
 			// Add visual gizmo to preview
-			addOverlayGizmo('image', 'Image', 100, 100, overlayIndex);
+			window.GizmoManager.createGizmo('image', 'Image', centerX, centerY, overlayIndex);
 			LayerManager.updateLayersList();
-
-			// Clear file input
-			e.target.value = '';
 		};
 		reader.readAsDataURL(file);
+	}
+
+	// Set up file input change listener
+	document.getElementById('imageFile').addEventListener('change', (e) => {
+		const file = e.target.files[0];
+		if (file) {
+			addImageAsOverlay(file);
+			// Clear file input
+			e.target.value = '';
+		}
 	});
 
 	// Initialize Flatpickr date picker (hidden input)
@@ -2124,10 +1585,10 @@ document.addEventListener('DOMContentLoaded', () => {
 			'#ff00ff',
 			'#00ffff',
 		],
-		onChange: (color) => {
+		onChange: (color, alpha) => {
 			selectedTextColor = color;
 			window.selectedTextColor = color;
-			UIControls.updateLayerColor(color, false);
+			UIControls.updateLayerColor(color, false, alpha);
 		},
 	});
 
@@ -2136,65 +1597,115 @@ document.addEventListener('DOMContentLoaded', () => {
 	window.selectedTextColor = selectedTextColor;
 	window.textColorPicker = textColorPicker;
 
-	bgColorPicker = new ColorPicker({
-		container: '#bgColorPicker',
-		default: '#ffffff',
-		label: 'Background Color',
+	// Highlight Color Picker
+	highlightColorPicker = new ColorPicker({
+		container: '#highlightColorPicker',
+		default: '#ffff00',
+		label: 'Text Highlight',
 		swatches: [
-			'#ffffff',
-			'#000000',
 			'#ffff00',
-			'#00ffff',
-			'#ff00ff',
-			'#c0c0c0',
-			'#808080',
-		],
-		onChange: (color) => {
-			selectedBgColor = color;
-			window.selectedBgColor = color;
-			UIControls.updateLayerColor(color, true);
-		},
-	});
-
-	// Initialize selected color
-	selectedBgColor = bgColorPicker.getColor();
-	window.selectedBgColor = selectedBgColor;
-	window.bgColorPicker = bgColorPicker;
-
-	// Border Color Picker
-	borderColorPicker = new ColorPicker({
-		container: '#borderColorPicker',
-		default: '#000000',
-		label: 'Text Border',
-		swatches: [
-			'#000000',
-			'#ffffff',
-			'#ff0000',
 			'#00ff00',
-			'#0000ff',
-			'#ffff00',
-			'#ff00ff',
 			'#00ffff',
+			'#ff00ff',
+			'#ffa500',
+			'#ff69b4',
+			'#add8e6',
+			'#90ee90',
 		],
-		onChange: (color) => {
-			selectedBorderColor = color;
-			window.selectedBorderColor = color;
-			// Update current layer's border color
+		onChange: (color, alpha) => {
+			selectedHighlightColor = color;
+			window.selectedHighlightColor = color;
+			// Update current layer's highlight color
 			const index = AppState.getSelectedIndex();
 			if (index !== null) {
 				AppState.updateOverlay(index, {
-					borderColor: color,
-					borderWidth: 2, // Default border width
+					highlightColor: color,
+					highlightAlpha: alpha,
 				});
-				window.PreviewController?.renderPage(window.currentPreviewPage);
+				// Update gizmo visual to show highlight
+				if (window.GizmoManager) {
+					window.GizmoManager.updateGizmoFromOverlay(index);
+				}
 			}
 		},
 	});
 
-	// Initialize selected border color
-	selectedBorderColor = null; // Default: no border
-	window.selectedBorderColor = selectedBorderColor;
-	window.borderColorPicker = borderColorPicker;
+	// Initialize selected highlight color
+	selectedHighlightColor = null; // Default: no highlight
+	window.selectedHighlightColor = selectedHighlightColor;
+	window.highlightColorPicker = highlightColorPicker;
+
+	// Show drop options dialog
+	function showDropOptionsDialog(file, isPdf, isImage) {
+		const modal = document.getElementById('modalOverlay');
+		const header = document.getElementById('modalHeader');
+		const body = document.getElementById('modalBody');
+		const footer = document.getElementById('modalFooter');
+
+		const fileTypeLabel = isPdf ? 'PDF' : 'Image';
+
+		header.textContent = `What would you like to do with "${file.name}"?`;
+
+		if (isPdf) {
+			body.innerHTML = `
+				<p style="margin-bottom: 12px;">Choose how to handle this PDF file:</p>
+			`;
+			footer.innerHTML = `
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('replace')">Replace Current File</button>
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('beginning')">Merge to Beginning</button>
+				<button class="modal-btn modal-btn-primary" onclick="closeModal(); handleDropOption('end')">Merge to End</button>
+			`;
+		} else {
+			body.innerHTML = `
+				<p style="margin-bottom: 12px;">Choose how to handle this image:</p>
+			`;
+			footer.innerHTML = `
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal()">Cancel</button>
+				<button class="modal-btn modal-btn-primary" onclick="closeModal(); handleDropOption('overlay')">Add as Overlay</button>
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('beginning')">Merge as Page (Beginning)</button>
+				<button class="modal-btn modal-btn-secondary" onclick="closeModal(); handleDropOption('end')">Merge as Page (End)</button>
+			`;
+		}
+
+		// Store file for later use
+		window.pendingDropFile = file;
+		window.pendingDropIsPdf = isPdf;
+		window.pendingDropIsImage = isImage;
+
+		modal.classList.add('active');
+	}
+
+	// Handle drop option selection
+	async function handleDropOption(option) {
+		const file = window.pendingDropFile;
+		const isPdf = window.pendingDropIsPdf;
+		const isImage = window.pendingDropIsImage;
+
+		if (!file) return;
+
+		if (option === 'replace') {
+			// Load as new file (replace current)
+			await loadPDFFile(file);
+		} else if (option === 'overlay') {
+			// Add image as overlay
+			addImageAsOverlay(file);
+		} else if (option === 'beginning' || option === 'end') {
+			// Merge to beginning or end
+			window.pendingMergeFile = file;
+			if (isImage || isPdf) {
+				await MergeHandler.mergeFiles(option, file.name);
+			}
+		}
+
+		// Clear pending file
+		window.pendingDropFile = null;
+		window.pendingDropIsPdf = false;
+		window.pendingDropIsImage = false;
+	}
+
+	// Expose to window for onclick handlers
+	window.handleDropOption = handleDropOption;
 
 	// Set up drag & drop for PDF, image, and document files
 	const thumbnailsPanel = document.getElementById('thumbnailsPanel');
@@ -2202,88 +1713,185 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	// Thumbnails panel - always merge as page
 	thumbnailsPanel.addEventListener('dragover', (e) => {
-		e.preventDefault();
-		e.stopPropagation();
-		thumbnailsPanel.style.opacity = '0.7';
-		thumbnailsPanel.style.backgroundColor = 'rgba(127, 165, 223, 0.1)';
-	});
+		// Check if dragging files (not thumbnail reordering)
+		if (e.dataTransfer.types.includes('Files')) {
+			e.preventDefault();
+			e.stopPropagation();
+			e.dataTransfer.dropEffect = 'copy';
+			thumbnailsPanel.classList.add('drop-zone-active');
+		}
+	}, true); // Use capture phase to ensure we catch events even when dragging over thumbnails
 
 	thumbnailsPanel.addEventListener('dragleave', (e) => {
-		e.preventDefault();
-		e.stopPropagation();
-		thumbnailsPanel.style.opacity = '';
-		thumbnailsPanel.style.backgroundColor = '';
-	});
-
-	thumbnailsPanel.addEventListener('drop', async (e) => {
-		e.preventDefault();
-		e.stopPropagation();
-		thumbnailsPanel.style.opacity = '';
-		thumbnailsPanel.style.backgroundColor = '';
-
-		const files = e.dataTransfer.files;
-		if (files.length > 0) {
-			const file = files[0];
-			const fileType = file.type.toLowerCase();
-			const fileName = file.name.toLowerCase();
-
-			const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
-			const isImage =
-				fileType.startsWith('image/') ||
-				fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
-
-			if (isPdf || isImage) {
-				// Merge as page
-				window.pendingMergeFile = file;
-				showMergeDialog(file);
-			} else {
-				showModal('Invalid File', 'Please drop a PDF or image file');
-			}
+		// Check if we're actually leaving the thumbnailsPanel element
+		// relatedTarget is where the mouse is going
+		if (!thumbnailsPanel.contains(e.relatedTarget)) {
+			thumbnailsPanel.classList.remove('drop-zone-active');
 		}
 	});
 
-	// Preview area - images as overlay, PDFs as merge
+	thumbnailsPanel.addEventListener('drop', async (e) => {
+		// Only handle file drops, not thumbnail reordering
+		if (e.dataTransfer.types.includes('Files')) {
+			e.preventDefault();
+			e.stopPropagation();
+			thumbnailsPanel.classList.remove('drop-zone-active');
+
+			const files = Array.from(e.dataTransfer.files);
+			if (files.length === 0) return;
+
+			// Validate all files first
+			const validFiles = [];
+			const invalidFiles = [];
+
+			for (const file of files) {
+				const fileType = file.type.toLowerCase();
+				const fileName = file.name.toLowerCase();
+				const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
+				const isImage =
+					fileType.startsWith('image/') ||
+					fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
+
+				if (isPdf || isImage) {
+					validFiles.push(file);
+				} else {
+					invalidFiles.push(file.name);
+				}
+			}
+
+			if (invalidFiles.length > 0) {
+				showModal(
+					'Invalid Files',
+					`The following files are not PDF or image files and will be skipped:<br><br>${invalidFiles.map((name) => `• ${name}`).join('<br>')}`
+				);
+			}
+
+			if (validFiles.length === 0) return;
+
+			// If single file, show merge dialog
+			if (validFiles.length === 1) {
+				window.pendingMergeFile = validFiles[0];
+				showMergeDialog(validFiles[0]);
+			} else {
+				// Multiple files - show batch merge dialog
+				showBatchMergeDialog(validFiles);
+			}
+		}
+	}, true); // Use capture phase
+
+	// Preview area - show options dialog
 	previewArea.addEventListener('dragover', (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		previewArea.style.opacity = '0.7';
-		previewArea.style.backgroundColor = 'rgba(127, 165, 223, 0.1)';
+		e.dataTransfer.dropEffect = 'copy';
+
+		// Only highlight if dragging files
+		if (e.dataTransfer.types.includes('Files')) {
+			previewArea.classList.add('drop-zone-active');
+		}
 	});
 
 	previewArea.addEventListener('dragleave', (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		previewArea.style.opacity = '';
-		previewArea.style.backgroundColor = '';
+
+		// Only remove highlight if leaving the preview area entirely
+		const rect = previewArea.getBoundingClientRect();
+		if (
+			e.clientX < rect.left ||
+			e.clientX >= rect.right ||
+			e.clientY < rect.top ||
+			e.clientY >= rect.bottom
+		) {
+			previewArea.classList.remove('drop-zone-active');
+		}
 	});
 
 	previewArea.addEventListener('drop', async (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		previewArea.style.opacity = '';
-		previewArea.style.backgroundColor = '';
+		previewArea.classList.remove('drop-zone-active');
 
-		const files = e.dataTransfer.files;
-		if (files.length > 0) {
-			const file = files[0];
-			const fileType = file.type.toLowerCase();
-			const fileName = file.name.toLowerCase();
+		const files = Array.from(e.dataTransfer.files);
+		if (files.length === 0) return;
 
-			const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
-			const isImage =
-				fileType.startsWith('image/') ||
-				fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
+		// If multiple files, they must all be images (to add as overlays) or all PDFs (to merge)
+		if (files.length > 1) {
+			const allImages = files.every((f) => {
+				const fileType = f.type.toLowerCase();
+				const fileName = f.name.toLowerCase();
+				return (
+					fileType.startsWith('image/') ||
+					fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/)
+				);
+			});
 
-			if (isPdf) {
-				// Merge as page
-				window.pendingMergeFile = file;
-				showMergeDialog(file);
-			} else if (isImage) {
-				// Add as overlay
-				await handleImageDrop(file);
+			const allPdfs = files.every((f) => {
+				const fileType = f.type.toLowerCase();
+				const fileName = f.name.toLowerCase();
+				return fileType === 'application/pdf' || fileName.endsWith('.pdf');
+			});
+
+			if (allImages) {
+				showModal(
+					'Multiple Images',
+					'For multiple images, please drag them to the thumbnails panel to merge as pages. Dropping on the preview area is only for single overlay images.'
+				);
+				return;
+			} else if (allPdfs) {
+				// Show batch merge dialog
+				showBatchMergeDialog(files);
+				return;
 			} else {
-				showModal('Invalid File', 'Please drop a PDF or image file');
+				showModal(
+					'Mixed File Types',
+					'When dropping multiple files, they must all be PDFs or all be images. Please drop them to the thumbnails panel to merge as pages.'
+				);
+				return;
 			}
 		}
+
+		// Single file
+		const file = files[0];
+		const fileType = file.type.toLowerCase();
+		const fileName = file.name.toLowerCase();
+
+		const isPdf = fileType === 'application/pdf' || fileName.endsWith('.pdf');
+		const isImage =
+			fileType.startsWith('image/') ||
+			fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/);
+
+		if (isPdf || isImage) {
+			// Show dialog for both PDFs and images
+			showDropOptionsDialog(file, isPdf, isImage);
+		} else {
+			showModal('Invalid File', 'Please drop a PDF or image file');
+		}
 	});
+
+	// Warn before closing with unsaved changes
+	window.addEventListener('beforeunload', (e) => {
+		if (AppState.hasUnsavedChanges()) {
+			e.preventDefault();
+			e.returnValue = ''; // Modern browsers ignore custom message
+			return '';
+		}
+	});
+});
+
+// ===== HOTKEYS TOGGLE =====
+function toggleHotkeys(e) {
+	if (e) e.stopPropagation();
+	const hotkeysElement = document.getElementById('previewHotkeys');
+	if (hotkeysElement) {
+		hotkeysElement.classList.toggle('expanded');
+	}
+}
+
+// Close hotkeys when clicking outside
+document.addEventListener('click', (e) => {
+	const hotkeysElement = document.getElementById('previewHotkeys');
+	if (hotkeysElement && !hotkeysElement.contains(e.target)) {
+		hotkeysElement.classList.remove('expanded');
+	}
 });

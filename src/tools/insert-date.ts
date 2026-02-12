@@ -23,14 +23,17 @@ export interface DateInsertOptions {
 	pages?: number[]; // Specific page numbers (0-indexed), or all pages if undefined
 	rotation?: number; // Rotation angle in degrees
 	bgColor?: { r: number; g: number; b: number }; // Background color
+	canvasWidth?: number; // Original canvas width (for coordinate scaling)
+	canvasHeight?: number; // Original canvas height (for coordinate scaling)
 	// Font styling
 	fontFamily?: string;
 	bold?: boolean;
 	italic?: boolean;
 	underline?: boolean;
-	// Text border
-	borderColor?: { r: number; g: number; b: number };
-	borderWidth?: number;
+	// Text highlight (background behind text)
+	highlightColor?: { r: number; g: number; b: number };
+	highlightBlur?: number; // Gradient fade width at highlight edges (in pixels)
+	letterSpacing?: number; // Character spacing in pixels
 }
 
 /**
@@ -198,17 +201,47 @@ export async function insertDate(
 		const rotation = options.rotation ?? 0;
 
 		for (const page of targetPages) {
-			const { width, height } = page.getSize();
+			const { width: pageWidth, height: pageHeight } = page.getSize();
+
+			// Calculate scaling factors if canvas dimensions provided
+			const scaleX = options.canvasWidth ? pageWidth / options.canvasWidth : 1;
+			const scaleY = options.canvasHeight ? pageHeight / options.canvasHeight : 1;
+
+			// Scale font size if canvas dimensions provided
+			const scaledFontSize = fontSize * scaleX;
+
+			// Calculate text dimensions
+			// Account for letter spacing in width calculation
+			let canvasTextWidth = font.widthOfTextAtSize(dateText, scaledFontSize);
+			if (options.letterSpacing && options.letterSpacing !== 0) {
+				// Add letter spacing for all characters except the last one
+				canvasTextWidth += (options.letterSpacing * scaleX) * (dateText.length - 1);
+			}
+			const textWidth = canvasTextWidth;
+			const canvasTextHeight = scaledFontSize;
+			const textHeight = canvasTextHeight;
 
 			// Calculate position (default: bottom right with padding)
-			const textWidth = font.widthOfTextAtSize(dateText, fontSize);
-			const textHeight = fontSize;
-			const x = options.x ?? width - textWidth - 50;
+			const canvasX = options.x ?? (options.canvasWidth ? options.canvasWidth - (textWidth / scaleX) - 50 : pageWidth - textWidth - 50);
+			const x = canvasX * scaleX;
 
-			// CRITICAL FIX: Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
+			// Convert Y coordinate from top-left (canvas) to bottom-left (PDF)
 			// Canvas: y=0 at top, PDF: y=0 at bottom
 			const canvasY = options.y ?? 30;
-			const y = height - canvasY - textHeight;
+			const pdfY_topLeft = canvasY * scaleY;
+			const y = pageHeight - pdfY_topLeft - textHeight;
+
+			console.log(`\n=== Text Drawing Details ===`);
+			console.log(`Canvas dimensions: ${options.canvasWidth || 'N/A'}x${options.canvasHeight || 'N/A'}`);
+			console.log(`Page size: ${pageWidth}x${pageHeight}`);
+			console.log(`Scale factors: X=${scaleX.toFixed(4)}, Y=${scaleY.toFixed(4)}`);
+			console.log(`Canvas position: x=${canvasX}, y=${canvasY}`);
+			console.log(`Canvas font size: ${fontSize}`);
+			console.log(`Scaled font size: ${scaledFontSize.toFixed(2)}`);
+			console.log(`Text dimensions: ${textWidth.toFixed(2)}x${textHeight.toFixed(2)}`);
+			console.log(`PDF Y (top-left): ${pdfY_topLeft.toFixed(2)}`);
+			console.log(`PDF position: x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
+			console.log(`Rotation: ${rotation}°`);
 
 			// Draw background if specified
 			if (options.bgColor) {
@@ -222,33 +255,89 @@ export async function insertDate(
 				});
 			}
 
-			// Draw text border if specified
-			if (options.borderColor && options.borderWidth) {
-				const borderPadding = 2;
+			// Draw text highlight if specified (filled rectangle behind text with gradient fade)
+			if (options.highlightColor) {
+				const highlightPadding = 0.5; // Minimal padding for tight fit
+				const blurWidth = (options as any).highlightBlur || 0; // Gradient fade width
+				const borderRadius = 1.5; // Slight rounding for softer look
+
+				const baseX = x - highlightPadding;
+				const baseY = y - highlightPadding;
+				const baseWidth = textWidth + highlightPadding * 2;
+				const baseHeight = textHeight + highlightPadding * 2;
+
+				if (blurWidth > 0) {
+					// Draw gradient fade: multiple layers with decreasing opacity
+					const steps = Math.ceil(blurWidth / 2); // Number of gradient steps
+					for (let i = steps; i > 0; i--) {
+						const offset = (blurWidth / steps) * i;
+						const opacity = 0.7 * (1 - i / (steps + 1)); // Fade from transparent to 70%
+
+						page.drawRectangle({
+							x: baseX - offset,
+							y: baseY - offset,
+							width: baseWidth + offset * 2,
+							height: baseHeight + offset * 2,
+							color: rgb(
+								options.highlightColor.r,
+								options.highlightColor.g,
+								options.highlightColor.b,
+							),
+							opacity: opacity,
+							borderRadius: borderRadius + offset * 0.2,
+							rotate: { angle: rotation, type: 'degrees' },
+						});
+					}
+				}
+
+				// Draw main highlight rectangle
 				page.drawRectangle({
-					x: x - borderPadding,
-					y: y - borderPadding,
-					width: textWidth + borderPadding * 2,
-					height: textHeight + borderPadding * 2,
-					borderColor: rgb(
-						options.borderColor.r,
-						options.borderColor.g,
-						options.borderColor.b,
+					x: baseX,
+					y: baseY,
+					width: baseWidth,
+					height: baseHeight,
+					color: rgb(
+						options.highlightColor.r,
+						options.highlightColor.g,
+						options.highlightColor.b,
 					),
-					borderWidth: options.borderWidth,
+					opacity: 0.7, // Slightly transparent for highlight effect
+					borderRadius: borderRadius,
 					rotate: { angle: rotation, type: 'degrees' },
 				});
 			}
 
 			// Draw date text
-			page.drawText(dateText, {
-				x,
-				y,
-				size: fontSize,
-				font,
-				color: rgb(color.r, color.g, color.b),
-				rotate: { angle: rotation, type: 'degrees' },
-			});
+			// If letter spacing is specified, draw character by character
+			if (options.letterSpacing && options.letterSpacing !== 0) {
+				let currentX = x;
+				const chars = dateText.split('');
+
+				for (const char of chars) {
+					page.drawText(char, {
+						x: currentX,
+						y,
+						size: scaledFontSize,
+						font,
+						color: rgb(color.r, color.g, color.b),
+						rotate: { angle: rotation, type: 'degrees' },
+					});
+
+					// Calculate character width and add letter spacing
+					const charWidth = font.widthOfTextAtSize(char, scaledFontSize);
+					currentX += charWidth + (options.letterSpacing * scaleX);
+				}
+			} else {
+				// Normal rendering without letter spacing
+				page.drawText(dateText, {
+					x,
+					y,
+					size: scaledFontSize,
+					font,
+					color: rgb(color.r, color.g, color.b),
+					rotate: { angle: rotation, type: 'degrees' },
+				});
+			}
 
 			// Draw underline if specified
 			if (options.underline) {

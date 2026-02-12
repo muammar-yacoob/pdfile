@@ -7,7 +7,7 @@ const ModalManager = (() => {
 		const footer = document.getElementById('modalFooter');
 
 		header.textContent = title;
-		body.textContent = message;
+		body.innerHTML = message;
 
 		if (callback) {
 			footer.innerHTML = `
@@ -21,6 +21,11 @@ const ModalManager = (() => {
 		}
 
 		overlay.classList.add('active');
+
+		// Render any Lucide icons in the message
+		if (window.lucide) {
+			window.lucide.createIcons();
+		}
 	}
 
 	function closeModal() {
@@ -29,24 +34,30 @@ const ModalManager = (() => {
 		window.modalCallback = null;
 	}
 
-	function showConfirmModal(title, message, onConfirm, onCancel) {
+	function showConfirmModal(title, message, onConfirm, onCancel, isDestructive = false) {
 		const overlay = document.getElementById('modalOverlay');
 		const header = document.getElementById('modalHeader');
 		const body = document.getElementById('modalBody');
 		const footer = document.getElementById('modalFooter');
 
 		header.textContent = title;
-		body.textContent = message;
+		body.innerHTML = message;
 
+		const confirmBtnClass = isDestructive ? 'modal-btn-danger' : 'modal-btn-primary';
 		footer.innerHTML = `
             <button class="modal-btn modal-btn-secondary" onclick="window.modalCancelCallback(); closeModal()">Cancel</button>
-            <button class="modal-btn modal-btn-primary" onclick="window.modalConfirmCallback(); closeModal();">Confirm</button>
+            <button class="modal-btn ${confirmBtnClass}" onclick="window.modalConfirmCallback(); closeModal();">Confirm</button>
         `;
 
 		window.modalConfirmCallback = onConfirm || (() => {});
 		window.modalCancelCallback = onCancel || (() => {});
 
 		overlay.classList.add('active');
+
+		// Render any Lucide icons in the message
+		if (window.lucide) {
+			window.lucide.createIcons();
+		}
 	}
 
 	return {

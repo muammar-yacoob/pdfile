@@ -478,3 +478,38 @@ input[type="range"]::-webkit-slider-thumb {
 .hide {
 	display: none !important;
 }
+
+/* Collapsed pages panel */
+#thumbnailsPanel.collapsed {
+	width: 48px !important;
+	min-width: 48px !important;
+}
+
+#thumbnailsPanel.collapsed .thumbnails-header span,
+#thumbnailsPanel.collapsed .page-actions-toolbar,
+#thumbnailsPanel.collapsed #thumbnailsList {
+	display: none;
+}
+
+#thumbnailsPanel.collapsed .thumbnails-header {
+	justify-content: center;
+	padding: 8px;
+}
+
+/* Dark mode preview background */
+#previewArea.dark-mode {
+	background: #1a1a1a;
+}
+
+#previewArea.dark-mode .canvas-wrapper {
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+}
+
+#previewArea.dark-mode #pdfCanvas {
+	filter: invert(0.92) hue-rotate(180deg);
+}
+
+/* Dark mode for thumbnails */
+body.dark-mode .thumbnail-canvas {
+	filter: invert(0.92) hue-rotate(180deg);
+}

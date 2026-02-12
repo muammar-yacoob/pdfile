@@ -1,10 +1,11 @@
-// ColorPicker - Compact color picker with popover dialogue
-// Uses native HTML5 color input and EyeDropper API
+// ColorPicker - Wrapper around Pickr library for consistent color picking
+// Uses @simonwep/pickr with eyedropper and alpha support
 
 class ColorPicker {
 	constructor(options = {}) {
 		this.container = options.container; // Element or selector
 		this.defaultColor = options.default || '#000000';
+		this.defaultAlpha = options.alpha !== undefined ? options.alpha : 1.0;
 		this.onChange = options.onChange || (() => {});
 		this.label = options.label || 'Color';
 		this.swatches = options.swatches || [
@@ -18,8 +19,8 @@ class ColorPicker {
 			'#00ffff',
 		];
 		this.currentColor = this.defaultColor;
-		this.isOpen = false;
-		this.popover = null;
+		this.currentAlpha = this.defaultAlpha;
+		this.pickr = null;
 
 		this.init();
 	}
@@ -36,153 +37,99 @@ class ColorPicker {
 			return;
 		}
 
-		// Build compact UI - just the color box
-		container.innerHTML = `
-			<div class="color-picker-compact">
-				<div class="color-picker-box" style="background-color: ${this.currentColor};" title="Click to pick color"></div>
-			</div>
-		`;
+		// Clear container
+		container.innerHTML = '';
 
-		// Get elements
-		this.colorBox = container.querySelector('.color-picker-box');
+		// Initialize Pickr - it will create a button inside the container
+		this.pickr = Pickr.create({
+			el: container,
+			theme: 'nano', // Minimal theme
+			default: this.hexToRgba(this.currentColor, this.currentAlpha),
+			swatches: this.swatches,
+			useAsButton: false, // Let Pickr create its own button
+			components: {
+				// Main components
+				preview: true,
+				opacity: true, // Alpha channel support
+				hue: true,
+
+				// Input / output Options
+				interaction: {
+					hex: true,
+					rgba: true,
+					input: true,
+					save: false,
+					clear: false,
+				},
+			},
+		});
 
 		// Set up event listeners
 		this.setupEvents();
+
+		// Add eyedropper button after Pickr app is created
+		this.pickr.on('init', () => {
+			this.addEyedropperButton();
+		});
 	}
 
 	setupEvents() {
-		// Color box click opens popover
-		this.colorBox.addEventListener('click', (e) => {
-			e.stopPropagation();
-			if (this.isOpen) {
-				this.closePopover();
-			} else {
-				this.openPopover();
-			}
+		// When color changes
+		this.pickr.on('change', (color) => {
+			const rgba = color.toRGBA();
+			const hex = this.rgbToHex(rgba[0], rgba[1], rgba[2]);
+			const alpha = rgba[3];
+
+			this.currentColor = hex;
+			this.currentAlpha = alpha;
+
+			// Trigger onChange callback
+			this.onChange(hex, alpha);
+		});
+
+		// Update on init
+		this.pickr.on('init', () => {
+			// Set initial color
+			const rgba = this.hexToRgba(this.currentColor, this.currentAlpha);
+			this.pickr.setColor(rgba, true);
 		});
 	}
 
-	openPopover() {
-		if (this.isOpen) return;
+	addEyedropperButton() {
+		// Only add if EyeDropper API is supported
+		if (!('EyeDropper' in window)) return;
 
-		// Create popover
-		this.popover = document.createElement('div');
-		this.popover.className = 'color-picker-popover';
-		this.popover.innerHTML = `
-			<div class="color-picker-popover-content">
-				<div class="color-picker-preview" style="background-color: ${this.currentColor};" data-role="preview"></div>
-				<input type="color" class="color-picker-input" value="${this.currentColor}" data-role="input" />
-				<button class="color-picker-eyedropper" title="Pick color from screen" data-role="eyedropper">
-					<i data-lucide="pipette" style="width: 14px; height: 14px;"></i>
-				</button>
-				<div class="color-picker-swatches" data-role="swatches">
-					${this.swatches.map((color) => `<button class="color-swatch" style="background-color: ${color};" data-color="${color}" title="${color}"></button>`).join('')}
-				</div>
-			</div>
+		// Find the Pickr interaction container
+		const pickrApp = this.pickr.getRoot().app;
+		const interactionSection = pickrApp.querySelector('.pcr-interaction');
+
+		if (!interactionSection) return;
+
+		// Create eyedropper button
+		const eyedropperBtn = document.createElement('button');
+		eyedropperBtn.type = 'button';
+		eyedropperBtn.className = 'pcr-eyedropper-btn';
+		eyedropperBtn.innerHTML = '💧'; // Droplet emoji or you can use an icon
+		eyedropperBtn.title = 'Pick color from screen';
+		eyedropperBtn.style.cssText = `
+			background: var(--bg3);
+			border: 1px solid var(--brd);
+			border-radius: 4px;
+			padding: 6px 12px;
+			cursor: pointer;
+			margin-top: 8px;
+			width: 100%;
+			color: var(--txt2);
+			font-size: 14px;
 		`;
 
-		// Add to body
-		document.body.appendChild(this.popover);
-
-		// Initialize Lucide icons
-		if (window.lucide) {
-			lucide.createIcons();
-		}
-
-		// Position popover near the color box
-		this.positionPopover();
-
-		// Get popover elements
-		this.popoverElements = {
-			preview: this.popover.querySelector('[data-role="preview"]'),
-			input: this.popover.querySelector('[data-role="input"]'),
-			eyedropper: this.popover.querySelector('[data-role="eyedropper"]'),
-			swatches: this.popover.querySelectorAll('.color-swatch'),
-		};
-
-		// Set up popover event listeners
-		this.setupPopoverEvents();
-
-		// Check if EyeDropper is supported
-		if (!('EyeDropper' in window)) {
-			this.popoverElements.eyedropper.style.display = 'none';
-		}
-
-		// Close popover when clicking outside
-		setTimeout(() => {
-			document.addEventListener('click', this.handleOutsideClick);
-		}, 0);
-
-		this.isOpen = true;
-	}
-
-	closePopover() {
-		if (!this.isOpen || !this.popover) return;
-
-		document.removeEventListener('click', this.handleOutsideClick);
-		this.popover.remove();
-		this.popover = null;
-		this.isOpen = false;
-	}
-
-	handleOutsideClick = (e) => {
-		if (this.popover && !this.popover.contains(e.target) && !this.colorBox.contains(e.target)) {
-			this.closePopover();
-		}
-	};
-
-	positionPopover() {
-		const boxRect = this.colorBox.getBoundingClientRect();
-		const popoverHeight = 180; // Approximate height
-		const popoverWidth = 220;
-
-		// Position below the color box
-		let top = boxRect.bottom + 8;
-		let left = boxRect.left;
-
-		// Check if popover would go off-screen
-		if (top + popoverHeight > window.innerHeight) {
-			// Position above instead
-			top = boxRect.top - popoverHeight - 8;
-		}
-
-		if (left + popoverWidth > window.innerWidth) {
-			// Align to right
-			left = window.innerWidth - popoverWidth - 8;
-		}
-
-		this.popover.style.top = `${top}px`;
-		this.popover.style.left = `${left}px`;
-	}
-
-	setupPopoverEvents() {
-		// Preview click opens native color picker
-		this.popoverElements.preview.addEventListener('click', () => {
-			this.popoverElements.input.click();
-		});
-
-		// Color input change
-		this.popoverElements.input.addEventListener('input', (e) => {
-			this.setColor(e.target.value);
-		});
-
-		// Eyedropper click
-		this.popoverElements.eyedropper.addEventListener('click', async () => {
+		eyedropperBtn.addEventListener('click', async (e) => {
+			e.preventDefault();
+			e.stopPropagation();
 			await this.openEyeDropper();
 		});
 
-		// Swatch clicks
-		this.popoverElements.swatches.forEach((swatch) => {
-			swatch.addEventListener('click', () => {
-				const color = swatch.dataset.color;
-				this.setColor(color);
-			});
-		});
-
-		// Prevent popover clicks from closing it
-		this.popover.addEventListener('click', (e) => {
-			e.stopPropagation();
-		});
+		interactionSection.appendChild(eyedropperBtn);
 	}
 
 	async openEyeDropper() {
@@ -194,52 +141,68 @@ class ColorPicker {
 		try {
 			const eyeDropper = new EyeDropper();
 			const result = await eyeDropper.open();
-			this.setColor(result.sRGBHex);
+
+			// Extract RGB values from the result
+			const color = result.sRGBHex;
+			this.setColor(color, this.currentAlpha);
 		} catch (err) {
-			// User cancelled or error occurred
-			console.log('EyeDropper cancelled or error:', err);
+			// User cancelled or error occurred - silently ignore
 		}
 	}
 
-	setColor(color) {
-		// Normalize color to hex
-		const hexColor = this.normalizeColor(color);
+	setColor(color, alpha = this.currentAlpha) {
+		this.currentColor = color;
+		this.currentAlpha = alpha;
 
-		this.currentColor = hexColor;
-		this.colorBox.style.backgroundColor = hexColor;
+		if (this.pickr) {
+			const rgba = this.hexToRgba(color, alpha);
+			this.pickr.setColor(rgba, true);
 
-		// Update popover if open
-		if (this.isOpen && this.popoverElements) {
-			this.popoverElements.preview.style.backgroundColor = hexColor;
-			this.popoverElements.input.value = hexColor;
+			// Manually update the button background to ensure visual update
+			const button = this.pickr.getRoot().button;
+			if (button) {
+				button.style.setProperty('--pcr-color', rgba);
+			}
 		}
-
-		// Trigger onChange callback
-		this.onChange(hexColor);
 	}
 
 	getColor() {
 		return this.currentColor;
 	}
 
-	normalizeColor(color) {
-		// Ensure color is in #RRGGBB format
-		if (color.length === 9 && color.startsWith('#')) {
-			// Remove alpha channel if present (#RRGGBBAA -> #RRGGBB)
-			return color.substring(0, 7);
-		}
-		return color;
+	getAlpha() {
+		return this.currentAlpha;
+	}
+
+	getRGBA() {
+		return this.hexToRgba(this.currentColor, this.currentAlpha);
+	}
+
+	hexToRgb(hex) {
+		hex = hex.replace('#', '');
+		const r = Number.parseInt(hex.substring(0, 2), 16);
+		const g = Number.parseInt(hex.substring(2, 4), 16);
+		const b = Number.parseInt(hex.substring(4, 6), 16);
+		return { r, g, b };
+	}
+
+	hexToRgba(hex, alpha) {
+		const { r, g, b } = this.hexToRgb(hex);
+		return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+	}
+
+	rgbToHex(r, g, b) {
+		const toHex = (n) => {
+			const hex = Math.round(n).toString(16);
+			return hex.length === 1 ? '0' + hex : hex;
+		};
+		return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 	}
 
 	destroy() {
-		// Clean up
-		this.closePopover();
-		const container =
-			typeof this.container === 'string'
-				? document.querySelector(this.container)
-				: this.container;
-		if (container) {
-			container.innerHTML = '';
+		if (this.pickr) {
+			this.pickr.destroyAndRemove();
+			this.pickr = null;
 		}
 	}
 }

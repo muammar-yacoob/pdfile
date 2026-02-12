@@ -1,7 +1,7 @@
 {
 	"name": "@spark-apps/pdfile",
-	"version": "1.0.2",
-	"description": "Comprehensive PDF utility toolkit for document manipulation",
+	"version": "1.0.3",
+	"description": "A comprehensive PDF utility toolkit for document manipulation",
 	"type": "module",
 	"bin": {
 		"pdfile": "dist/cli.js"
@@ -70,6 +70,7 @@
 	},
 	"dependencies": {
 		"@pdf-lib/fontkit": "^1.1.1",
+		"@simonwep/pickr": "^1.9.1",
 		"chalk": "^5.6.2",
 		"commander": "^14.0.2",
 		"docx": "^9.0.1",
@@ -77,6 +78,7 @@
 		"figlet": "^1.8.0",
 		"flatpickr": "^4.6.13",
 		"gradient-string": "^3.0.0",
+		"html2canvas": "^1.4.1",
 		"pdf-lib": "^1.17.1",
 		"pdf-parse": "^1.1.1",
 		"prompts": "^2.4.2"

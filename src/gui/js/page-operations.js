@@ -7,22 +7,37 @@ const PageOperations = {
 		if (isSelected) {
 			window.selectedPages.add(pageNum);
 			window.lastSelectedPage = pageNum;
-			// Show the selected page in preview (always show the last selected one)
-			window.PreviewController?.renderPage(pageNum);
+			window.AppState?.setLastSelectedPage(pageNum);
 		} else {
 			window.selectedPages.delete(pageNum);
-			window.lastSelectedPage =
+			const newLast =
 				window.selectedPages.size > 0
 					? Array.from(window.selectedPages)[0]
 					: null;
+			window.lastSelectedPage = newLast;
+			window.AppState?.setLastSelectedPage(newLast);
 		}
 
-		// If we have a selection, preview the last selected page
-		if (window.selectedPages.size > 0 && window.lastSelectedPage) {
-			window.PreviewController?.renderPage(window.lastSelectedPage);
+		// Always preview the last selected page using original page number
+		if (window.lastSelectedPage) {
+			const originalPageNum = this.getOriginalPageNumber(window.lastSelectedPage);
+			window.PreviewController?.renderPage(originalPageNum);
 		}
 
 		this.updateSelectionUI();
+	},
+
+	// Get the original page number (before reordering) for a display page number
+	getOriginalPageNumber(displayPageNum) {
+		const items = document.querySelectorAll('.thumbnail-item');
+		for (const item of items) {
+			if (Number.parseInt(item.dataset.pageNum) === displayPageNum) {
+				// Use originalPage if it exists (pages were reordered), otherwise use pageNum
+				const originalPageNum = Number.parseInt(item.dataset.originalPage || item.dataset.pageNum);
+				return originalPageNum;
+			}
+		}
+		return displayPageNum; // Fallback
 	},
 
 	updateSelectionUI() {
@@ -148,7 +163,7 @@ const PageOperations = {
 		const pageCount = pagesToRotate.length;
 
 		try {
-			showModal('Processing', 'Rotating pages...');
+			showProcessing('Rotating pages...');
 
 			const response = await fetch('/api/rotate-pages', {
 				method: 'POST',
@@ -195,11 +210,11 @@ const PageOperations = {
 				});
 				this.updateSelectionUI();
 
-				closeModal();
+				hideProcessing();
 			};
 			reader.readAsDataURL(blob);
 		} catch (error) {
-			closeModal();
+			hideProcessing();
 			showModal('Error', error.message || 'Failed to rotate pages');
 		}
 	},
@@ -231,7 +246,9 @@ const PageOperations = {
 
 		// Update lastSelectedPage with new page number
 		if (window.lastSelectedPage && oldToNew.has(window.lastSelectedPage)) {
-			window.lastSelectedPage = oldToNew.get(window.lastSelectedPage);
+			const newLast = oldToNew.get(window.lastSelectedPage);
+			window.lastSelectedPage = newLast;
+			window.AppState?.setLastSelectedPage(newLast);
 		}
 
 		// Refresh visual selection with checkmarks
@@ -284,10 +301,10 @@ const PageOperations = {
 			return;
 		}
 
-		// Get current page order from thumbnails
+		// Get current page order from thumbnails using original page numbers
 		const items = document.querySelectorAll('.thumbnail-item');
 		const pageOrder = Array.from(items).map((item) =>
-			Number.parseInt(item.dataset.pageNum),
+			Number.parseInt(item.dataset.originalPage || item.dataset.pageNum),
 		);
 
 		showConfirmModal(
@@ -295,7 +312,7 @@ const PageOperations = {
 			'Apply the new page order? This will download a reordered PDF file.',
 			async () => {
 				try {
-					showModal('Processing', 'Reordering pages...');
+					showProcessing('Reordering pages...');
 
 					const response = await fetch('/api/reorder-pages', {
 						method: 'POST',
@@ -313,10 +330,9 @@ const PageOperations = {
 					a.click();
 					URL.revokeObjectURL(url);
 
-					closeModal();
-					showModal('Success', 'Pages reordered successfully!', 2000);
+					hideProcessing();
 				} catch (err) {
-					closeModal();
+					hideProcessing();
 					showModal('Error', `Failed to reorder pages: ${err.message}`);
 				}
 			},

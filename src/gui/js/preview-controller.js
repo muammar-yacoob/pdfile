@@ -2,12 +2,14 @@
 
 const PreviewController = {
 	currentRenderTask: null,
+	isRendering: false,
+	pendingRender: null,
 
 	async getPDFPageDimensions(pageNum) {
 		if (!window.pdfDocument) return null;
 		try {
 			const page = await window.pdfDocument.getPage(pageNum);
-			const viewport = page.getViewport({ scale: 1 }); // Unscaled = PDF points
+			const viewport = page.getViewport({ scale: 1 });
 			return { width: viewport.width, height: viewport.height };
 		} catch (err) {
 			console.error('Error getting PDF page dimensions:', err);
@@ -33,81 +35,227 @@ const PreviewController = {
 	async renderPage(pageNum) {
 		if (!window.pdfDocument) return;
 
-		// Cancel previous render task if still running
-		if (this.currentRenderTask) {
-			try {
-				await this.currentRenderTask.cancel();
-			} catch (err) {
-				// Ignore cancellation errors
-			}
-			this.currentRenderTask = null;
-		}
-
-		window.currentPreviewPage = pageNum;
-		const page = await window.pdfDocument.getPage(pageNum);
-
-		const canvas = document.getElementById('pdfCanvas');
-		if (!canvas) return;
-
-		const context = canvas.getContext('2d');
-
-		// Clear previous overlays
-		const wrapper = canvas.parentElement;
-		if (wrapper) {
-			const oldOverlays = wrapper.querySelectorAll('.overlay-gizmo');
-			oldOverlays.forEach((o) => o.remove());
-		}
-
-		// Calculate base scale to fill width
-		const previewArea = document.getElementById('previewArea');
-		const containerWidth = previewArea.clientWidth - 20;
-		const pageViewport = page.getViewport({ scale: 1 });
-
-		const baseScale = containerWidth / pageViewport.width; // Fill width
-
-		// Apply zoom level - if 'fit', use baseScale; otherwise apply zoom multiplier
-		const scale =
-			window.zoomLevel === 'fit' ? baseScale : baseScale * window.zoomLevel;
-		window.previewScale = scale;
-
-		const viewport = page.getViewport({ scale });
-
-		canvas.width = viewport.width;
-		canvas.height = viewport.height;
-
-		// Store render task so we can cancel it if needed
-		this.currentRenderTask = page.render({ canvasContext: context, viewport });
-
-		try {
-			await this.currentRenderTask.promise;
-		} catch (err) {
-			// Ignore cancellation errors
-			if (err.name !== 'RenderingCancelledException') {
-				console.error('Error rendering preview page:', err);
-			}
+		// If already rendering, queue this render
+		if (this.isRendering) {
+			this.pendingRender = pageNum;
 			return;
 		}
 
-		this.currentRenderTask = null;
+		this.isRendering = true;
 
-		// Render overlays for this page
-		this.updateGizmosForPage(pageNum);
+		try {
+			// Cancel any active render task
+			if (this.currentRenderTask) {
+				try {
+					this.currentRenderTask.cancel();
+				} catch (err) {
+					// Ignore
+				}
+			}
+
+			const canvas = document.getElementById('pdfCanvas');
+			if (!canvas) {
+				this.isRendering = false;
+				return;
+			}
+
+			window.currentPreviewPage = pageNum;
+			const page = await window.pdfDocument.getPage(pageNum);
+
+			// Calculate scale
+			const previewArea = document.getElementById('previewArea');
+			const containerWidth = previewArea.clientWidth - 20;
+			const pageViewport = page.getViewport({ scale: 1 });
+			const baseScale = containerWidth / pageViewport.width;
+			// When zoomLevel is 'fit', use baseScale to fit container
+		// When zoomLevel is a number, use it directly (1.0 = 100% = actual PDF size)
+		const scale = window.zoomLevel === 'fit' ? baseScale : window.zoomLevel;
+			window.previewScale = scale;
+
+			const viewport = page.getViewport({ scale });
+
+			// Update canvas
+			const context = canvas.getContext('2d');
+			context.clearRect(0, 0, canvas.width, canvas.height);
+			canvas.width = viewport.width;
+			canvas.height = viewport.height;
+
+			// Render PDF (store the task so we can cancel it)
+			this.currentRenderTask = page.render({ canvasContext: context, viewport });
+			await this.currentRenderTask.promise;
+			this.currentRenderTask = null;
+
+			// Update overlays
+			this.updateGizmosForPage(pageNum);
+		} catch (err) {
+			if (err.name !== 'RenderingCancelledException') {
+				console.error('Error rendering page:', err);
+			}
+		} finally {
+			this.isRendering = false;
+
+			// Process pending render if any
+			if (this.pendingRender !== null) {
+				const pending = this.pendingRender;
+				this.pendingRender = null;
+				this.renderPage(pending);
+			}
+		}
 	},
 
-	setZoom(newZoom) {
-		// Convert 'fit' to numeric value first if needed
-		if (window.zoomLevel === 'fit') {
-			window.zoomLevel = 1.0;
-		}
+	setZoom(newZoom, mousePos = null) {
+		// Get the actual current render scale (not just the zoom level setting)
+		const oldZoom = window.zoomLevel === 'fit' ? (window.previewScale || 1.0) : window.zoomLevel;
+		const wasAtFit = window.zoomLevel === 'fit';
 
-		// If newZoom is a delta adjustment, add it to current zoom
+		// Update zoom level
 		if (typeof newZoom === 'number') {
 			window.zoomLevel = Math.max(0.5, Math.min(3.0, newZoom)); // Clamp between 50% and 300%
 		} else if (newZoom === 'fit') {
 			window.zoomLevel = 'fit';
 		}
 
-		this.renderPage(window.currentPreviewPage);
+		// For calculating zoom ratio, we need to know what the new render scale will be
+		// If switching to fit, we'll use the oldZoom as approximation (will be corrected after render)
+		const newZoomValue = window.zoomLevel === 'fit' ? oldZoom : window.zoomLevel;
+		const isNowAtFit = window.zoomLevel === 'fit';
+
+		// Update zoom display
+		this.updateZoomDisplay();
+
+		// Store mouse position and scroll for zoom adjustment
+		if (mousePos) {
+			const area = document.getElementById('previewArea');
+			const scrollLeft = area.scrollLeft;
+			const scrollTop = area.scrollTop;
+
+			// Render at new zoom
+			this.renderPage(window.currentPreviewPage).then(() => {
+				// Adjust scroll to keep mouse position fixed
+				const zoomRatio = newZoomValue / oldZoom;
+				area.scrollLeft = (scrollLeft + mousePos.x) * zoomRatio - mousePos.x;
+				area.scrollTop = (scrollTop + mousePos.y) * zoomRatio - mousePos.y;
+			});
+		} else {
+			// When switching to fit mode (and not zooming with mouse), reset scroll to top
+			if (isNowAtFit && !wasAtFit) {
+				this.renderPage(window.currentPreviewPage).then(() => {
+					const area = document.getElementById('previewArea');
+					if (area) {
+						area.scrollTop = 0;
+						area.scrollLeft = 0;
+					}
+				});
+			} else {
+				this.renderPage(window.currentPreviewPage);
+			}
+		}
+	},
+
+	zoomIn() {
+		let currentZoom;
+		if (window.zoomLevel === 'fit') {
+			// When at fit mode, use the current render scale as baseline
+			currentZoom = window.previewScale || 1.0;
+		} else {
+			currentZoom = window.zoomLevel;
+		}
+		this.setZoom(Math.min(3.0, currentZoom + 0.25));
+	},
+
+	zoomOut() {
+		let currentZoom;
+		if (window.zoomLevel === 'fit') {
+			// When at fit mode, use the current render scale as baseline
+			currentZoom = window.previewScale || 1.0;
+		} else {
+			currentZoom = window.zoomLevel;
+		}
+		this.setZoom(Math.max(0.5, currentZoom - 0.25));
+	},
+
+	zoomFit() {
+		// Toggle between fit mode and actual size (100%)
+		if (window.zoomLevel === 'fit') {
+			this.setZoom(1.0); // Go to actual size
+		} else {
+			this.setZoom('fit'); // Go to fit
+		}
+	},
+
+	updateZoomDisplay() {
+		const display = document.getElementById('zoomDisplay');
+		if (!display) return;
+
+		if (window.zoomLevel === 'fit') {
+			display.textContent = 'Fit';
+		} else {
+			const percentage = Math.round(window.zoomLevel * 100);
+			display.textContent = `${percentage}%`;
+		}
+
+		// Update fit button icon and tooltip
+		this.updateFitButton();
+	},
+
+	updateFitButton() {
+		const fitBtn = document.querySelector('.zoom-controls button:nth-child(4)'); // 4th button is fit
+		if (!fitBtn) return;
+
+		const icon = fitBtn.querySelector('i');
+		if (!icon) return;
+
+		if (window.zoomLevel === 'fit') {
+			// Currently at fit, button should show "go to actual size"
+			icon.setAttribute('data-lucide', 'scan');
+			fitBtn.setAttribute('title', 'Actual Size (Ctrl+0)');
+		} else {
+			// Currently at specific zoom, button should show "go to fit"
+			icon.setAttribute('data-lucide', 'maximize-2');
+			fitBtn.setAttribute('title', 'Fit to Width (Ctrl+0)');
+		}
+
+		// Refresh Lucide icons
+		if (window.lucide) window.lucide.createIcons();
+	},
+
+	toggleDarkMode() {
+		const previewArea = document.getElementById('previewArea');
+		const darkModeBtn = document.getElementById('darkModeBtn');
+		if (!previewArea || !darkModeBtn) return;
+
+		const isDark = previewArea.classList.toggle('dark-mode');
+
+		// Also toggle on body for global dark mode (affects thumbnails)
+		document.body.classList.toggle('dark-mode', isDark);
+
+		// Update button icon
+		const icon = darkModeBtn.querySelector('i');
+		if (icon) {
+			icon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+			if (window.lucide) window.lucide.createIcons();
+		}
+
+		// Store preference
+		localStorage.setItem('previewDarkMode', isDark ? 'true' : 'false');
+	},
+
+	initDarkMode() {
+		const previewArea = document.getElementById('previewArea');
+		const darkModeBtn = document.getElementById('darkModeBtn');
+		if (!previewArea || !darkModeBtn) return;
+
+		// Restore preference
+		const isDark = localStorage.getItem('previewDarkMode') === 'true';
+		if (isDark) {
+			previewArea.classList.add('dark-mode');
+			document.body.classList.add('dark-mode');
+			const icon = darkModeBtn.querySelector('i');
+			if (icon) {
+				icon.setAttribute('data-lucide', 'sun');
+				if (window.lucide) window.lucide.createIcons();
+			}
+		}
 	},
 
 	updateGizmosForPage(pageNum) {
@@ -118,11 +266,25 @@ const PreviewController = {
 		const oldGizmos = canvasWrapper.querySelectorAll('.overlay-gizmo');
 		oldGizmos.forEach((g) => g.remove());
 
-		// Re-add gizmos for this page
+		// Get canvas for scaling
+		const canvas = document.getElementById('pdfCanvas');
+		if (!canvas) return;
+
+		// Re-add gizmos for this page with scaled positions and sizes
 		const overlays = AppState.getOverlays();
 		overlays.forEach((overlay, i) => {
 			const overlayPage = (overlay.pageIndex || 0) + 1;
 			if (overlayPage === pageNum) {
+				// Calculate scale based on stored canvas size
+				const storedWidth = overlay.canvasWidth || canvas.width;
+				const storedHeight = overlay.canvasHeight || canvas.height;
+				const scaleX = canvas.width / storedWidth;
+				const scaleY = canvas.height / storedHeight;
+
+				// Scale position
+				const scaledX = overlay.x * scaleX;
+				const scaledY = overlay.y * scaleY;
+
 				const label =
 					overlay.type === 'date'
 						? `${overlay.dateText || 'Today'}`
@@ -131,7 +293,31 @@ const PreviewController = {
 							: overlay.type === 'image'
 								? 'Image'
 								: 'Signature';
-				window.GizmoManager?.add(overlay.type, label, overlay.x, overlay.y, i);
+
+				// Create gizmo at scaled position
+				if (window.GizmoManager) {
+					window.GizmoManager.createGizmo(overlay.type, label, scaledX, scaledY, i);
+				}
+
+				// Manually scale the gizmo size and styling (don't modify AppState)
+				const gizmo = document.querySelector(`.overlay-gizmo[data-overlay-index="${i}"]`);
+				if (gizmo && overlay.width && overlay.height) {
+					gizmo.style.width = `${overlay.width * scaleX}px`;
+					gizmo.style.height = `${overlay.height * scaleY}px`;
+
+					// Scale font size for text overlays
+					if (overlay.type === 'date' || overlay.type === 'text') {
+						const textEl = gizmo.querySelector('.overlay-gizmo-text');
+						if (textEl && overlay.fontSize) {
+							textEl.style.fontSize = `${Math.min(overlay.fontSize * scaleX, 24)}px`;
+						}
+					}
+				}
+
+				// Apply all overlay styling to the gizmo (uses original overlay data)
+				if (window.GizmoManager) {
+					window.GizmoManager.updateGizmoFromOverlay(i);
+				}
 			}
 		});
 	},
@@ -145,32 +331,32 @@ const PreviewController = {
 		previewArea.parentNode.replaceChild(newPreviewArea, previewArea);
 		const area = newPreviewArea;
 
-		// Mouse wheel zoom
+		// Mouse wheel zoom towards cursor (only with Ctrl key)
 		area.addEventListener(
 			'wheel',
 			(e) => {
+				// Only zoom if Ctrl key is pressed
+				if (!e.ctrlKey) return;
+
 				e.preventDefault();
 
 				// Smooth zoom with smaller increments
 				const delta = e.deltaY < 0 ? 0.15 : -0.15;
-
-				// Get current scroll position
-				const scrollLeft = area.scrollLeft;
-				const scrollTop = area.scrollTop;
-				const oldZoom = window.zoomLevel === 'fit' ? 1.0 : window.zoomLevel;
+				// Get current zoom (use actual render scale if in fit mode)
+			const oldZoom = window.zoomLevel === 'fit' ? (window.previewScale || 1.0) : window.zoomLevel;
 
 				// Calculate new zoom level
 				const newZoom = Math.max(0.5, Math.min(3.0, oldZoom + delta));
 
-				// Update zoom immediately (no debounce)
-				this.setZoom(newZoom);
+				// Get mouse position relative to preview area
+				const rect = area.getBoundingClientRect();
+				const mousePos = {
+					x: e.clientX - rect.left,
+					y: e.clientY - rect.top,
+				};
 
-				// Adjust scroll to zoom toward center
-				requestAnimationFrame(() => {
-					const zoomRatio = newZoom / oldZoom;
-					area.scrollLeft = scrollLeft * zoomRatio;
-					area.scrollTop = scrollTop * zoomRatio;
-				});
+				// Update zoom with mouse position
+				this.setZoom(newZoom, mousePos);
 			},
 			{ passive: false },
 		);

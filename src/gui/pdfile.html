@@ -7,11 +7,15 @@
     <link rel="icon" href="img/logo.ico">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/flatpickr.min.css">
+    <link rel="stylesheet" href="/css/pickr-nano.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Open+Sans:wght@400;700&family=Lato:wght@400;700&family=Source+Sans+Pro:wght@400;700&family=Montserrat:wght@400;700&family=Oswald:wght@400;700&family=Raleway:wght@400;700&family=PT+Sans:wght@400;700&family=Merriweather:wght@400;700&family=Nunito:wght@400;700&family=Playfair+Display:wght@400;700&family=Ubuntu:wght@400;700&family=Poppins:wght@400;700&family=Work+Sans:wght@400;700&family=Noto+Sans:wght@400;700&family=Fira+Sans:wght@400;700&family=Inter:wght@400;700&family=Quicksand:wght@400;700&family=Josefin+Sans:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
     <script src="/js/lucide.min.js"></script>
     <script src="/js/pdf.min.js"></script>
     <script src="/js/flatpickr.min.js"></script>
+    <script src="/js/pickr.min.js"></script>
     <script src="/js/color-picker.js"></script>
-    <script src="/js/font-style-dialog.js"></script>
     <style>
         * { box-sizing: border-box; }
 
@@ -138,17 +142,38 @@
         .main {
             display: flex;
             flex: 1;
-            gap: 8px;
+            gap: 0;
             overflow: hidden;
+        }
+
+        .panel-resizer {
+            width: 4px;
+            background: var(--brd);
+            cursor: col-resize;
+            flex-shrink: 0;
+            transition: background 0.2s;
+            position: relative;
+            margin-right: 4px;
+        }
+
+        .panel-resizer:hover {
+            background: #7fa5df;
+        }
+
+        .panel-resizer.dragging {
+            background: #7fa5df;
         }
 
         /* Left: Page Thumbnails */
         .thumbnails-panel {
-            width: 160px;
+            flex: 0 0 160px;
+            min-width: 120px;
+            max-width: 400px;
             background: var(--bg2);
             border-radius: 6px;
             border: 1px solid var(--brd);
             display: flex;
+            margin-right: 4px;
             flex-direction: column;
             overflow: hidden;
             transition: width 0.3s ease;
@@ -278,14 +303,14 @@
 
         .thumbnail-item {
             background: var(--bg);
-            border: 2px solid var(--brd);
-            border-radius: 4px;
+            border: 3px solid var(--brd);
+            border-radius: 6px;
             cursor: grab;
             position: relative;
             transition: all 0.2s;
             user-select: none;
+            overflow: hidden;
         }
-
 
         .thumbnail-item:hover {
             border-color: #7fa5df;
@@ -300,6 +325,35 @@
         .thumbnail-item.dragover {
             border-color: #7fa5df;
             background: rgba(127, 165, 223, 0.1);
+        }
+
+        /* Drop zone highlighting */
+        .drop-zone-active {
+            position: relative;
+            outline: 3px dashed #7fa5df !important;
+            outline-offset: -8px;
+            background: rgba(127, 165, 223, 0.15) !important;
+        }
+
+        .drop-zone-active::before {
+            content: 'Drop here to merge as pages';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(127, 165, 223, 0.95);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .preview-area.drop-zone-active::before {
+            content: 'Drop here for options...';
         }
 
         .thumbnail-canvas {
@@ -321,28 +375,32 @@
             font-weight: 600;
         }
 
-        .thumbnail-item.selected {
-            border: 3px solid #7fa5df !important;
-            background: rgba(127, 165, 223, 0.15);
-            box-shadow: 0 0 12px rgba(127, 165, 223, 0.5);
-            position: relative;
+        .thumbnail-source-label {
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            right: 4px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-size: 8px;
+            font-weight: 600;
+            color: #fff;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: none;
         }
 
-        .thumbnail-item.selected::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 32px;
-            height: 32px;
-            background: #7fa5df;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-            z-index: 10;
+        .show-source-labels .thumbnail-source-label {
+            display: block;
+        }
+
+        .thumbnail-item.selected {
+            border: 4px solid #ffffff !important;
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 0 0 1px rgba(127, 165, 223, 0.3), 0 0 16px rgba(127, 165, 223, 0.4);
+            position: relative;
         }
 
         .thumbnail-item.selected .thumbnail-checkmark {
@@ -350,16 +408,34 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 32px;
-            height: 32px;
+            width: 44px;
+            height: 44px;
             background: #7fa5df;
+            border: 3px solid #ffffff;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             pointer-events: none;
             z-index: 10;
-            color: white;
+            color: #ffffff;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        .thumbnail-item.selected .thumbnail-checkmark i {
+            width: 24px !important;
+            height: 24px !important;
+            stroke-width: 3.5px;
+        }
+
+        /* Dim unselected thumbnails when any page is selected */
+        .thumbnails-list:has(.thumbnail-item.selected) .thumbnail-item:not(.selected) {
+            opacity: 0.4;
+            filter: grayscale(0.3);
+        }
+
+        .thumbnails-list:has(.thumbnail-item.selected) .thumbnail-item:not(.selected):hover {
+            opacity: 0.7;
         }
 
         /* Center: PDF Preview */
@@ -378,10 +454,17 @@
             border: 1px solid var(--brd);
             overflow: auto;
             position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             cursor: grab;
+            text-align: center;
+            font-size: 0; /* Remove whitespace from inline-block */
+        }
+
+        /* Vertical centering helper */
+        .preview-area::after {
+            content: '';
+            display: inline-block;
+            height: 100%;
+            vertical-align: middle;
         }
 
         .preview-area.panning {
@@ -413,14 +496,14 @@
 
         .canvas-wrapper {
             position: relative;
-            display: inline-block;
             z-index: 1;
+            display: inline-block;
+            vertical-align: middle;
+            margin: 20px;
         }
 
         .preview-area canvas {
             display: block;
-            max-width: 100%;
-            max-height: 100%;
             background: #fff;
         }
 
@@ -451,19 +534,187 @@
             color: #7fa5df;
         }
 
+        /* Hotkeys Display */
+        .preview-hotkeys {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(26, 26, 29, 0.95);
+            border: 1px solid var(--brd);
+            border-radius: 50%;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(8px);
+            font-size: 8px;
+            color: var(--txt3);
+            pointer-events: auto;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            overflow: hidden;
+            width: 24px;
+            height: 24px;
+        }
+
+        .preview-hotkeys.expanded {
+            border-radius: 6px;
+            width: auto;
+            height: auto;
+        }
+
+        .hotkey-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            color: var(--txt2);
+            transition: color 0.2s;
+            flex-shrink: 0;
+        }
+
+        .preview-hotkeys:hover .hotkey-icon {
+            color: #7fa5df;
+        }
+
+        .hotkey-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 0;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+        }
+
+        .preview-hotkeys.expanded .hotkey-content {
+            max-height: 200px;
+            opacity: 1;
+            padding: 0 12px 12px 12px;
+        }
+
+        .hotkey-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .hotkey-item kbd {
+            background: var(--bg2);
+            border: 1px solid var(--brd);
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: monospace;
+            font-size: 9px;
+            color: var(--txt);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .hotkey-item span {
+            color: var(--txt3);
+        }
+
+        /* Zoom Controls */
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(26, 26, 29, 0.95);
+            border: 1px solid var(--brd);
+            border-radius: 4px;
+            padding: 3px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            backdrop-filter: blur(8px);
+        }
+
+        .zoom-btn {
+            background: var(--bg2);
+            border: 1px solid var(--brd);
+            border-radius: 3px;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--txt2);
+            transition: all 0.2s;
+        }
+
+        .zoom-btn:hover {
+            background: var(--bg3);
+            border-color: #7fa5df;
+            color: #7fa5df;
+        }
+
+        .zoom-btn:active {
+            transform: scale(0.95);
+        }
+
+        .zoom-display {
+            min-width: 35px;
+            text-align: center;
+            font-size: 9px;
+            font-weight: 600;
+            color: var(--txt);
+            padding: 0 4px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Processing Overlay */
+        .processing-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+
+        .processing-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .processing-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(127, 165, 223, 0.3);
+            border-top-color: #7fa5df;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .processing-text {
+            font-size: 14px;
+            font-weight: 500;
+            color: #fff;
+            letter-spacing: 0.5px;
+        }
+
         /* Overlay gizmo */
         .overlay-gizmo {
             position: absolute;
-            border: 2px dotted rgba(127, 165, 223, 0.4);
+            border: none;
             background: transparent;
             cursor: move;
             z-index: 10;
             min-width: 60px;
             min-height: 30px;
-            padding: 10px 2px 2px 2px;
-            display: flex;
-            align-items: flex-start;
-            justify-content: flex-start;
+            padding: 0;
             user-select: none;
             transition: all 0.15s ease;
             box-sizing: border-box;
@@ -481,19 +732,31 @@
             color: #7fa5df;
             text-align: left;
             word-break: break-word;
-            padding: 4px;
-            line-height: 1.2;
+            padding: 0;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
             width: 100%;
             height: 100%;
-            display: flex;
-            align-items: flex-start;
-            justify-content: flex-start;
+            max-width: 100%;
+            pointer-events: none;
+        }
+
+        .overlay-gizmo-rectangle,
+        .overlay-gizmo-image-preview {
+            pointer-events: none;
         }
 
         .overlay-gizmo:hover {
             background: rgba(127, 165, 223, 0.08);
-            border-color: #7fa5df;
-            border-style: solid;
+            border: 2px solid #7fa5df;
+        }
+
+        .overlay-gizmo.selected {
+            border: 2px solid #7fa5df !important;
+            background: rgba(127, 165, 223, 0.12) !important;
+            box-shadow: 0 0 0 2px rgba(127, 165, 223, 0.3), 0 0 12px rgba(127, 165, 223, 0.5);
         }
 
         /* Resize handles - tiny squares */
@@ -511,12 +774,16 @@
 
         /* Corner handles - lock aspect ratio - larger and brighter */
         .overlay-gizmo-handle.se,
-        .overlay-gizmo-handle.sw {
+        .overlay-gizmo-handle.sw,
+        .overlay-gizmo-handle.ne,
+        .overlay-gizmo-handle.nw {
             width: 9px;
             height: 9px;
             background: #7fa5df;
         }
 
+        .overlay-gizmo-handle.nw { top: -5px; left: -5px; cursor: nwse-resize; }
+        .overlay-gizmo-handle.ne { top: -5px; right: -5px; cursor: nesw-resize; }
         .overlay-gizmo-handle.sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
         .overlay-gizmo-handle.se { bottom: -5px; right: -5px; cursor: nwse-resize; }
 
@@ -580,6 +847,28 @@
             transform: scale(0.95);
         }
 
+        /* Rotation guide circle */
+        .rotation-guide {
+            position: absolute;
+            border: 2px dashed rgba(127, 165, 223, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .rotation-guide::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 6px;
+            height: 6px;
+            background: #7fa5df;
+            border-radius: 50%;
+            box-shadow: 0 0 0 2px #fff;
+        }
+
         .overlay-gizmo-label {
             display: none; /* Hidden - unnecessary */
         }
@@ -594,14 +883,14 @@
             border: 2px solid #fff;
             border-radius: 50%;
             color: var(--txt3);
-            font-size: 13px;
+            font-size: 14px;
             font-weight: bold;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 0;
-            line-height: 1;
+            line-height: 0;
             opacity: 0;
             pointer-events: none;
             transition: all 0.2s;
@@ -674,12 +963,6 @@
             background: #7fa5df;
             border-color: #7fa5df;
             color: #000;
-        }
-
-        .overlay-gizmo.selected {
-            border: 2px solid #7fa5df !important;
-            background: rgba(127, 165, 223, 0.12) !important;
-            box-shadow: 0 0 0 2px rgba(127, 165, 223, 0.3), 0 0 12px rgba(127, 165, 223, 0.5);
         }
 
         .overlay-gizmo.selected .overlay-gizmo-handle,
@@ -854,6 +1137,11 @@
             background: #a3b8d9;
         }
 
+        .tool-btn.active {
+            background: #5a8abf;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
         .tool-btn-secondary {
             background: var(--bg3);
             color: var(--txt2);
@@ -896,6 +1184,15 @@
             border-color: #7fa5df;
         }
 
+        .font-select {
+            max-height: none;
+        }
+
+        .font-select option {
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+
         .color-picker {
             width: 100%;
             height: 32px;
@@ -928,6 +1225,28 @@
             color: #000;
             border-color: #7fa5df;
             font-weight: 600;
+        }
+
+        /* Checkbox labels */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: var(--txt2);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+            accent-color: #7fa5df;
+        }
+
+        .checkbox-label span {
+            line-height: 1;
         }
 
         /* Toggle Switch */
@@ -1044,318 +1363,99 @@
         .color-input-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: space-between;
+            width: 100%;
         }
 
         .color-input-group label {
-            font-size: 10px;
-            color: var(--txt2);
-            font-weight: 500;
-        }
-
-        /* Color Picker Component - Compact with Popover */
-        .color-picker-compact {
-            display: inline-block;
-        }
-
-        .color-picker-box {
-            width: 32px;
-            height: 32px;
-            border-radius: 4px;
-            border: 2px solid var(--brd);
-            cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .color-picker-box:hover {
-            border-color: #7fa5df;
-            box-shadow: 0 2px 8px rgba(127, 165, 223, 0.4);
-        }
-
-        .color-picker-popover {
-            position: fixed;
-            z-index: 10000;
-            background: var(--bg2);
-            border: 1px solid var(--brd);
-            border-radius: 8px;
-            padding: 12px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-            animation: fadeIn 0.15s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-8px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .color-picker-popover-content {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            width: 200px;
-        }
-
-        .color-picker-preview {
-            width: 100%;
-            height: 48px;
-            border-radius: 6px;
-            border: 2px solid var(--brd);
-            cursor: pointer;
-            transition: border-color 0.2s;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .color-picker-preview:hover {
-            border-color: #7fa5df;
-        }
-
-        .color-picker-input {
-            width: 0;
-            height: 0;
-            opacity: 0;
-            position: absolute;
-            pointer-events: none;
-        }
-
-        .color-picker-eyedropper {
-            width: 100%;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            background: var(--bg3);
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            color: var(--txt2);
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 11px;
-        }
-
-        .color-picker-eyedropper:hover {
-            background: var(--bg2);
-            border-color: #7fa5df;
-            color: #7fa5df;
-        }
-
-        .color-picker-swatches {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-        }
-
-        .color-swatch {
-            width: 100%;
-            aspect-ratio: 1;
-            border-radius: 4px;
-            border: 2px solid var(--brd);
-            cursor: pointer;
-            transition: all 0.2s;
-            padding: 0;
-        }
-
-        .color-swatch:hover {
-            transform: scale(1.1);
-            border-color: #7fa5df;
-            box-shadow: 0 0 12px rgba(127, 165, 223, 0.5);
-        }
-
-        /* Font Style Dialog */
-        .font-style-dialog {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10001;
-            animation: fadeIn 0.2s ease-out;
-        }
-
-        .font-style-dialog-content {
-            background: var(--bg2);
-            border: 1px solid var(--brd);
-            border-radius: 8px;
-            padding: 20px;
-            width: 400px;
-            max-width: 90vw;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-            animation: slideUp 0.2s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                transform: translateY(20px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .font-style-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--brd);
-        }
-
-        .font-style-header h3 {
-            margin: 0;
-            font-size: 16px;
-            color: var(--txt);
-        }
-
-        .font-style-close {
-            background: none;
-            border: none;
-            color: var(--txt3);
-            cursor: pointer;
-            padding: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-            transition: all 0.2s;
-        }
-
-        .font-style-close:hover {
-            background: var(--bg3);
-            color: var(--txt);
-        }
-
-        .font-style-section {
-            margin-bottom: 16px;
-        }
-
-        .font-style-label {
-            display: block;
             font-size: 11px;
             color: var(--txt2);
-            margin-bottom: 6px;
             font-weight: 500;
+            flex-shrink: 0;
         }
 
-        .font-style-select {
-            width: 100%;
-            padding: 8px 10px;
-            background: var(--bg);
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            color: var(--txt);
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
+        /* Pickr Color Picker Customization */
+        .pcr-button {
+            width: 32px !important;
+            height: 28px !important;
+            border-radius: 4px !important;
+            border: 1px solid var(--brd) !important;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease !important;
         }
 
-        .font-style-select:focus {
-            outline: none;
-            border-color: #7fa5df;
-            box-shadow: 0 0 0 3px rgba(127, 165, 223, 0.1);
+        .pcr-button:hover {
+            border-color: #7fa5df !important;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(127, 165, 223, 0.15) !important;
         }
 
-        .font-style-select optgroup {
-            background: var(--bg2);
-            color: var(--txt2);
-            font-weight: 600;
+        .pcr-button:focus {
+            outline: none !important;
+            border-color: #7fa5df !important;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(127, 165, 223, 0.25) !important;
         }
 
-        .font-style-select option {
-            background: var(--bg);
-            color: var(--txt);
+        .pcr-app {
+            background: var(--bg2) !important;
+            border: 1px solid var(--brd) !important;
+            border-radius: 6px !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+            padding: 12px !important;
         }
 
-        .font-size-controls {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .pcr-app .pcr-selection {
+            margin-bottom: 10px !important;
         }
 
-        .font-size-input {
-            flex: 1;
-            padding: 8px 10px;
-            background: var(--bg);
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            color: var(--txt);
-            font-size: 13px;
-            transition: all 0.2s;
+        .pcr-app .pcr-selection .pcr-picker {
+            border-radius: 4px !important;
+            border: 1px solid var(--brd) !important;
         }
 
-        .font-size-input:focus {
-            outline: none;
-            border-color: #7fa5df;
-            box-shadow: 0 0 0 3px rgba(127, 165, 223, 0.1);
+        .pcr-app .pcr-interaction {
+            padding: 8px 0 0 0 !important;
         }
 
-        .font-size-unit {
-            font-size: 12px;
-            color: var(--txt3);
-            min-width: 24px;
+        .pcr-app .pcr-interaction input {
+            background: var(--bg) !important;
+            color: var(--txt) !important;
+            border-color: var(--brd) !important;
+            border-radius: 4px !important;
+            font-size: 11px !important;
+            padding: 4px 6px !important;
         }
 
-        .font-style-toggles {
-            display: flex;
-            gap: 8px;
+        .pcr-app .pcr-interaction .pcr-result {
+            background: var(--bg) !important;
+            color: var(--txt) !important;
+            border-color: var(--brd) !important;
+            border-radius: 4px !important;
+            font-size: 11px !important;
         }
 
-        .font-style-toggle {
-            flex: 1;
-            padding: 8px;
-            background: var(--bg);
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            color: var(--txt3);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
+        .pcr-app .pcr-interaction input:focus {
+            border-color: #7fa5df !important;
+            outline: none !important;
         }
 
-        .font-style-toggle:hover {
-            background: var(--bg3);
-            border-color: #7fa5df;
-            color: var(--txt);
+        .pcr-app .pcr-swatches {
+            margin-top: 8px !important;
         }
 
-        .font-style-toggle.active {
-            background: #7fa5df;
-            border-color: #7fa5df;
-            color: #000;
+        .pcr-app .pcr-swatches > button {
+            border-radius: 3px !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
         }
 
-        .font-style-preview-section {
-            margin-top: 20px;
-            padding-top: 16px;
-            border-top: 1px solid var(--brd);
+        .pcr-eyedropper-btn {
+            font-size: 11px !important;
         }
 
-        .font-style-preview {
-            background: var(--bg);
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            padding: 16px;
-            color: var(--txt);
-            text-align: center;
-            min-height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .pcr-eyedropper-btn:hover {
+            background: var(--bg3) !important;
+            border-color: #7fa5df !important;
+            color: #7fa5df !important;
         }
 
         /* Tabs */
@@ -1468,6 +1568,15 @@
 
         .modal-btn-primary:hover {
             background: #a3b8d9;
+        }
+
+        .modal-btn-danger {
+            background: #dc3545;
+            color: #fff;
+        }
+
+        .modal-btn-danger:hover {
+            background: #c82333;
         }
 
         .modal-btn-secondary {
@@ -1642,6 +1751,9 @@
 
                 <!-- Action Toolbar (always visible) -->
                 <div class="page-actions-toolbar">
+                    <button class="page-action-btn" id="toggleSourceLabelsBtn" onclick="toggleSourceLabels()" title="Show/Hide Source File Labels">
+                        <i data-lucide="tag" style="width: 14px; height: 14px;"></i>
+                    </button>
                     <div style="flex: 1;"></div>
                     <button class="page-action-btn arrow-btn" id="rotateLeftBtn" onclick="rotateSelectedPages(-90)" title="Rotate left 90°" disabled>
                         <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
@@ -1678,6 +1790,9 @@
                 </div>
             </div>
 
+            <!-- Resizer -->
+            <div class="panel-resizer" id="thumbnailResizer"></div>
+
             <!-- Center: PDF Preview -->
             <div class="preview-panel">
                 <div class="preview-area" id="previewArea">
@@ -1685,6 +1800,53 @@
                         <i data-lucide="file" style="width: 48px; height: 48px; opacity: 0.4;"></i>
                         <p>PDF preview will appear here</p>
                         <button class="load-btn" onclick="loadPDF()">Load PDF</button>
+                    </div>
+
+                    <!-- Hotkeys Display (Bottom Left) -->
+                    <div class="preview-hotkeys" id="previewHotkeys" onclick="toggleHotkeys(event)">
+                        <div class="hotkey-icon">
+                            <i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i>
+                        </div>
+                        <div class="hotkey-content">
+                            <div class="hotkey-item">
+                                <kbd>←↑↓→</kbd><span>Move overlay</span>
+                            </div>
+                            <div class="hotkey-item">
+                                <kbd>Alt</kbd><span>+</span><kbd>←↑↓→</kbd><span>Precise move</span>
+                            </div>
+                            <div class="hotkey-item">
+                                <kbd>Del</kbd><span>Delete overlay</span>
+                            </div>
+                            <div class="hotkey-item">
+                                <kbd>Esc</kbd><span>Deselect</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Zoom Controls (Bottom Right) -->
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="PreviewController.zoomOut()" title="Zoom Out (Scroll Down)">
+                            <i data-lucide="minus" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <div class="zoom-display" id="zoomDisplay">100%</div>
+                        <button class="zoom-btn" onclick="PreviewController.zoomIn()" title="Zoom In (Scroll Up)">
+                            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <button class="zoom-btn" onclick="PreviewController.zoomFit()" title="Fit to Width">
+                            <i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <div style="width: 1px; height: 20px; background: var(--brd); margin: 0 4px;"></div>
+                        <button class="zoom-btn" id="darkModeBtn" onclick="PreviewController.toggleDarkMode()" title="Toggle Dark Background">
+                            <i data-lucide="moon" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
+
+                    <!-- Processing Overlay -->
+                    <div class="processing-overlay" id="processingOverlay" style="display: none;">
+                        <div class="processing-content">
+                            <div class="processing-spinner"></div>
+                            <div class="processing-text" id="processingText">Processing...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1724,7 +1886,7 @@
                             </div>
                             <div class="form-group">
                                 <div style="display: flex; gap: 4px;">
-                                    <input type="text" class="form-input" id="textContent" placeholder="Enter text..." style="flex: 1;">
+                                    <input type="text" class="form-input" id="textContent" placeholder="Enter text..." style="flex: 1;" onkeypress="if(event.key === 'Enter' && !document.getElementById('addTextBtn').disabled) addTextOverlay()">
                                     <button class="toggle-btn" onclick="openDatePicker()" title="Pick Date">
                                         <i data-lucide="calendar" style="width: 12px; height: 12px;"></i>
                                     </button>
@@ -1760,46 +1922,91 @@
                                     </button>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Font Style</label>
-                                    <button class="tool-btn" id="fontStyleBtn" onclick="openFontStyleDialog()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                                        <i data-lucide="type" style="width: 16px; height: 16px;"></i>
-                                        <span>Customize Font</span>
+                                    <label class="form-label">Font Family</label>
+                                    <input class="form-input" id="editFontFamily" list="fontFamilyList" onchange="UIControls.updateLayerFontFamily(this.value)" placeholder="Select or type font name">
+                                    <datalist id="fontFamilyList">
+                                        <option value="Helvetica">Helvetica</option>
+                                        <option value="Times">Times New Roman</option>
+                                        <option value="Courier">Courier</option>
+                                        <option value="Arial">Arial</option>
+                                        <option value="Georgia">Georgia</option>
+                                        <option value="Verdana">Verdana</option>
+                                        <option value="Roboto">Roboto</option>
+                                        <option value="Open Sans">Open Sans</option>
+                                        <option value="Lato">Lato</option>
+                                        <option value="Source Sans Pro">Source Sans Pro</option>
+                                        <option value="Montserrat">Montserrat</option>
+                                        <option value="Oswald">Oswald</option>
+                                        <option value="Raleway">Raleway</option>
+                                        <option value="PT Sans">PT Sans</option>
+                                        <option value="Merriweather">Merriweather</option>
+                                        <option value="Nunito">Nunito</option>
+                                        <option value="Playfair Display">Playfair Display</option>
+                                        <option value="Ubuntu">Ubuntu</option>
+                                        <option value="Poppins">Poppins</option>
+                                        <option value="Work Sans">Work Sans</option>
+                                        <option value="Noto Sans">Noto Sans</option>
+                                        <option value="Fira Sans">Fira Sans</option>
+                                        <option value="Inter">Inter</option>
+                                        <option value="Quicksand">Quicksand</option>
+                                        <option value="Josefin Sans">Josefin Sans</option>
+                                        <option value="Bebas Neue">Bebas Neue</option>
+                                    </datalist>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Text Style</label>
+                                    <div style="display: flex; gap: 4px;">
+                                        <button class="tool-btn" id="boldBtn" onclick="UIControls.toggleBold()" title="Bold" style="flex: 1;">
+                                            <i data-lucide="bold" style="width: 14px; height: 14px;"></i>
+                                        </button>
+                                        <button class="tool-btn" id="italicBtn" onclick="UIControls.toggleItalic()" title="Italic" style="flex: 1;">
+                                            <i data-lucide="italic" style="width: 14px; height: 14px;"></i>
+                                        </button>
+                                        <button class="tool-btn" id="underlineBtn" onclick="UIControls.toggleUnderline()" title="Underline" style="flex: 1;">
+                                            <i data-lucide="underline" style="width: 14px; height: 14px;"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="color-input-group">
+                                        <label>Text Color</label>
+                                        <div id="textColorPicker"></div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="color-input-group">
+                                        <label>Text Highlight</label>
+                                        <div id="highlightColorPicker"></div>
+                                    </div>
+                                </div>
+                                <div class="form-group" id="highlightBlurGroup" style="display: none;">
+                                    <label class="form-label">Highlight Fade: <span id="highlightBlurValue">0</span>px</label>
+                                    <input type="range" min="0" max="20" value="0" id="highlightBlurSlider" style="width: 100%;" oninput="UIControls.updateHighlightBlur(this.value)">
+                                    <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">
+                                        Gradient fade at highlight edges
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Text Blur: <span id="textBlurValue">0</span>px</label>
+                                    <input type="range" min="0" max="2" step="0.1" value="0" id="textBlurSlider" style="width: 100%;" oninput="UIControls.updateTextBlur(this.value)">
+                                    <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">
+                                        Blur preview (CSS effect)
+                                    </div>
+                                    <button class="tool-btn" id="convertToImageBtn" onclick="UIControls.convertBlurredTextToImage()" style="width: 100%; display: none; margin-top: 6px;">
+                                        <i data-lucide="image" style="width: 12px; height: 12px; margin-right: 4px;"></i>
+                                        Convert to Image (Permanent)
                                     </button>
                                 </div>
                                 <div class="form-group">
-                                    <div class="color-input-group">
-                                        <div id="textColorPicker"></div>
-                                        <label>Text Color</label>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <div class="color-input-group">
-                                        <div id="bgColorPicker"></div>
-                                        <label>Background</label>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <div class="color-input-group">
-                                        <div id="borderColorPicker"></div>
-                                        <label>Text Border</label>
+                                    <label class="form-label">Character Spacing: <span id="letterSpacingValue">0</span>px</label>
+                                    <input type="range" min="-2" max="10" step="0.5" value="0" id="letterSpacingSlider" style="width: 100%;" oninput="UIControls.updateLetterSpacing(this.value)">
+                                    <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">
+                                        Adjust spacing between characters
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Common controls (background, opacity) -->
-                            <div class="form-group">
-                                <label class="form-label" style="display: flex; align-items: center; justify-content: space-between;">
-                                    <span id="transparentBtnText">Background Box</span>
-                                    <label class="switch" style="margin: 0;">
-                                        <input type="checkbox" id="layerTransparentCheckbox" onchange="UIControls.toggleLayerTransparency()">
-                                        <span class="slider"></span>
-                                    </label>
-                                </label>
-                                <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;" id="transparentHelpText">
-                                    Show colored background box
-                                </div>
-                            </div>
-
+                            <!-- Common controls (opacity) -->
                             <div class="form-group">
                                 <label class="form-label">Layer Opacity: <span id="opacityValue">100</span>%</label>
                                 <input type="range" min="10" max="100" value="100" id="opacitySlider" style="width: 100%;" oninput="UIControls.updateLayerOpacity(this.value)">
@@ -1901,6 +2108,7 @@
     <!-- Modular Scripts -->
     <script src="/js/app-state.js"></script>
     <script src="/js/modal-manager.js"></script>
+    <script src="/js/folder-opener.js"></script>
     <script src="/js/share-modal.js"></script>
     <script src="/js/date-utils.js"></script>
     <script src="/js/image-manager.js"></script>
@@ -1909,8 +2117,13 @@
     <script src="/js/preview-controller.js"></script>
     <script src="/js/page-operations.js"></script>
     <script src="/js/pdf-export.js"></script>
+    <script src="/js/pdf-export-v2.js"></script>
     <script src="/js/background-remover.js"></script>
     <script src="/js/ui-controls.js"></script>
+    <script src="/js/gizmo-manager.js"></script>
+    <script src="/js/merge-handler.js"></script>
+    <script src="/js/tool-manager.js"></script>
+    <script src="/js/keyboard-handler.js"></script>
     <script src="/js/main.js"></script>
 </body>
 </html>

@@ -15,14 +15,36 @@ const UIControls = (() => {
 		}
 	}
 
+	function showRectangleEditor() {
+		document.getElementById('rectangleEditorSection').style.display = 'block';
+		document.getElementById('selectedLayerEditor').style.display = 'none';
+		document.getElementById('textEditorSection').style.display = 'none';
+
+		// Reset rectangle editor state
+		window.selectedRectangleColor = '#000000';
+		window.selectedRectangleBorderFade = 0;
+
+		const fadeSlider = document.getElementById('rectangleBorderFadeSlider');
+		const fadeValue = document.getElementById('rectangleBorderFadeValue');
+		if (fadeSlider) fadeSlider.value = 0;
+		if (fadeValue) fadeValue.textContent = 0;
+	}
+
+	function closeRectangleEditor() {
+		document.getElementById('rectangleEditorSection').style.display = 'none';
+	}
+
+	function updateRectangleBorderFade(fadeWidth) {
+		const fadeValue = document.getElementById('rectangleBorderFadeValue');
+		if (fadeValue) {
+			fadeValue.textContent = fadeWidth;
+		}
+		window.selectedRectangleBorderFade = Number.parseFloat(fadeWidth);
+	}
+
 	function showLayerEditor(overlay, index) {
 		const editor = document.getElementById('selectedLayerEditor');
 		const textControls = document.getElementById('textLayerControls');
-		const transparentCheckbox = document.getElementById(
-			'layerTransparentCheckbox',
-		);
-		const transparentBtnText = document.getElementById('transparentBtnText');
-		const transparentHelpText = document.getElementById('transparentHelpText');
 		const titleEl = document.getElementById('selectedLayerTitle');
 		const opacitySlider = document.getElementById('opacitySlider');
 		const opacityValue = document.getElementById('opacityValue');
@@ -30,20 +52,25 @@ const UIControls = (() => {
 		editor.style.display = 'block';
 		document.getElementById('textEditorSection').style.display = 'none';
 
+		// Hide rectangle editor if it exists
+		const rectangleEditor = document.getElementById('rectangleEditorSection');
+		if (rectangleEditor) {
+			rectangleEditor.style.display = 'none';
+		}
+
 		const isText = overlay.type === 'date' || overlay.type === 'text';
-		titleEl.textContent = isText ? 'Edit Text' : 'Edit Image';
+		const isRectangle = overlay.type === 'rectangle';
+
+		if (isRectangle) {
+			titleEl.textContent = 'Edit Shape';
+		} else {
+			titleEl.textContent = isText ? 'Edit Text' : 'Edit Image';
+		}
+
 		textControls.style.display = isText ? 'block' : 'none';
 
-		if (isText) {
-			transparentBtnText.textContent = 'Background Box';
-			transparentHelpText.textContent = 'Show colored background box';
-			const hasBg = !overlay.transparentBg && overlay.bgColor;
-			transparentCheckbox.checked = hasBg;
-		} else {
-			transparentBtnText.textContent = 'Remove Background';
-			transparentHelpText.textContent = 'Remove image background (uses AI)';
-			transparentCheckbox.checked = overlay.removeBackground || false;
-
+		// Handle background removal for images (not text)
+		if (!isText && !isRectangle) {
 			// Apply background removal preview if enabled and not already processed
 			if (
 				overlay.removeBackground &&
@@ -61,11 +88,115 @@ const UIControls = (() => {
 		if (isText) {
 			document.getElementById('editTextContent').value = overlay.dateText || '';
 
+			// Font family
+			const fontFamilySelect = document.getElementById('editFontFamily');
+			if (fontFamilySelect) {
+				fontFamilySelect.value = overlay.fontFamily || 'Helvetica';
+			}
+
+			// Text style button states
+			const bold = overlay.bold || false;
+			const italic = overlay.italic || false;
+			const underline = overlay.underline || false;
+
+			// Update individual toggle button states
+			const boldBtn = document.getElementById('boldBtn');
+			const italicBtn = document.getElementById('italicBtn');
+			const underlineBtn = document.getElementById('underlineBtn');
+
+			if (boldBtn) {
+				if (bold) {
+					boldBtn.classList.add('active');
+				} else {
+					boldBtn.classList.remove('active');
+				}
+			}
+			if (italicBtn) {
+				if (italic) {
+					italicBtn.classList.add('active');
+				} else {
+					italicBtn.classList.remove('active');
+				}
+			}
+			if (underlineBtn) {
+				if (underline) {
+					underlineBtn.classList.add('active');
+				} else {
+					underlineBtn.classList.remove('active');
+				}
+			}
+
+			// Text style cycling button state (for backwards compatibility)
+			const textStyleIcon = document.getElementById('textStyleIcon');
+			const textStyleLabel = document.getElementById('textStyleLabel');
+
+			// Determine current style
+			const styles = [
+				{ bold: false, italic: false, underline: false, icon: 'type', label: 'Regular' },
+				{ bold: true, italic: false, underline: false, icon: 'bold', label: 'Bold' },
+				{ bold: false, italic: true, underline: false, icon: 'italic', label: 'Italic' },
+				{ bold: false, italic: false, underline: true, icon: 'underline', label: 'Underline' },
+				{ bold: true, italic: true, underline: false, icon: 'bold', label: 'Bold Italic' },
+				{ bold: true, italic: false, underline: true, icon: 'bold', label: 'Bold Underline' },
+				{ bold: false, italic: true, underline: true, icon: 'italic', label: 'Italic Underline' },
+				{ bold: true, italic: true, underline: true, icon: 'bold', label: 'Bold Italic Underline' },
+			];
+			const currentStyle = styles.find(
+				s => s.bold === bold && s.italic === italic && s.underline === underline
+			) || styles[0];
+
+			if (textStyleIcon) {
+				textStyleIcon.setAttribute('data-lucide', currentStyle.icon);
+				if (window.lucide) window.lucide.createIcons();
+			}
+			if (textStyleLabel) {
+				textStyleLabel.textContent = currentStyle.label;
+			}
+
 			if (window.textColorPicker) {
 				const textColor = overlay.textColor || '#000000';
 				window.textColorPicker.setColor(textColor);
 				window.selectedTextColor = textColor;
 			}
+
+			if (window.highlightColorPicker) {
+				const highlightColor = overlay.highlightColor || '#ffff00';
+				window.highlightColorPicker.setColor(highlightColor);
+				window.selectedHighlightColor = highlightColor;
+			}
+
+			// Show/update highlight blur slider if highlight is enabled
+			const highlightBlurGroup = document.getElementById('highlightBlurGroup');
+			const highlightBlurSlider = document.getElementById('highlightBlurSlider');
+			const highlightBlurValue = document.getElementById('highlightBlurValue');
+			if (overlay.highlightColor) {
+				if (highlightBlurGroup) highlightBlurGroup.style.display = 'block';
+				const blurWidth = overlay.highlightBlur || 0;
+				if (highlightBlurSlider) highlightBlurSlider.value = blurWidth;
+				if (highlightBlurValue) highlightBlurValue.textContent = blurWidth;
+			} else {
+				if (highlightBlurGroup) highlightBlurGroup.style.display = 'none';
+			}
+
+			// Update text blur slider
+			const textBlurSlider = document.getElementById('textBlurSlider');
+			const textBlurValue = document.getElementById('textBlurValue');
+			const convertToImageBtn = document.getElementById('convertToImageBtn');
+			const blurAmount = overlay.textBlur || 0;
+			if (textBlurSlider) textBlurSlider.value = blurAmount;
+			if (textBlurValue) textBlurValue.textContent = blurAmount;
+
+			// Show convert button only if blur is applied
+			if (convertToImageBtn) {
+				convertToImageBtn.style.display = blurAmount > 0 ? 'block' : 'none';
+			}
+
+			// Update letter spacing slider
+			const letterSpacingSlider = document.getElementById('letterSpacingSlider');
+			const letterSpacingValue = document.getElementById('letterSpacingValue');
+			const spacing = overlay.letterSpacing || 0;
+			if (letterSpacingSlider) letterSpacingSlider.value = spacing;
+			if (letterSpacingValue) letterSpacingValue.textContent = spacing;
 
 			if (window.bgColorPicker) {
 				const bgColor = overlay.bgColor || '#ffffff';
@@ -221,6 +352,7 @@ const UIControls = (() => {
 		if (overlay.type !== 'date' && overlay.type !== 'text') return;
 
 		AppState.updateOverlay(index, { dateText: newText });
+		AppState.saveToHistory();
 
 		const label =
 			newText.length > 20 ? `${newText.substring(0, 20)}...` : newText;
@@ -237,7 +369,7 @@ const UIControls = (() => {
 		LayerManager.updateLayersList();
 	}
 
-	function updateLayerColor(color, isBackground = false) {
+	function updateLayerColor(color, isBackground = false, alpha = 1.0) {
 		const index = AppState.getSelectedIndex();
 		if (index === null) return;
 
@@ -247,36 +379,543 @@ const UIControls = (() => {
 		if (isBackground) {
 			window.selectedBgColor = color;
 			if (!overlay.transparentBg) {
-				AppState.updateOverlay(index, { bgColor: color });
+				AppState.updateOverlay(index, { bgColor: color, bgAlpha: alpha });
+		AppState.saveToHistory();
 				const gizmo = document.querySelector(
 					`.overlay-gizmo[data-overlay-index="${index}"]`,
 				);
 				if (gizmo) {
 					const textEl = gizmo.querySelector('.overlay-gizmo-text');
-					if (textEl) textEl.style.backgroundColor = color;
+					if (textEl) {
+						const rgba = hexToRgba(color, alpha);
+						textEl.style.backgroundColor = rgba;
+					}
 				}
 			}
 		} else {
 			window.selectedTextColor = color;
-			AppState.updateOverlay(index, { textColor: color });
+			AppState.updateOverlay(index, { textColor: color, textAlpha: alpha });
 			const gizmo = document.querySelector(
 				`.overlay-gizmo[data-overlay-index="${index}"]`,
 			);
 			if (gizmo) {
 				const textEl = gizmo.querySelector('.overlay-gizmo-text');
-				if (textEl) textEl.style.color = color;
+				if (textEl) {
+					const rgba = hexToRgba(color, alpha);
+					textEl.style.color = rgba;
+				}
 			}
 		}
+	}
+
+	// Helper function to convert hex + alpha to rgba
+	function hexToRgba(hex, alpha) {
+		hex = hex.replace('#', '');
+		const r = Number.parseInt(hex.substring(0, 2), 16);
+		const g = Number.parseInt(hex.substring(2, 4), 16);
+		const b = Number.parseInt(hex.substring(4, 6), 16);
+		return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+	}
+
+	function updateLayerFontFamily(fontFamily) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		AppState.updateOverlay(index, { fontFamily });
+		AppState.saveToHistory();
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				// System fonts that don't need to be loaded from Google
+				const systemFonts = ['Helvetica', 'Times', 'Courier', 'Arial', 'Georgia', 'Verdana'];
+
+				// Load Google Font if needed (fonts already loaded in HTML head, but this is a fallback)
+				if (!systemFonts.includes(fontFamily)) {
+					const link = document.createElement('link');
+					link.rel = 'stylesheet';
+					link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@400;700&display=swap`;
+					document.head.appendChild(link);
+				}
+
+				// Apply font family with fallbacks
+				if (fontFamily === 'Times') {
+					textEl.style.fontFamily = 'Times New Roman, Times, serif';
+				} else if (fontFamily === 'Courier') {
+					textEl.style.fontFamily = 'Courier New, Courier, monospace';
+				} else if (fontFamily === 'Helvetica') {
+					textEl.style.fontFamily = 'Helvetica, Arial, sans-serif';
+				} else {
+					textEl.style.fontFamily = fontFamily;
+				}
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateLayerBold(bold) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		AppState.updateOverlay(index, { bold });
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				textEl.style.fontWeight = bold ? 'bold' : 'normal';
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateLayerItalic(italic) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		AppState.updateOverlay(index, { italic });
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				textEl.style.fontStyle = italic ? 'italic' : 'normal';
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateLayerUnderline(underline) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		AppState.updateOverlay(index, { underline });
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				textEl.style.textDecoration = underline ? 'underline' : 'none';
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateLayerHighlight(color) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		window.selectedHighlightColor = color;
+		AppState.updateOverlay(index, { highlightColor: color });
+		AppState.saveToHistory();
+
+		// Show blur slider if highlight is enabled
+		const highlightBlurGroup = document.getElementById('highlightBlurGroup');
+		if (highlightBlurGroup) {
+			highlightBlurGroup.style.display = color ? 'block' : 'none';
+		}
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				// Highlight is like a background color on the text itself
+				textEl.style.backgroundColor = color;
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateHighlightBlur(blurWidth) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		// Update value display
+		const highlightBlurValue = document.getElementById('highlightBlurValue');
+		if (highlightBlurValue) {
+			highlightBlurValue.textContent = blurWidth;
+		}
+
+		// Store blur width in overlay
+		AppState.updateOverlay(index, { highlightBlur: Number.parseFloat(blurWidth) });
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateTextBlur(blurAmount) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		// Update value display
+		const textBlurValue = document.getElementById('textBlurValue');
+		if (textBlurValue) {
+			textBlurValue.textContent = blurAmount;
+		}
+
+		// Store blur amount in overlay
+		const blurValue = Number.parseFloat(blurAmount);
+		AppState.updateOverlay(index, { textBlur: blurValue });
+		AppState.saveToHistory();
+
+		// Show/hide convert button
+		const convertToImageBtn = document.getElementById('convertToImageBtn');
+		if (convertToImageBtn) {
+			convertToImageBtn.style.display = blurValue > 0 ? 'block' : 'none';
+		}
+
+		// Update gizmo visual with CSS filter
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				if (blurValue > 0) {
+					textEl.style.filter = `blur(${blurValue}px)`;
+				} else {
+					textEl.style.filter = 'none';
+				}
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	function updateLetterSpacing(spacing) {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		// Update value display
+		const letterSpacingValue = document.getElementById('letterSpacingValue');
+		if (letterSpacingValue) {
+			letterSpacingValue.textContent = spacing;
+		}
+
+		// Store letter spacing in overlay
+		const spacingValue = Number.parseFloat(spacing);
+		AppState.updateOverlay(index, { letterSpacing: spacingValue });
+		AppState.saveToHistory();
+
+		// Update gizmo visual with CSS
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				textEl.style.letterSpacing = `${spacingValue}px`;
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
+	}
+
+	async function convertBlurredTextToImage() {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+		if (!overlay.textBlur || overlay.textBlur <= 0) return;
+
+		// Confirm with user
+		const confirmed = await new Promise((resolve) => {
+			window.showConfirmModal(
+				'Convert to Image?',
+				'This will convert the blurred text to an image overlay. This action cannot be undone. Continue?',
+				() => resolve(true),
+				() => resolve(false),
+				true
+			);
+		});
+
+		if (!confirmed) return;
+
+		try {
+			// Get canvas for scaling
+			const canvas = document.getElementById('pdfCanvas');
+			if (!canvas) return;
+
+			// Prepare text rendering parameters
+			const params = {
+				text: overlay.dateText || '',
+				fontSize: overlay.fontSize || 12,
+				fontFamily: overlay.fontFamily || 'Helvetica',
+				bold: overlay.bold || false,
+				italic: overlay.italic || false,
+				underline: overlay.underline || false,
+				textColor: overlay.textColor || '#000000',
+				highlightColor: overlay.highlightColor || null,
+				bgColor: overlay.transparentBg ? null : overlay.bgColor,
+				blur: overlay.textBlur,
+				width: overlay.width || 150,
+				height: overlay.height || 50,
+			};
+
+			// Call API to render text as image
+			const response = await fetch('/api/render-text-to-image', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(params),
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to render text to image');
+			}
+
+			const result = await response.json();
+
+			// Create new image overlay with the rendered image
+			const newOverlay = {
+				type: 'image',
+				imageData: result.imageData,
+				x: overlay.x,
+				y: overlay.y,
+				width: overlay.width,
+				height: overlay.height,
+				rotation: overlay.rotation || 0,
+				opacity: overlay.opacity || 100,
+				pageIndex: overlay.pageIndex || 0,
+				canvasWidth: overlay.canvasWidth || canvas.width,
+				canvasHeight: overlay.canvasHeight || canvas.height,
+			};
+
+			// Replace text overlay with image overlay
+			AppState.updateOverlay(index, newOverlay);
+
+			// Deselect and update UI
+			window.SelectionManager.deselectOverlay();
+			window.LayerManager.updateLayersList();
+
+			// Re-render the page
+			if (window.PreviewController && window.currentPreviewPage) {
+				window.PreviewController.updateGizmosForPage(window.currentPreviewPage);
+			}
+
+			// Show success message
+			window.showModal('Success', 'Text converted to image successfully!');
+
+		} catch (error) {
+			console.error('Error converting text to image:', error);
+			window.showModal('Error', `Failed to convert text to image: ${error.message}`);
+		}
+	}
+
+	function togglePagesPanel() {
+		const panel = document.getElementById('thumbnailsPanel');
+		const btn = panel?.querySelector('.collapse-btn i');
+		if (!panel) return;
+
+		const isCollapsed = panel.classList.toggle('collapsed');
+
+		// Update icon direction
+		if (btn) {
+			btn.setAttribute('data-lucide', isCollapsed ? 'chevron-right' : 'chevron-left');
+			if (window.lucide) lucide.createIcons();
+		}
+	}
+
+	function toggleBold() {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		const newBoldState = !overlay.bold;
+		updateLayerBold(newBoldState);
+
+		// Update button visual state
+		const btn = document.getElementById('boldBtn');
+		if (btn) {
+			if (newBoldState) {
+				btn.classList.add('active');
+			} else {
+				btn.classList.remove('active');
+			}
+		}
+	}
+
+	function toggleItalic() {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		const newItalicState = !overlay.italic;
+		updateLayerItalic(newItalicState);
+
+		// Update button visual state
+		const btn = document.getElementById('italicBtn');
+		if (btn) {
+			if (newItalicState) {
+				btn.classList.add('active');
+			} else {
+				btn.classList.remove('active');
+			}
+		}
+	}
+
+	function toggleUnderline() {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		const newUnderlineState = !overlay.underline;
+		updateLayerUnderline(newUnderlineState);
+
+		// Update button visual state
+		const btn = document.getElementById('underlineBtn');
+		if (btn) {
+			if (newUnderlineState) {
+				btn.classList.add('active');
+			} else {
+				btn.classList.remove('active');
+			}
+		}
+	}
+
+	function cycleTextStyle() {
+		const index = AppState.getSelectedIndex();
+		if (index === null) return;
+
+		const overlay = AppState.getOverlay(index);
+		if (overlay.type !== 'date' && overlay.type !== 'text') return;
+
+		// Get current style state
+		const bold = overlay.bold || false;
+		const italic = overlay.italic || false;
+		const underline = overlay.underline || false;
+
+		// Define style combinations cycle (8 states)
+		const styles = [
+			{ bold: false, italic: false, underline: false, icon: 'type', label: 'Regular' },
+			{ bold: true, italic: false, underline: false, icon: 'bold', label: 'Bold' },
+			{ bold: false, italic: true, underline: false, icon: 'italic', label: 'Italic' },
+			{ bold: false, italic: false, underline: true, icon: 'underline', label: 'Underline' },
+			{ bold: true, italic: true, underline: false, icon: 'bold', label: 'Bold Italic' },
+			{ bold: true, italic: false, underline: true, icon: 'bold', label: 'Bold Underline' },
+			{ bold: false, italic: true, underline: true, icon: 'italic', label: 'Italic Underline' },
+			{ bold: true, italic: true, underline: true, icon: 'bold', label: 'Bold Italic Underline' },
+		];
+
+		// Find current style index
+		let currentIndex = styles.findIndex(
+			s => s.bold === bold && s.italic === italic && s.underline === underline
+		);
+		if (currentIndex === -1) currentIndex = 0;
+
+		// Move to next style
+		const nextIndex = (currentIndex + 1) % styles.length;
+		const nextStyle = styles[nextIndex];
+
+		// Update overlay
+		AppState.updateOverlay(index, {
+			bold: nextStyle.bold,
+			italic: nextStyle.italic,
+			underline: nextStyle.underline,
+		});
+
+		// Update button UI
+		const icon = document.getElementById('textStyleIcon');
+		const label = document.getElementById('textStyleLabel');
+		if (icon) {
+			icon.setAttribute('data-lucide', nextStyle.icon);
+			if (window.lucide) lucide.createIcons();
+		}
+		if (label) {
+			label.textContent = nextStyle.label;
+		}
+
+		// Update gizmo visual
+		const gizmo = document.querySelector(
+			`.overlay-gizmo[data-overlay-index="${index}"]`,
+		);
+		if (gizmo) {
+			const textEl = gizmo.querySelector('.overlay-gizmo-text');
+			if (textEl) {
+				textEl.style.fontWeight = nextStyle.bold ? 'bold' : 'normal';
+				textEl.style.fontStyle = nextStyle.italic ? 'italic' : 'normal';
+				textEl.style.textDecoration = nextStyle.underline ? 'underline' : 'none';
+			}
+		}
+
+		window.PreviewController?.renderPage(window.currentPreviewPage);
 	}
 
 	return {
 		showTextEditor,
 		closeTextEditor,
+		showRectangleEditor,
+		closeRectangleEditor,
+		updateRectangleBorderFade,
 		showLayerEditor,
 		toggleLayerTransparency,
 		updateLayerOpacity,
 		updateLayerText,
 		updateLayerColor,
+		updateLayerFontFamily,
+		updateLayerBold,
+		updateLayerItalic,
+		updateLayerUnderline,
+		updateLayerHighlight,
+		updateHighlightBlur,
+		updateTextBlur,
+		updateLetterSpacing,
+		convertBlurredTextToImage,
+		togglePagesPanel,
+		toggleBold,
+		toggleItalic,
+		toggleUnderline,
+		cycleTextStyle,
 	};
 })();
 
@@ -317,7 +956,7 @@ const LayerManager = (() => {
                 <div class="layer-icon">
                     <i data-lucide="${overlay.type === 'image' || overlay.type === 'signature' ? 'image' : 'type'}"></i>
                 </div>
-                <div class="layer-name">${displayLabel}</div>
+                <div class="layer-name">${displayLabel} <span style="opacity: 0.6; font-size: 11px; display: inline-flex; align-items: center; gap: 2px;"><i data-lucide="file" style="width: 10px; height: 10px;"></i>${(overlay.pageIndex || 0) + 1}</span></div>
                 <div class="layer-controls">
                     <button class="layer-btn" onclick="LayerManager.moveLayerUp(${index})" title="Move up" ${isFirst ? 'disabled' : ''}>
                         <i data-lucide="chevron-up" style="width: 10px; height: 10px;"></i>
@@ -362,8 +1001,8 @@ const LayerManager = (() => {
 		}
 
 		updateLayersList();
-		if (window.updateGizmosForPage) {
-			window.updateGizmosForPage(window.currentPreviewPage || 1);
+		if (window.PreviewController) {
+			window.PreviewController.updateGizmosForPage(window.currentPreviewPage || 1);
 		}
 	}
 
@@ -386,8 +1025,8 @@ const LayerManager = (() => {
 		}
 
 		updateLayersList();
-		if (window.updateGizmosForPage) {
-			window.updateGizmosForPage(window.currentPreviewPage || 1);
+		if (window.PreviewController) {
+			window.PreviewController.updateGizmosForPage(window.currentPreviewPage || 1);
 		}
 	}
 
@@ -396,6 +1035,29 @@ const LayerManager = (() => {
 
 const SelectionManager = (() => {
 	function selectOverlay(index) {
+		const overlay = AppState.getOverlay(index);
+		if (!overlay) return;
+
+		// Navigate to the page this overlay is on first
+		const overlayPageIndex = overlay.pageIndex || 0;
+		const overlayPageNumber = overlayPageIndex + 1;
+
+		// If overlay is on a different page, navigate to it first
+		if (window.currentPreviewPage !== overlayPageNumber) {
+			if (window.PreviewController) {
+				window.PreviewController.renderPage(overlayPageNumber).then(() => {
+					// After page is rendered, select the overlay
+					completeSelection(index, overlay);
+				});
+			} else {
+				completeSelection(index, overlay);
+			}
+		} else {
+			completeSelection(index, overlay);
+		}
+	}
+
+	function completeSelection(index, overlay) {
 		AppState.setSelectedIndex(index);
 		LayerManager.updateLayersList();
 
@@ -412,7 +1074,6 @@ const SelectionManager = (() => {
 			selectedGizmo.classList.add('selected');
 		}
 
-		const overlay = AppState.getOverlay(index);
 		if (overlay) {
 			UIControls.showLayerEditor(overlay, index);
 		}
@@ -436,3 +1097,6 @@ const SelectionManager = (() => {
 window.UIControls = UIControls;
 window.LayerManager = LayerManager;
 window.SelectionManager = SelectionManager;
+
+// Export togglePagesPanel as global function for onclick handler
+window.togglePagesPanel = UIControls.togglePagesPanel;

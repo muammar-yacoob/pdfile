@@ -76,3 +76,13 @@ const ShareModal = (() => {
 		init,
 	};
 })();
+
+// Export to global scope
+window.shareApp = ShareModal.show;
+window.closeShareModal = ShareModal.close;
+window.handleSocialShare = ShareModal.handleSocialShare;
+window.handleCopyLink = ShareModal.handleCopyLink;
+window.handleEmailShare = ShareModal.handleEmailShare;
+
+// Initialize
+ShareModal.init();
