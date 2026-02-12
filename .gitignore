@@ -7,11 +7,8 @@ node_modules/
 # Logs and test outputs
 *.log
 *.txt
-server-output.txt
-server.log
-test-results.txt
 
-# Test files in root
+# Test files
 test-*.js
 test-*.html
 test-*.ts
@@ -21,30 +18,33 @@ test-*.ts
 /*.jpg
 /*.jpeg
 
-# Documentation (keep only README, LICENSE, PRIVACY, CLAUDE)
-/COMPLETE_TEST_REPORT.md
-/FEATURE_STATUS.md
-/IMPROVEMENTS.md
-/MAIN_JS_REFACTORING.md
-/MIGRATION.md
-/REFACTORING.md
-/TESTING.md
-/TEST_REPORT.md
-/ZOOM_FIX_SUMMARY.md
-/ZOOM_TESTS_PASSED.md
+# Documentation (keep only README, LICENSE, PRIVACY, CLAUDE, THIRD_PARTY)
+/*.md
+!README.md
+!LICENSE.md
+!PRIVACY.md
+!CLAUDE.md
+!THIRD_PARTY_NOTICES.md
 
-# Editor
+# Editor & IDE
 *.*~
+.vscode/
+.idea/
+.taskmaster/
+
+# Dev/Test directories
+.playwright-mcp/
+test-fixtures/
+Demo/
+pdfile-web/
 
 # Legacy
 /libs
 /demo
-/Demo
-/pdfile-web
 
-# Promo - keep only Pdfile.png (the logo)
+# Promo - keep only profile.png (the logo)
 /Promo/*
-!/Promo/Pdfile.png
+!/Promo/profile.png
 
 # Lock files (npm only)
 bun.lock
@@ -53,6 +53,3 @@ pnpm-lock.yaml
 
 # Generated social media cards (regenerate with: npm run social-cards)
 social-cards/*.png
-
-# Test fixtures
-test-fixtures/
