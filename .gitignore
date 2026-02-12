@@ -4,27 +4,20 @@ dist/
 # Dependencies
 node_modules/
 
-# Logs and test outputs
+# Logs
 *.log
-*.txt
 
-# Test files
-test-*.js
-test-*.html
-test-*.ts
+# Config files
+.releaserc
+biome.json
+tsconfig.json
+tsup.config.ts
+desktop.ini
 
-# Screenshots and images in root
-/*.png
-/*.jpg
-/*.jpeg
-
-# Documentation (keep only README, LICENSE, PRIVACY, CLAUDE, THIRD_PARTY)
+# Documentation (keep only README, LICENSE, PRIVACY, THIRD_PARTY)
 /*.md
 !README.md
-!LICENSE.md
 !PRIVACY.md
-!CLAUDE.md
-!THIRD_PARTY_NOTICES.md
 
 # Editor & IDE
 *.*~
@@ -37,19 +30,17 @@ test-*.ts
 test-fixtures/
 Demo/
 pdfile-web/
+social-cards/
+
+# Promo directory (all ignored, logo is in src/imgs/)
+Promo/
 
 # Legacy
 /libs
 /demo
+/res
 
-# Promo - keep only profile.png (the logo)
-/Promo/*
-!/Promo/profile.png
-
-# Lock files (npm only)
+# Lock files
 bun.lock
 yarn.lock
 pnpm-lock.yaml
-
-# Generated social media cards (regenerate with: npm run social-cards)
-social-cards/*.png
